@@ -146,6 +146,7 @@ transports/extension
 # Jupyter
 .ipynb_checkpoints
 .autoversion
+Untitled*.ipynb
 !transports/extension/transports.json
 !transports/extension/install.json
 transports/nbextension
