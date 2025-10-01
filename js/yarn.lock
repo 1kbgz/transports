@@ -468,13 +468,13 @@ es-to-primitive@^1.2.1:
     is-date-object "^1.0.1"
     is-symbol "^1.0.2"
 
-esbuild-plugin-less@^1.3.25:
-  version "1.3.25"
-  resolved "https://registry.yarnpkg.com/esbuild-plugin-less/-/esbuild-plugin-less-1.3.25.tgz#8854bfeee215bbe6304786e412c2b9e9d0b6ca5b"
-  integrity sha512-K1lbEdjebX294VbOZjw38zChvGafoF5g3MZbY/P5yKo6jpEbxCniiULh9O4AUXjEWUe4vEBnfV/caVj2DWKprg==
+esbuild-plugin-less@^1.3.27:
+  version "1.3.27"
+  resolved "https://registry.yarnpkg.com/esbuild-plugin-less/-/esbuild-plugin-less-1.3.27.tgz#c08809ec8fecdb7ce42606e018028c657831c0ea"
+  integrity sha512-GRD29/F9jmXkEoUBzbXXEgK6MVvKCBQJFO+lBH/HOiHlP+UMsx0ePx/4qeHfpJNYZtGKMZa8/WEodj3xUIoPvg==
   dependencies:
     "@types/less" "^3.0.8"
-    less "^4.3.0"
+    less "^4.4.1"
 
 esbuild@^0.25.5:
   version "0.25.8"
@@ -920,10 +920,10 @@ junk@^4.0.1:
   resolved "https://registry.yarnpkg.com/junk/-/junk-4.0.1.tgz#7ee31f876388c05177fe36529ee714b07b50fbed"
   integrity sha512-Qush0uP+G8ZScpGMZvHUiRfI0YBWuB3gVBYlI0v0vvOJt5FLicco+IkP0a50LqTTQhmts/m6tP5SWE+USyIvcQ==
 
-less@^4.3.0:
-  version "4.4.0"
-  resolved "https://registry.yarnpkg.com/less/-/less-4.4.0.tgz#deaf881f4880ee80691beae925b8fac699d3a76d"
-  integrity sha512-kdTwsyRuncDfjEs0DlRILWNvxhDG/Zij4YLO4TMJgDLW+8OzpfkdPnRgrsRuY1o+oaxJGWsps5f/RVBgGmmN0w==
+less@^4.4.1:
+  version "4.4.1"
+  resolved "https://registry.yarnpkg.com/less/-/less-4.4.1.tgz#2f97168bf887ca6a9957ee69e16cc34f8b007cc7"
+  integrity sha512-X9HKyiXPi0f/ed0XhgUlBeFfxrlDP3xR4M7768Zl+WXLUViuL9AOPPJP4nCV0tgRWvTYvpNmN0SFhZOQzy16PA==
   dependencies:
     copy-anything "^2.0.1"
     parse-node-version "^1.0.1"
