@@ -11,8 +11,7 @@ crate-type = ["cdylib"]
 
 [dependencies]
 transports = { path = "./rust", version = "*" }
-pyo3 = { version = "0.26", features = ["abi3-py39", "extension-module", "multiple-pymethods"] }
-strum = "0.27.2"
+pyo3 = { version = "0.27.1", features = ["abi3-py39", "extension-module", "multiple-pymethods"] }
 
 [profile.release]
 panic = 'abort'
