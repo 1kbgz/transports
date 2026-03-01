@@ -522,10 +522,10 @@ es-to-primitive@^1.2.1:
     is-date-object "^1.0.1"
     is-symbol "^1.0.2"
 
-esbuild-plugin-less@^1.3.35:
-  version "1.3.35"
-  resolved "https://registry.yarnpkg.com/esbuild-plugin-less/-/esbuild-plugin-less-1.3.35.tgz#5b6bca9f09bfa39bf78080db699030a9d4ca600b"
-  integrity sha512-lD72cg2hAcnlaskipAzNoKrtX+072AxEuMGF20nJI/+Pyq2EguwwcZr7H9Pk56hz/v6XcImyALXPJPpt6soajQ==
+esbuild-plugin-less@^1.3.36:
+  version "1.3.36"
+  resolved "https://registry.yarnpkg.com/esbuild-plugin-less/-/esbuild-plugin-less-1.3.36.tgz#8b4f6c0649dab2d781655d797e0ba24c1ce63aa3"
+  integrity sha512-LwqW//mAPdJrmoGk9gKh7AvgIg4rDRKwHAIx0JDcRrNkJVTec8FAVU3ml/c/tvzp2dYq7iV9khYMDBbzamUjyg==
   dependencies:
     "@types/less" "^3.0.8"
     less "^4.5.1"
