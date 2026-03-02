@@ -168,10 +168,10 @@
   dependencies:
     playwright "1.58.2"
 
-"@prospective.co/procss@^0.1.17":
-  version "0.1.17"
-  resolved "https://registry.yarnpkg.com/@prospective.co/procss/-/procss-0.1.17.tgz#8df590face5cedeac68242e106f322bae34aebf3"
-  integrity sha512-jZCbEji9gTgJIJ41a0VQQV8GARUNKp9ils8/6347fbNkGBtA3cRwhQfRAxnqc0dhyo6pTSjMSflqop5ToIiSwQ==
+"@prospective.co/procss@^0.1.18":
+  version "0.1.18"
+  resolved "https://registry.yarnpkg.com/@prospective.co/procss/-/procss-0.1.18.tgz#2acf24d4c85365726b1b4a9ff5c1319fa004cb62"
+  integrity sha512-odl+Vd/Lm2XdkB223/eghsGS4A5x5q8D9f/vCei2Wb/ljyLCGFWvP7w4Dtglid9xpvDCpJZtogeZASLcitMxug==
 
 "@sindresorhus/merge-streams@^4.0.0":
   version "4.0.0"
