@@ -4,4 +4,23 @@ export * as wasm from "../../dist/pkg/transports";
 
 export const placeholder = "";
 
-export const foo = () => wasm.foo();
+/** Diff two JSON-encoded models, returning the JSON-encoded patch. */
+export const diff = (oldModel: string, newModel: string): string =>
+  wasm.diff(oldModel, newModel);
+
+/** Apply a JSON-encoded patch to a JSON-encoded model, returning the JSON-encoded result. */
+export const apply = (model: string, patch: string): string =>
+  wasm.apply(model, patch);
+
+/** Encode a JSON-encoded model to codec bytes. */
+export const encode = (model: string): Uint8Array => wasm.encode(model);
+
+/** Decode codec bytes back to a JSON-encoded model string. */
+export const decode = (bytes: Uint8Array): string => wasm.decode(bytes);
+
+/** In-process model store: host / mutate → patch / apply / snapshot. */
+export const Store = wasm.Store;
+
+// Plain JS object <-> core `Value` bridge (the JS analog of the Python bridge).
+export { toValue, fromValue } from "./bridge";
+export type { Value } from "./bridge";

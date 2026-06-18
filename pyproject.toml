@@ -33,14 +33,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "aiohttp",
-    "aiostream",
-    "bigbrother",
-    "orjson",
+    "bigbrother>=0.1.4",
+    "msgspec",
     "pydantic",
-    "starlette",
-    "uvicorn",
-    "websockets",
 ]
 
 [project.optional-dependencies]
@@ -214,3 +209,20 @@ section-order = [
     "F401",
     "F403",
 ]
+
+[tool.yardang]
+title = "transports"
+root = "README.md"
+pages = [
+    "docs/src/quickstart.md",
+    "docs/src/concepts.md",
+    "docs/src/bridges.md",
+    "docs/src/api.md",
+]
+exclude_patterns = [
+    "README.md",
+    "AGENTS.md",
+    "ROADMAP.md",
+    ".github",
+]
+use-autoapi = false
