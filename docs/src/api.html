@@ -256,6 +256,12 @@ extension).</p>
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="transports.Session.ids">
+<span class="sig-name descname"><span class="pre">ids</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.ids" title="Link to this definition">¶</a></dt>
+<dd><p>The ids of all hosted models.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="transports.Session.on_patch">
 <span class="sig-name descname"><span class="pre">on_patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.on_patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.on_patch" title="Link to this definition">¶</a></dt>
 <dd><p>Register a callback invoked as <cite>fn(model_id, patch)</cite> for each emitted patch.</p>
@@ -449,6 +455,7 @@ hosting.</p>
 <li><a class="reference internal" href="#session">Session</a><ul>
 <li><a class="reference internal" href="#transports.Session"><code class="docutils literal notranslate"><span class="pre">Session</span></code></a><ul>
 <li><a class="reference internal" href="#transports.Session.host"><code class="docutils literal notranslate"><span class="pre">Session.host()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Session.ids"><code class="docutils literal notranslate"><span class="pre">Session.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.on_patch"><code class="docutils literal notranslate"><span class="pre">Session.on_patch()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.flush"><code class="docutils literal notranslate"><span class="pre">Session.flush()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.update"><code class="docutils literal notranslate"><span class="pre">Session.update()</span></code></a></li>
