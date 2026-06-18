@@ -39,6 +39,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# WebSocket connection adapters (Starlette server, websockets client)
+connections = [
+    "starlette",
+    "websockets",
+]
 develop = [
     "build",
     "bump-my-version",
@@ -48,12 +53,15 @@ develop = [
     "hatch-js",
     "hatch-rs",
     "hatchling",
+    "httpx",
     "mdformat",
     "mdformat-tables>=1",
     "pytest",
     "pytest-cov",
     "ruff",
+    "starlette",
     "twine",
+    "websockets",
     "ty",
     "uv",
     "wheel",
