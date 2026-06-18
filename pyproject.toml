@@ -225,6 +225,8 @@ pages = [
     "docs/src/quickstart.md",
     "docs/src/concepts.md",
     "docs/src/bridges.md",
+    "docs/src/connections.md",
+    "docs/src/codecs.md",
     "docs/src/api.md",
 ]
 exclude_patterns = [

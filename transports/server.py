@@ -17,6 +17,10 @@ from .session import Session
 
 
 class Server:
+    """Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and
+    relays a client's patches to the other clients (a hub). Transport-agnostic — its methods return
+    the messages to send; an adapter such as `starlette_endpoint` performs the I/O."""
+
     def __init__(self, session: Session) -> None:
         self._session = session
         self._conns: set = set()
