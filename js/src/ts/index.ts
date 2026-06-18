@@ -18,6 +18,14 @@ export const encode = (model: string): Uint8Array => wasm.encode(model);
 /** Decode codec bytes back to a JSON-encoded model string. */
 export const decode = (bytes: Uint8Array): string => wasm.decode(bytes);
 
+/** Encode a JSON-encoded model with the codec named by `codec` (e.g. "application/msgpack"). */
+export const encodeAs = (model: string, codec: string): Uint8Array =>
+  wasm.encode_as(model, codec);
+
+/** Decode bytes (from `codec`'s codec) back to a JSON-encoded model string. */
+export const decodeAs = (bytes: Uint8Array, codec: string): string =>
+  wasm.decode_as(bytes, codec);
+
 /** In-process model store: host / mutate → patch / apply / snapshot. */
 export const Store = wasm.Store;
 

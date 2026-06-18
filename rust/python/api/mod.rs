@@ -30,6 +30,19 @@ pub fn decode(data: &[u8]) -> PyResult<String> {
     transports::decode_json(data).map_err(PyValueError::new_err)
 }
 
+/// Encode a JSON-encoded model with the codec named by `codec` (e.g. `"application/msgpack"`).
+#[pyfunction]
+pub fn encode_as<'py>(py: Python<'py>, value: &str, codec: &str) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = transports::encode_as(value, codec).map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &bytes))
+}
+
+/// Decode bytes (produced by `codec`'s codec) back to a JSON-encoded model string.
+#[pyfunction]
+pub fn decode_as(data: &[u8], codec: &str) -> PyResult<String> {
+    transports::decode_as(data, codec).map_err(PyValueError::new_err)
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

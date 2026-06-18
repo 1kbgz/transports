@@ -27,6 +27,18 @@ pub fn decode(data: &[u8]) -> Result<String, JsError> {
     transports::decode_json(data).map_err(|e| JsError::new(&e))
 }
 
+/// Encode a JSON-encoded model with the codec named by `codec` (e.g. `"application/msgpack"`).
+#[wasm_bindgen]
+pub fn encode_as(value: &str, codec: &str) -> Result<Vec<u8>, JsError> {
+    transports::encode_as(value, codec).map_err(|e| JsError::new(&e))
+}
+
+/// Decode bytes (produced by `codec`'s codec) back to a JSON-encoded model string.
+#[wasm_bindgen]
+pub fn decode_as(data: &[u8], codec: &str) -> Result<String, JsError> {
+    transports::decode_as(data, codec).map_err(|e| JsError::new(&e))
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[wasm_bindgen]
 pub struct Store {
