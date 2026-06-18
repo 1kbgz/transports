@@ -24,3 +24,6 @@ export const Store = wasm.Store;
 // Plain JS object <-> core `Value` bridge (the JS analog of the Python bridge).
 export { toValue, fromValue } from "./bridge";
 export type { Value } from "./bridge";
+
+// WebSocket client that mirrors a remote Session.
+export { Client } from "./client";

@@ -1,4 +1,11 @@
-import { placeholder, diff, apply, toValue, fromValue } from "../src/ts/index";
+import {
+  placeholder,
+  diff,
+  apply,
+  toValue,
+  fromValue,
+  Client,
+} from "../src/ts/index";
 import { initSync } from "../dist/pkg/transports";
 import fs from "fs";
 import { test, expect } from "@playwright/test";
@@ -22,4 +29,28 @@ test("diff/apply via the wasm core", async () => {
   const b = JSON.stringify(toValue({ on: true }));
   const patch = diff(a, b);
   expect(JSON.parse(apply(a, patch))).toEqual(JSON.parse(b));
+});
+
+test("Client mirrors a snapshot then a patch", async () => {
+  const c = new Client();
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 0,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  c.recv(
+    JSON.stringify({
+      t: "patch",
+      id: 1,
+      patch: {
+        rev: 1,
+        ops: [{ Set: { path: [{ Key: "on" }], value: { Bool: true } } }],
+      },
+    }),
+  );
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
