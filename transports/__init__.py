@@ -3,7 +3,7 @@ from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .client import Client
 from .server import Server, autoflush, starlette_endpoint
 from .session import Session
-from .transports import Store, apply, decode, diff, encode  # compiled Rust extension (rust/python)
+from .transports import Store, apply, decode, decode_as, diff, encode, encode_as  # compiled Rust extension (rust/python)
 
 __version__ = "0.1.2"
 
@@ -13,8 +13,10 @@ __all__ = [
     "Store",
     "apply",
     "decode",
+    "decode_as",
     "diff",
     "encode",
+    "encode_as",
     # model bridge + reactive session (high-level)
     "Session",
     "to_value",

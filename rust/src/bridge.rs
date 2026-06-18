@@ -5,7 +5,7 @@
 //! This is the concrete "one core, two bindings": a patch produced by [`diff_json`] in Python is
 //! consumed by [`apply_json`] in the browser using the same Rust.
 
-use crate::codec::{Codec, JsonCodec};
+use crate::codec::{codec_for, Codec, JsonCodec};
 use crate::diff::{apply, diff, Patch};
 use crate::store::Store;
 use crate::value::{ModelId, Value};
@@ -34,6 +34,21 @@ pub fn encode_json(value: &str) -> Result<Vec<u8>, String> {
 /// Decode codec bytes back to a JSON-encoded model string.
 pub fn decode_json(bytes: &[u8]) -> Result<String, String> {
     let value = JsonCodec.decode_value(bytes).map_err(|e| e.to_string())?;
+    serde_json::to_string(&value).map_err(|e| e.to_string())
+}
+
+/// Encode a JSON-encoded model to bytes using the codec named by `content_type`
+/// (`"application/json"`, `"application/msgpack"`, ...).
+pub fn encode_as(value: &str, content_type: &str) -> Result<Vec<u8>, String> {
+    let value: Value = serde_json::from_str(value).map_err(|e| e.to_string())?;
+    let codec = codec_for(content_type).ok_or_else(|| format!("unknown codec: {content_type}"))?;
+    Ok(codec.encode_value(&value))
+}
+
+/// Decode codec bytes (produced by `content_type`'s codec) back to a JSON-encoded model string.
+pub fn decode_as(bytes: &[u8], content_type: &str) -> Result<String, String> {
+    let codec = codec_for(content_type).ok_or_else(|| format!("unknown codec: {content_type}"))?;
+    let value = codec.decode_value(bytes).map_err(|e| e.to_string())?;
     serde_json::to_string(&value).map_err(|e| e.to_string())
 }
 
