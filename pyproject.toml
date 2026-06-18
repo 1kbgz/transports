@@ -33,7 +33,9 @@ classifiers = [
 ]
 
 dependencies = [
-    "bigbrother",
+    # TODO: revert to "bigbrother" once the dataclass-watching fix (merged to bigbrother main)
+    # is released to PyPI; the published 0.1.3 lacks it and breaks dataclass/msgspec hosting.
+    "bigbrother @ git+https://github.com/timkpaine/bigbrother@cd31128e2aa9ba45b9a3a30e34cd6cb4def1e2a6",
     "msgspec",
     "pydantic",
 ]
@@ -137,6 +139,10 @@ exclude_also = [
 ]
 ignore_errors = true
 fail_under = 50
+
+[tool.hatch.metadata]
+# allow the temporary git pin of bigbrother above (revert when bigbrother is released)
+allow-direct-references = true
 
 [tool.hatch.build.hooks.hatch-js]
 path = "js"
