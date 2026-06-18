@@ -40,6 +40,10 @@ class Session:
         self._models[mid] = watch(model, _watcher, deepstate=True)
         return mid
 
+    def ids(self) -> List[int]:
+        """The ids of all hosted models."""
+        return list(self._models.keys())
+
     def on_patch(self, fn: Callable[[int, dict], None]) -> None:
         """Register a callback invoked as `fn(model_id, patch)` for each emitted patch."""
         self._on_patch = fn
