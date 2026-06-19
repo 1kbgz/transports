@@ -51,3 +51,39 @@ The server encodes every outbound message in *that* connection's codec and decod
 type, so a MessagePack client's edit is transparently relayed to a JSON client and vice versa — see
 [Connections](connections.md). Whole protocol messages (not just model values) are converted with
 `json_to_msgpack` / `msgpack_to_json` (`jsonToMsgpack` / `msgpackToJson` in JavaScript).
+
+## Registering your own codec
+
+Beyond the built-ins, you can register a codec under any content type. A codec is just a pair of
+functions over a JSON-able object — a protocol message or a model `Value`:
+
+```python
+import transports
+
+transports.register_codec(
+    "application/protobuf",
+    encode=lambda obj: my_proto_encode(obj),   # object -> bytes (or str)
+    decode=lambda data: my_proto_decode(data),  # bytes (or str) -> object
+)
+```
+
+Once registered, the content type works anywhere a codec name is accepted — `Client(codec=...)`, a
+`?codec=` query param, and {py:func}`~transports.encode_as` / {py:func}`~transports.decode_as`. A
+codec returning `bytes` travels as a binary frame; returning `str` travels as a text frame. The
+built-in `json` / `msgpack` codecs cannot be overridden.
+
+Register the matching implementation in every binding that participates. JavaScript has its own
+`registerCodec`:
+
+```javascript
+import { registerCodec, Client } from "transports";
+
+registerCodec("application/protobuf", encode, decode);
+new Client("application/protobuf").connect("ws://localhost:8000/ws");
+```
+
+```{note}
+JSON and MessagePack are *self-describing*, so they encode the dynamic `Value` with no schema.
+Schema-driven formats such as Protobuf or FlatBuffers need a descriptor per model — your `encode` /
+`decode` are where that mapping lives.
+```

@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Concepts" href="concepts.html"><link rel="prev" title="transports" href="../../index.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API Reference" href="api.html"><link rel="prev" title="Codecs" href="codecs.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Quickstart - transports v0.2.0</title>
+        <title>Multi-tenancy &amp; sharing - transports v0.2.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -197,12 +197,12 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
 <li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Multi-tenancy &amp; sharing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
@@ -224,7 +224,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../../_sources/docs/src/quickstart.md.txt" title="View this page">
+  <a class="muted-link" href="../../_sources/docs/src/multitenancy.md.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -242,82 +242,85 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="quickstart">
-<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">¶</a></h1>
-<section id="install">
-<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
-</pre></div>
-</div>
-</section>
-<section id="host-a-model-and-react-to-changes">
-<h2>Host a model and react to changes<a class="headerlink" href="#host-a-model-and-react-to-changes" title="Link to this heading">¶</a></h2>
-<p>A <a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a> hosts models and turns their mutations into incremental patches.</p>
+          <section class="tex2jax_ignore mathjax_ignore" id="multi-tenancy-sharing">
+<h1>Multi-tenancy &amp; sharing<a class="headerlink" href="#multi-tenancy-sharing" title="Link to this heading">¶</a></h1>
+<p>A single process often serves many independent tenants, and some data is <strong>shared</strong> between them. A
+<a class="reference internal" href="api.html#transports.Hub" title="transports.Hub"><code class="xref py py-class docutils literal notranslate"><span class="pre">Hub</span></code></a> handles both: it routes each connection to its tenant and lets any number
+of tenants subscribe to a shared data structure.</p>
+<section id="tenants">
+<h2>Tenants<a class="headerlink" href="#tenants" title="Link to this heading">¶</a></h2>
+<p>Each tenant’s models live in their own <a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a>, so tenants are fully
+isolated — one tenant never sees another’s models. The <code class="docutils literal notranslate"><span class="pre">Hub</span></code> maps a connection to a tenant with a
+<code class="docutils literal notranslate"><span class="pre">key</span></code> function you provide:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
 
-<span class="k">class</span><span class="w"> </span><span class="nc">Device</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">&quot;tenant&quot;</span><span class="p">])</span>
 
-<span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
-<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>        <span class="c1"># registers the schema, stores the value, watches the model</span>
-
-<span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>                  <span class="c1"># mutate normally — no .send(), no manual diff</span>
-<span class="n">patches</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>       <span class="c1"># -&gt; [(mid, {&#39;rev&#39;: 1, &#39;ops&#39;: [...]})]</span>
+<span class="c1"># a tenant&#39;s private models</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="s2">&quot;alice&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;notes&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">drain()</span></code> returns (and clears) every patch accumulated since the last drain. Each patch is the
-<strong>minimal</strong> set of operations — flipping <code class="docutils literal notranslate"><span class="pre">on</span></code> produces a single <code class="docutils literal notranslate"><span class="pre">Set</span></code>, not a whole-model resend.</p>
+<p>A connection only ever receives its own tenant’s private models (plus any shared models it
+subscribes to), and a private edit is relayed only to that tenant’s other connections.</p>
 </section>
-<section id="patches-coalesce">
-<h2>Patches coalesce<a class="headerlink" href="#patches-coalesce" title="Link to this heading">¶</a></h2>
-<p>Emission is deferred to a flush (triggered by <code class="docutils literal notranslate"><span class="pre">drain()</span></code>, <code class="docutils literal notranslate"><span class="pre">snapshot()</span></code>, or an explicit <code class="docutils literal notranslate"><span class="pre">flush()</span></code>), so
-several writes between flushes collapse into one patch:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">False</span>
-<span class="n">lamp</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;desk lamp&quot;</span>
-<span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>   <span class="c1"># one patch, two ops</span>
+<section id="shared-data-structures">
+<h2>Shared data structures<a class="headerlink" href="#shared-data-structures" title="Link to this heading">¶</a></h2>
+<p>A <strong>shared</strong> model’s authoritative state lives in the hub. Register it with <code class="docutils literal notranslate"><span class="pre">share()</span></code>, then connect
+tenants to it with <code class="docutils literal notranslate"><span class="pre">subscribe()</span></code> and an access mode — <code class="docutils literal notranslate"><span class="pre">READ</span></code> or <code class="docutils literal notranslate"><span class="pre">WRITE</span></code>. The sharing shape is just
+the set of subscriptions:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">READ</span><span class="p">,</span> <span class="n">WRITE</span>
+
+<span class="n">doc</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;roadmap&quot;</span><span class="p">))</span>   <span class="c1"># returns a shared id</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span> <span class="n">doc</span><span class="p">,</span> <span class="n">WRITE</span><span class="p">)</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;bob&quot;</span><span class="p">,</span> <span class="n">doc</span><span class="p">,</span> <span class="n">READ</span><span class="p">)</span>              <span class="c1"># bob mirrors it but cannot write</span>
 </pre></div>
 </div>
+<ul class="simple">
+<li><p><strong>One model, many readers</strong> — subscribe many tenants <code class="docutils literal notranslate"><span class="pre">READ</span></code> (broadcast / fan-out).</p></li>
+<li><p><strong>Many writers, one model</strong> — subscribe many tenants <code class="docutils literal notranslate"><span class="pre">WRITE</span></code> (collaborative editing).</p></li>
+<li><p><strong>Many models, many tenants</strong> — any mix of the above; each connection receives exactly the models
+it subscribes to.</p></li>
+</ul>
+<p>Shared models are <strong>server-authoritative</strong>: a writer sends its edit and receives the reconciled
+patch back, and every subscriber is kept in sync. Write to a shared model from the host side with
+<code class="docutils literal notranslate"><span class="pre">set_shared(id,</span> <span class="pre">value)</span></code>; the change is broadcast on the next flush.</p>
 </section>
-<section id="mirror-a-model">
-<h2>Mirror a model<a class="headerlink" href="#mirror-a-model" title="Link to this heading">¶</a></h2>
-<p>Patches are portable: apply them to a copy of the model hosted elsewhere (here, a second in-process
-session; in a real app the patch travels over a connection).</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
-<span class="n">sid</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
+<section id="reconciling-concurrent-writes">
+<h2>Reconciling concurrent writes<a class="headerlink" href="#reconciling-concurrent-writes" title="Link to this heading">¶</a></h2>
+<p>When several tenants write the same shared model, a <a class="reference internal" href="api.html#transports.MergeStrategy" title="transports.MergeStrategy"><code class="xref py py-class docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a> decides how
+the writes combine. Pass one per shared model:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">LastWriteWins</span><span class="p">,</span> <span class="n">LwwMapCrdt</span>
 
-<span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">mirror</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">server</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">sid</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span> <span class="n">Device</span><span class="p">)</span>
-<span class="n">cid</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">mirror</span><span class="p">)</span>
-
-<span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="k">for</span> <span class="n">_mid</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">drain</span><span class="p">():</span>
-    <span class="n">client</span><span class="o">.</span><span class="n">apply_patch</span><span class="p">(</span><span class="n">cid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span>
-
-<span class="k">assert</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">value</span><span class="p">(</span><span class="n">cid</span><span class="p">),</span> <span class="n">Device</span><span class="p">)</span><span class="o">.</span><span class="n">on</span> <span class="ow">is</span> <span class="kc">True</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(),</span> <span class="n">merge</span><span class="o">=</span><span class="n">LastWriteWins</span><span class="p">)</span>   <span class="c1"># default: apply writes in arrival order</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(),</span> <span class="n">merge</span><span class="o">=</span><span class="n">LwwMapCrdt</span><span class="p">)</span>      <span class="c1"># conflict-free per-field resolution</span>
 </pre></div>
 </div>
+<ul class="simple">
+<li><p><a class="reference internal" href="api.html#transports.LastWriteWins" title="transports.LastWriteWins"><code class="xref py py-class docutils literal notranslate"><span class="pre">LastWriteWins</span></code></a> (the default) applies each write as it arrives.</p></li>
+<li><p><a class="reference internal" href="api.html#transports.LwwMapCrdt" title="transports.LwwMapCrdt"><code class="xref py py-class docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code></a> resolves per top-level field: concurrent edits to <em>different</em>
+fields both survive, and conflicting edits to the <em>same</em> field converge to the same value
+regardless of the order the writes arrive in.</p></li>
+</ul>
+<p>To plug in your own reconciliation, implement <code class="docutils literal notranslate"><span class="pre">merge(current,</span> <span class="pre">patch,</span> <span class="pre">origin)</span> <span class="pre">-&gt;</span> <span class="pre">value</span></code> and pass the
+class to <code class="docutils literal notranslate"><span class="pre">share(merge=...)</span></code>.</p>
 </section>
-<section id="any-model-kind">
-<h2>Any model kind<a class="headerlink" href="#any-model-kind" title="Link to this heading">¶</a></h2>
-<p>The same API works for dataclasses and msgspec structs — see <a class="reference internal" href="bridges.html"><span class="std std-doc">Model bridges</span></a>.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<section id="serving-it">
+<h2>Serving it<a class="headerlink" href="#serving-it" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Hub.endpoint()</span></code> adapts the hub to a Starlette WebSocket route, reusing the same per-connection
+<a class="reference internal" href="codecs.html"><span class="std std-doc">codec negotiation</span></a> as a single-tenant server. Run one
+<a class="reference internal" href="api.html#transports.autoflush" title="transports.autoflush"><code class="xref py py-func docutils literal notranslate"><span class="pre">autoflush()</span></code></a> task to stream host-side changes to every connection.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">starlette.applications</span><span class="w"> </span><span class="kn">import</span> <span class="n">Starlette</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketRoute</span>
 
-<span class="nd">@dataclass</span>
-<span class="k">class</span><span class="w"> </span><span class="nc">Reading</span><span class="p">:</span>
-    <span class="n">sensor</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
-
-<span class="n">s</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">r</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
-<span class="n">s</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
-<span class="n">r</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mf">21.5</span>
-<span class="n">s</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>   <span class="c1"># [(mid, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;value&#39;}], &#39;value&#39;: {&#39;Float&#39;: 21.5}}}]})]</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hub</span><span class="o">.</span><span class="n">endpoint</span><span class="p">())],</span>
+    <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="k">lambda</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">hub</span><span class="p">))],</span>
+<span class="p">)</span>
 </pre></div>
 </div>
+<p>On the client side nothing changes — a <a class="reference internal" href="api.html#transports.Client" title="transports.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">Client</span></code></a> mirrors whatever models the
+hub sends it, private or shared.</p>
 </section>
 </section>
 
@@ -326,23 +329,23 @@ session; in a real app the patch travels over a connection).</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="concepts.html">
+          <a class="next-page" href="api.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Concepts</div>
+                <div class="title">API Reference</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="../../index.html">
+          <a class="prev-page" href="codecs.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Home</div>
+                <div class="title">Codecs</div>
                 
               </div>
             </a>
@@ -376,12 +379,11 @@ session; in a real app the patch travels over a connection).</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Quickstart</a><ul>
-<li><a class="reference internal" href="#install">Install</a></li>
-<li><a class="reference internal" href="#host-a-model-and-react-to-changes">Host a model and react to changes</a></li>
-<li><a class="reference internal" href="#patches-coalesce">Patches coalesce</a></li>
-<li><a class="reference internal" href="#mirror-a-model">Mirror a model</a></li>
-<li><a class="reference internal" href="#any-model-kind">Any model kind</a></li>
+<li><a class="reference internal" href="#">Multi-tenancy &amp; sharing</a><ul>
+<li><a class="reference internal" href="#tenants">Tenants</a></li>
+<li><a class="reference internal" href="#shared-data-structures">Shared data structures</a></li>
+<li><a class="reference internal" href="#reconciling-concurrent-writes">Reconciling concurrent writes</a></li>
+<li><a class="reference internal" href="#serving-it">Serving it</a></li>
 </ul>
 </li>
 </ul>

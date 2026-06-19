@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API Reference" href="api.html"><link rel="prev" title="Connections" href="connections.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Multi-tenancy &amp; sharing" href="multitenancy.html"><link rel="prev" title="Connections" href="connections.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>Codecs - transports v0.2.0</title>
@@ -202,6 +202,7 @@
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
@@ -303,6 +304,38 @@ type, so a MessagePack client’s edit is transparently relayed to a JSON client
 <a class="reference internal" href="connections.html"><span class="std std-doc">Connections</span></a>. Whole protocol messages (not just model values) are converted with
 <code class="docutils literal notranslate"><span class="pre">json_to_msgpack</span></code> / <code class="docutils literal notranslate"><span class="pre">msgpack_to_json</span></code> (<code class="docutils literal notranslate"><span class="pre">jsonToMsgpack</span></code> / <code class="docutils literal notranslate"><span class="pre">msgpackToJson</span></code> in JavaScript).</p>
 </section>
+<section id="registering-your-own-codec">
+<h2>Registering your own codec<a class="headerlink" href="#registering-your-own-codec" title="Link to this heading">¶</a></h2>
+<p>Beyond the built-ins, you can register a codec under any content type. A codec is just a pair of
+functions over a JSON-able object — a protocol message or a model <code class="docutils literal notranslate"><span class="pre">Value</span></code>:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
+
+<span class="n">transports</span><span class="o">.</span><span class="n">register_codec</span><span class="p">(</span>
+    <span class="s2">&quot;application/protobuf&quot;</span><span class="p">,</span>
+    <span class="n">encode</span><span class="o">=</span><span class="k">lambda</span> <span class="n">obj</span><span class="p">:</span> <span class="n">my_proto_encode</span><span class="p">(</span><span class="n">obj</span><span class="p">),</span>   <span class="c1"># object -&gt; bytes (or str)</span>
+    <span class="n">decode</span><span class="o">=</span><span class="k">lambda</span> <span class="n">data</span><span class="p">:</span> <span class="n">my_proto_decode</span><span class="p">(</span><span class="n">data</span><span class="p">),</span>  <span class="c1"># bytes (or str) -&gt; object</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>Once registered, the content type works anywhere a codec name is accepted — <code class="docutils literal notranslate"><span class="pre">Client(codec=...)</span></code>, a
+<code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param, and <a class="reference internal" href="api.html#transports.encode_as" title="transports.encode_as"><code class="xref py py-func docutils literal notranslate"><span class="pre">encode_as()</span></code></a> / <a class="reference internal" href="api.html#transports.decode_as" title="transports.decode_as"><code class="xref py py-func docutils literal notranslate"><span class="pre">decode_as()</span></code></a>. A
+codec returning <code class="docutils literal notranslate"><span class="pre">bytes</span></code> travels as a binary frame; returning <code class="docutils literal notranslate"><span class="pre">str</span></code> travels as a text frame. The
+built-in <code class="docutils literal notranslate"><span class="pre">json</span></code> / <code class="docutils literal notranslate"><span class="pre">msgpack</span></code> codecs cannot be overridden.</p>
+<p>Register the matching implementation in every binding that participates. JavaScript has its own
+<code class="docutils literal notranslate"><span class="pre">registerCodec</span></code>:</p>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">registerCodec</span><span class="p">,</span><span class="w"> </span><span class="nx">Client</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+
+<span class="nx">registerCodec</span><span class="p">(</span><span class="s2">&quot;application/protobuf&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">encode</span><span class="p">,</span><span class="w"> </span><span class="nx">decode</span><span class="p">);</span>
+<span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">&quot;application/protobuf&quot;</span><span class="p">).</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>JSON and MessagePack are <em>self-describing</em>, so they encode the dynamic <code class="docutils literal notranslate"><span class="pre">Value</span></code> with no schema.
+Schema-driven formats such as Protobuf or FlatBuffers need a descriptor per model — your <code class="docutils literal notranslate"><span class="pre">encode</span></code> /
+<code class="docutils literal notranslate"><span class="pre">decode</span></code> are where that mapping lives.</p>
+</div>
+</section>
 </section>
 
         </article>
@@ -310,12 +343,12 @@ type, so a MessagePack client’s edit is transparently relayed to a JSON client
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="api.html">
+          <a class="next-page" href="multitenancy.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">API Reference</div>
+                <div class="title">Multi-tenancy &amp; sharing</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -363,6 +396,7 @@ type, so a MessagePack client’s edit is transparently relayed to a JSON client
 <li><a class="reference internal" href="#">Codecs</a><ul>
 <li><a class="reference internal" href="#encoding">Encoding</a></li>
 <li><a class="reference internal" href="#on-a-connection">On a connection</a></li>
+<li><a class="reference internal" href="#registering-your-own-codec">Registering your own codec</a></li>
 </ul>
 </li>
 </ul>

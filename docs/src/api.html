@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Codecs" href="codecs.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Multi-tenancy &amp; sharing" href="multitenancy.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>API Reference - transports v0.2.0</title>
@@ -202,6 +202,7 @@
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
 <li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
 </ul>
 
@@ -437,9 +438,111 @@ background task to stream server-side model changes to clients.</p>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.autoflush">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">autoflush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Server" title="transports.server.Server"><span class="pre">Server</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#autoflush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.autoflush" title="Link to this definition">¶</a></dt>
-<dd><p>Background task: periodically flush the session and broadcast patches to all connections.</p>
-<p>Run exactly one of these per <cite>Server</cite> (not per connection), so a single drain feeds every client.</p>
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">autoflush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#autoflush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.autoflush" title="Link to this definition">¶</a></dt>
+<dd><p>Background task: periodically flush and broadcast patches to all connections.</p>
+<p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
+client.</p>
+</dd></dl>
+
+</section>
+<section id="multi-tenancy-sharing">
+<h2>Multi-tenancy &amp; sharing<a class="headerlink" href="#multi-tenancy-sharing" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.Hub">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Hub</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Route connections to per-tenant <cite>Session</cite> objects and fan shared data structures to subscribers.</p>
+<p>Construct with <cite>key</cite>, a function mapping a connection handle to its tenant key. Register shared
+models with <cite>share()</cite> and connect tenants to them with <cite>subscribe()</cite>. Like <cite>Server</cite>, the methods
+return the messages to send keyed by connection; <cite>endpoint()</cite> performs the I/O over Starlette.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.tenant">
+<span class="sig-name descname"><span class="pre">tenant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.tenant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.tenant" title="Link to this definition">¶</a></dt>
+<dd><p>Get (or create) the <cite>Session</cite> holding a tenant’s private models.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.share">
+<span class="sig-name descname"><span class="pre">share</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_or_value:</span> <span class="pre">~typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge:</span> <span class="pre">~typing.Any</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'transports.hub.LastWriteWins'&gt;</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.share"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.share" title="Link to this definition">¶</a></dt>
+<dd><p>Register a shared data structure; returns its shared id.</p>
+<p>Pass a model instance (pydantic/dataclass/msgspec) to capture its value and type name, or a
+core <cite>Value</cite> dict together with <cite>type_name</cite>. <cite>merge</cite> is a <cite>MergeStrategy</cite> subclass (each
+shared model gets its own instance) or an instance to reuse.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.subscribe">
+<span class="sig-name descname"><span class="pre">subscribe</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">tenant_key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'read'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.subscribe"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.subscribe" title="Link to this definition">¶</a></dt>
+<dd><p>Subscribe a tenant to a shared model with <cite>READ</cite> or <cite>WRITE</cite> access.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.open">
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.open" title="Link to this definition">¶</a></dt>
+<dd><p>Register a connection; returns the snapshots of its tenant’s private + subscribed shared models.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.recv">
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.recv" title="Link to this definition">¶</a></dt>
+<dd><p>Handle an inbound patch; returns messages to send, keyed by connection.</p>
+<p>A patch to a private model is applied to the tenant’s session and relayed to that tenant’s
+<em>other</em> connections. A patch to a shared model (from a <cite>WRITE</cite> subscriber) is merged into the
+authoritative value and the resulting patch is broadcast to every subscriber connection.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.flush">
+<span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.flush" title="Link to this definition">¶</a></dt>
+<dd><p>Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.set_shared">
+<span class="sig-name descname"><span class="pre">set_shared</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_value_or_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.set_shared"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.set_shared" title="Link to this definition">¶</a></dt>
+<dd><p>Write to a shared model from the host side; the change is broadcast on the next <cite>flush()</cite>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.close" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.endpoint">
+<span class="sig-name descname"><span class="pre">endpoint</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.endpoint" title="Link to this definition">¶</a></dt>
+<dd><p>Build a Starlette WebSocket endpoint that serves this hub (tenant from <cite>key(websocket)</cite>).</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.MergeStrategy">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">MergeStrategy</span></span><a class="reference internal" href="../../_modules/transports/hub.html#MergeStrategy"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.MergeStrategy" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>How a write to a shared model is reconciled into its authoritative value.</p>
+<p><cite>merge(current, patch, origin)</cite> returns the new core <cite>Value</cite>. Implementations may be stateful;
+pass the <strong>class</strong> (not an instance) to <cite>Hub.share(merge=…)</cite> so each shared model gets its own
+instance and its own state.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.LastWriteWins">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">LastWriteWins</span></span><a class="reference internal" href="../../_modules/transports/hub.html#LastWriteWins"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.LastWriteWins" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#transports.MergeStrategy" title="transports.hub.MergeStrategy"><code class="xref py py-class docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a></p>
+<p>Apply each write in arrival order (today’s <cite>Store</cite> semantics). Order-dependent.</p>
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.LwwMapCrdt">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">LwwMapCrdt</span></span><a class="reference internal" href="../../_modules/transports/hub.html#LwwMapCrdt"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.LwwMapCrdt" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <a class="reference internal" href="#transports.MergeStrategy" title="transports.hub.MergeStrategy"><code class="xref py py-class docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a></p>
+<p>Conflict-free per-top-level-key last-writer-wins register map.</p>
+<p>Each top-level map key carries a logical stamp <cite>(patch rev, origin)</cite>; a key’s write is accepted
+only if its stamp is at least the stored one. Two consequences: concurrent edits to <em>different</em>
+keys both survive, and conflicting edits to the <em>same</em> key converge to the same value regardless
+of the order the hub happens to receive them in (the stamp is intrinsic to the write, not its
+arrival order). Nested or list ops fall back to a direct apply, stamped by their top-level key.</p>
 </dd></dl>
 
 </section>
@@ -536,14 +639,14 @@ hosting.</p>
         
         <div class="related-pages">
           
-          <a class="prev-page" href="codecs.html">
+          <a class="prev-page" href="multitenancy.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Codecs</div>
+                <div class="title">Multi-tenancy &amp; sharing</div>
                 
               </div>
             </a>
@@ -620,6 +723,24 @@ hosting.</p>
 </li>
 <li><a class="reference internal" href="#transports.starlette_endpoint"><code class="docutils literal notranslate"><span class="pre">starlette_endpoint()</span></code></a></li>
 <li><a class="reference internal" href="#transports.autoflush"><code class="docutils literal notranslate"><span class="pre">autoflush()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#multi-tenancy-sharing">Multi-tenancy &amp; sharing</a><ul>
+<li><a class="reference internal" href="#transports.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Hub.tenant"><code class="docutils literal notranslate"><span class="pre">Hub.tenant()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.share"><code class="docutils literal notranslate"><span class="pre">Hub.share()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.subscribe"><code class="docutils literal notranslate"><span class="pre">Hub.subscribe()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.open"><code class="docutils literal notranslate"><span class="pre">Hub.open()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.recv"><code class="docutils literal notranslate"><span class="pre">Hub.recv()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.set_shared"><code class="docutils literal notranslate"><span class="pre">Hub.set_shared()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.close"><code class="docutils literal notranslate"><span class="pre">Hub.close()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Hub.endpoint"><code class="docutils literal notranslate"><span class="pre">Hub.endpoint()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#transports.MergeStrategy"><code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a></li>
+<li><a class="reference internal" href="#transports.LastWriteWins"><code class="docutils literal notranslate"><span class="pre">LastWriteWins</span></code></a></li>
+<li><a class="reference internal" href="#transports.LwwMapCrdt"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#core">Core</a><ul>
