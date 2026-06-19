@@ -80,6 +80,96 @@ def test_flush_without_connections_is_empty():
     assert server.flush() == {}
 
 
+# --- codec negotiation ---------------------------------------------------------------------------
+
+
+def test_msgpack_connection_mirrors_with_binary_frames():
+    session = Session()
+    server = Server(session)
+    client = Client(codec="msgpack")
+    d = Device(name="lamp")
+    mid = session.host(d)
+
+    snaps = server.open("c1", codec="msgpack")
+    assert all(isinstance(m, bytes) for m in snaps)  # binary frames over the wire
+    for m in snaps:
+        client.recv(m)
+    assert client.model(mid, Device) == d
+
+    d.on = True
+    out = server.flush()["c1"]
+    assert all(isinstance(m, bytes) for m in out)
+    for m in out:
+        client.recv(m)
+    assert client.model(mid, Device).on is True
+
+
+def test_mixed_codecs_per_connection():
+    session = Session()
+    server = Server(session)
+    j, m = Client(), Client(codec="msgpack")
+    d = Device(name="lamp")
+    mid = session.host(d)
+    for msg in server.open("j"):
+        j.recv(msg)
+    for msg in server.open("m", codec="msgpack"):
+        m.recv(msg)
+
+    d.name = "desk"
+    out = server.flush()
+    assert all(isinstance(x, str) for x in out["j"])  # JSON client gets text
+    assert all(isinstance(x, bytes) for x in out["m"])  # msgpack client gets binary
+    for msg in out["j"]:
+        j.recv(msg)
+    for msg in out["m"]:
+        m.recv(msg)
+    assert j.model(mid, Device).name == "desk"
+    assert m.model(mid, Device).name == "desk"
+
+
+def test_msgpack_client_edit_relays_to_json_client():
+    session = Session()
+    server = Server(session)
+    j, m = Client(), Client(codec="msgpack")
+    d = Device(name="lamp")
+    mid = session.host(d)
+    for msg in server.open("j"):
+        j.recv(msg)
+    for msg in server.open("m", codec="msgpack"):
+        m.recv(msg)
+
+    edit = m.edit(mid, to_value(Device(name="lamp", on=True)))  # msgpack client edits (binary frame)
+    assert isinstance(edit, bytes)
+    out = server.recv("m", edit)
+    assert set(out) == {"j"}
+    for msg in out["j"]:  # relayed to the JSON client, re-encoded as text
+        assert isinstance(msg, str)
+        j.recv(msg)
+    assert j.model(mid, Device).on is True
+
+
+def test_starlette_msgpack_connection():
+    from starlette.applications import Starlette
+    from starlette.routing import WebSocketRoute
+    from starlette.testclient import TestClient
+
+    session = Session()
+    server = Server(session)
+    d = Device(name="lamp")
+    mid = session.host(d)
+    app = Starlette(routes=[WebSocketRoute("/ws", starlette_endpoint(server))])
+
+    with TestClient(app) as tc, tc.websocket_connect("/ws?codec=msgpack") as ws:
+        client = Client(codec="msgpack")
+        client.recv(ws.receive_bytes())  # snapshot as a binary frame
+        assert client.model(mid, Device) == d
+
+        # client edits and sends a binary frame; server applies it
+        edit = client.edit(mid, to_value(Device(name="lamp", on=True)))
+        assert isinstance(edit, bytes)
+        ws.send_bytes(edit)
+
+
 # --- real Starlette WebSocket I/O ----------------------------------------------------------------
 
 

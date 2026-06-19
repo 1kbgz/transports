@@ -52,6 +52,21 @@ pub fn decode_as(bytes: &[u8], content_type: &str) -> Result<String, String> {
     serde_json::to_string(&value).map_err(|e| e.to_string())
 }
 
+/// Convert an arbitrary JSON document to MessagePack bytes.
+///
+/// Unlike [`encode_as`], this works on *any* JSON (not just a model [`Value`]) — the connection
+/// layer uses it to encode whole protocol messages in the negotiated codec.
+pub fn json_to_msgpack(json: &str) -> Result<Vec<u8>, String> {
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    rmp_serde::to_vec_named(&v).map_err(|e| e.to_string())
+}
+
+/// Convert MessagePack bytes back to a JSON document.
+pub fn msgpack_to_json(bytes: &[u8]) -> Result<String, String> {
+    let v: serde_json::Value = rmp_serde::from_slice(bytes).map_err(|e| e.to_string())?;
+    serde_json::to_string(&v).map_err(|e| e.to_string())
+}
+
 /// A string-in/string-out facade over [`Store`] for the bindings.
 #[derive(Default)]
 pub struct JsonStore {
@@ -120,6 +135,18 @@ mod bridge_tests {
         assert_eq!(
             back,
             serde_json::from_str::<serde_json::Value>(model).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_json_msgpack_round_trip() {
+        let json = r#"{"t":"patch","id":1,"patch":{"rev":2,"ops":[]}}"#;
+        let bytes = json_to_msgpack(json).unwrap();
+        let back: serde_json::Value =
+            serde_json::from_str(&msgpack_to_json(&bytes).unwrap()).unwrap();
+        assert_eq!(
+            back,
+            serde_json::from_str::<serde_json::Value>(json).unwrap()
         );
     }
 

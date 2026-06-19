@@ -3,7 +3,17 @@ from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .client import Client
 from .server import Server, autoflush, starlette_endpoint
 from .session import Session
-from .transports import Store, apply, decode, decode_as, diff, encode, encode_as  # compiled Rust extension (rust/python)
+from .transports import (  # compiled Rust extension (rust/python)
+    Store,
+    apply,
+    decode,
+    decode_as,
+    diff,
+    encode,
+    encode_as,
+    json_to_msgpack,
+    msgpack_to_json,
+)
 
 __version__ = "0.2.0"
 
@@ -17,6 +27,8 @@ __all__ = [
     "diff",
     "encode",
     "encode_as",
+    "json_to_msgpack",
+    "msgpack_to_json",
     # model bridge + reactive session (high-level)
     "Session",
     "to_value",

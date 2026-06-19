@@ -1,4 +1,4 @@
-import { apply } from "./index";
+import { apply, msgpackToJson } from "./index";
 
 type SnapshotMsg = {
   t: "snapshot";
@@ -15,14 +15,19 @@ type PatchMsg = {
 
 /** Mirrors a remote transports `Session` from connection messages.
  *
- * Requires the wasm core to be initialized before applying patches.
+ * Inbound frames are decoded by type — text frames are JSON, binary frames are MessagePack — so a
+ * client transparently mirrors a server regardless of the negotiated codec. Requires the wasm core
+ * to be initialized before applying patches.
  */
 export class Client {
   private values = new Map<number, unknown>();
   private revs = new Map<number, number>();
 
-  /** Apply an inbound snapshot or patch message to the local mirror. */
-  recv(text: string): void {
+  constructor(private codec: string = "json") {}
+
+  /** Apply an inbound snapshot or patch frame (string JSON or binary msgpack) to the mirror. */
+  recv(data: string | Uint8Array): void {
+    const text = typeof data === "string" ? data : msgpackToJson(data);
     const msg = JSON.parse(text) as SnapshotMsg | PatchMsg;
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
@@ -48,10 +53,15 @@ export class Client {
 
   /** Connect to a transports server and mirror it. Returns the `WebSocket`. */
   connect(url: string): WebSocket {
-    const ws = new WebSocket(url);
-    ws.addEventListener("message", (e) =>
-      this.recv(String((e as MessageEvent).data)),
-    );
+    const sep = url.includes("?") ? "&" : "?";
+    const ws = new WebSocket(`${url}${sep}codec=${this.codec}`);
+    ws.binaryType = "arraybuffer";
+    ws.addEventListener("message", (e) => {
+      const data = (e as MessageEvent).data;
+      this.recv(
+        typeof data === "string" ? data : new Uint8Array(data as ArrayBuffer),
+      );
+    });
     return ws;
   }
 }

@@ -43,6 +43,19 @@ pub fn decode_as(data: &[u8], codec: &str) -> PyResult<String> {
     transports::decode_as(data, codec).map_err(PyValueError::new_err)
 }
 
+/// Convert an arbitrary JSON document to MessagePack bytes (for encoding whole protocol messages).
+#[pyfunction]
+pub fn json_to_msgpack<'py>(py: Python<'py>, json: &str) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = transports::json_to_msgpack(json).map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &bytes))
+}
+
+/// Convert MessagePack bytes back to a JSON document.
+#[pyfunction]
+pub fn msgpack_to_json(data: &[u8]) -> PyResult<String> {
+    transports::msgpack_to_json(data).map_err(PyValueError::new_err)
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

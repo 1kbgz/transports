@@ -18,6 +18,12 @@ def encode_as(value: str, codec: str) -> bytes:
 def decode_as(data: bytes, codec: str) -> str:
     """Decode bytes (from `codec`'s codec) back to a JSON-encoded model string."""
 
+def json_to_msgpack(json: str) -> bytes:
+    """Convert an arbitrary JSON document to MessagePack bytes."""
+
+def msgpack_to_json(data: bytes) -> str:
+    """Convert MessagePack bytes back to a JSON document."""
+
 class Store:
     """In-process model store: host / mutate -> patch / apply / snapshot."""
 

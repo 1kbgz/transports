@@ -22,7 +22,8 @@ mod store;
 mod value;
 
 pub use bridge::{
-    apply_json, decode_as, decode_json, diff_json, encode_as, encode_json, JsonStore,
+    apply_json, decode_as, decode_json, diff_json, encode_as, encode_json, json_to_msgpack,
+    msgpack_to_json, JsonStore,
 };
 pub use codec::{codec_for, Codec, CodecError, JsonCodec, MsgpackCodec};
 pub use diff::{apply, diff, Op, Patch, Path, PathSeg};
