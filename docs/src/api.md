@@ -82,6 +82,12 @@ hosting.
 
 .. autofunction:: transports.msgpack_to_json
 
+.. autofunction:: transports.register_codec
+
+.. autofunction:: transports.unregister_codec
+
+.. autofunction:: transports.registered_codecs
+
 .. autoclass:: transports.Store
    :members:
    :undoc-members:

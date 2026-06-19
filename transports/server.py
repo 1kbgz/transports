@@ -58,7 +58,7 @@ class Server:
         A client patch is applied to the hosted model's value and relayed to the *other* connections,
         so the server acts as a hub. Each relay is encoded in the target connection's codec.
         """
-        msg = protocol.decode(data)
+        msg = protocol.decode(data, self._codecs.get(conn))
         if msg.get("t") == "patch":
             self._session.apply_patch(msg["id"], msg["patch"])
             relay = protocol.patch_msg(msg["id"], msg["patch"])

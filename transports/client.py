@@ -30,7 +30,7 @@ class Client:
 
     def recv(self, data: Union[str, bytes]) -> None:
         """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror."""
-        msg = protocol.decode(data)
+        msg = protocol.decode(data, self._codec)
         mid = msg["id"]
         if msg["t"] == "snapshot":
             self._values[mid] = msg["value"]

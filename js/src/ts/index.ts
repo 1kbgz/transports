@@ -43,3 +43,7 @@ export type { Value } from "./bridge";
 
 // WebSocket client that mirrors a remote Session.
 export { Client } from "./client";
+
+// Custom wire codec registry.
+export { registerCodec, unregisterCodec, codecFor } from "./codecs";
+export type { CodecEncode, CodecDecode } from "./codecs";
