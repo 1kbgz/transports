@@ -12,12 +12,20 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 """
 
 import asyncio
-from typing import Any, Dict, List, Union
+from typing import Any, Dict, List, Protocol, Union
 
 from . import protocol
 from .session import Session
 
 Wire = Union[str, bytes]
+
+
+class Broadcaster(Protocol):
+    """The structural contract `autoflush` drives — satisfied by both `Server` and `Hub`."""
+
+    def flush(self) -> Dict[Any, List[Wire]]: ...
+
+    def close(self, conn: Any) -> None: ...
 
 
 class Server:
@@ -114,10 +122,11 @@ def starlette_endpoint(server: Server):
     return endpoint
 
 
-async def autoflush(server: Server, interval: float = 0.01) -> None:
-    """Background task: periodically flush the session and broadcast patches to all connections.
+async def autoflush(server: Broadcaster, interval: float = 0.01) -> None:
+    """Background task: periodically flush and broadcast patches to all connections.
 
-    Run exactly one of these per `Server` (not per connection), so a single drain feeds every client.
+    Run exactly one of these per `Server`/`Hub` (not per connection), so a single drain feeds every
+    client.
     """
     while True:
         await asyncio.sleep(interval)

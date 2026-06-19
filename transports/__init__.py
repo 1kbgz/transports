@@ -1,6 +1,7 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .client import Client
+from .hub import READ, WRITE, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .server import Server, autoflush, starlette_endpoint
 from .session import Session
 from .transports import (  # compiled Rust extension (rust/python)
@@ -41,4 +42,11 @@ __all__ = [
     "starlette_endpoint",
     "autoflush",
     "protocol",
+    # multi-tenancy + sharing
+    "Hub",
+    "READ",
+    "WRITE",
+    "MergeStrategy",
+    "LastWriteWins",
+    "LwwMapCrdt",
 ]
