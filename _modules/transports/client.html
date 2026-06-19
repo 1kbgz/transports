@@ -244,7 +244,7 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Type</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">protocol</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">M</span><span class="p">,</span> <span class="n">from_value</span>
@@ -257,18 +257,21 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.</span>
 
 <span class="sd">    Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live</span>
-<span class="sd">    connection via `connect(url)`, or feed it messages directly with `recv(text)`.&quot;&quot;&quot;</span>
+<span class="sd">    connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`</span>
+<span class="sd">    (`&quot;json&quot;` or `&quot;msgpack&quot;`) controls how outbound edits are framed; inbound frames are decoded</span>
+<span class="sd">    automatically from their type (text=JSON, binary=msgpack).&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Client.recv">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.recv">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply an inbound snapshot or patch message to the local mirror.&quot;&quot;&quot;</span>
-        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.&quot;&quot;&quot;</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
         <span class="n">mid</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span>
         <span class="k">if</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;t&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;snapshot&quot;</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
@@ -301,24 +304,28 @@
 
 <div class="viewcode-block" id="Client.edit">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.edit">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Locally edit a mirrored model and return the patch message to send to the server.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Locally edit a mirrored model and return the patch frame to send (encoded in this codec).&quot;&quot;&quot;</span>
         <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_value</span><span class="p">)))</span>
         <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_value</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Client.connect">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes.</span>
+
+<span class="sd">        Appends ``?codec=`` for the client&#39;s codec so the server frames messages to match.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
 
-        <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
-            <span class="k">async</span> <span class="k">for</span> <span class="n">text</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">text</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">text</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="n">text</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span></div>
+        <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;&amp;&quot;</span> <span class="k">if</span> <span class="s2">&quot;?&quot;</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
+        <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}</span><span class="s2">codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 </div>
 
 </pre></div>

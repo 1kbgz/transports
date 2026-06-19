@@ -285,6 +285,24 @@ pair is <code class="docutils literal notranslate"><span class="pre">encodeAs(va
 switching formats is a one-line change and never touches your models. MessagePack is typically the
 choice for production traffic; JSON is convenient for debugging.</p>
 </section>
+<section id="on-a-connection">
+<h2>On a connection<a class="headerlink" href="#on-a-connection" title="Link to this heading">¶</a></h2>
+<p>A connection negotiates its codec independently, so JSON and MessagePack clients can share one
+server. Pass <code class="docutils literal notranslate"><span class="pre">codec=</span></code> when opening a client; over WebSocket the choice rides on a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query
+param, and JSON travels as text frames while MessagePack travels as binary frames.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">Client</span>
+
+<span class="k">await</span> <span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">&quot;msgpack&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">)</span>   <span class="c1"># appends ?codec=msgpack</span>
+</pre></div>
+</div>
+<div class="highlight-javascript notranslate"><div class="highlight"><pre><span></span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">&quot;msgpack&quot;</span><span class="p">).</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>The server encodes every outbound message in <em>that</em> connection’s codec and decodes inbound frames by
+type, so a MessagePack client’s edit is transparently relayed to a JSON client and vice versa — see
+<a class="reference internal" href="connections.html"><span class="std std-doc">Connections</span></a>. Whole protocol messages (not just model values) are converted with
+<code class="docutils literal notranslate"><span class="pre">json_to_msgpack</span></code> / <code class="docutils literal notranslate"><span class="pre">msgpack_to_json</span></code> (<code class="docutils literal notranslate"><span class="pre">jsonToMsgpack</span></code> / <code class="docutils literal notranslate"><span class="pre">msgpackToJson</span></code> in JavaScript).</p>
+</section>
 </section>
 
         </article>
@@ -344,6 +362,7 @@ choice for production traffic; JSON is convenient for debugging.</p>
             <ul>
 <li><a class="reference internal" href="#">Codecs</a><ul>
 <li><a class="reference internal" href="#encoding">Encoding</a></li>
+<li><a class="reference internal" href="#on-a-connection">On a connection</a></li>
 </ul>
 </li>
 </ul>

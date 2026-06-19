@@ -243,14 +243,18 @@
 <span class="sd">`autoflush`), so the protocol is testable without a network.</span>
 
 <span class="sd">A connection handle is any hashable object (the Starlette `WebSocket`, a test sentinel, ...) that the</span>
-<span class="sd">I/O adapter knows how to send on.</span>
+<span class="sd">I/O adapter knows how to send on. Each connection negotiates a codec (`&quot;json&quot;` or `&quot;msgpack&quot;`); the</span>
+<span class="sd">server encodes every outbound message in *that connection&#39;s* codec, so JSON and MessagePack clients</span>
+<span class="sd">can share one server. A wire message is a `str` (JSON text frame) or `bytes` (MessagePack binary).</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">protocol</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">Session</span>
+
+<span class="n">Wire</span> <span class="o">=</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="Server">
@@ -258,54 +262,60 @@
 <span class="k">class</span><span class="w"> </span><span class="nc">Server</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and</span>
 <span class="sd">    relays a client&#39;s patches to the other clients (a hub). Transport-agnostic — its methods return</span>
-<span class="sd">    the messages to send; an adapter such as `starlette_endpoint` performs the I/O.&quot;&quot;&quot;</span>
+<span class="sd">    the messages to send; an adapter such as `starlette_endpoint` performs the I/O.</span>
+
+<span class="sd">    Each connection has its own negotiated codec, so outbound messages are encoded per connection.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">session</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_encode_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">msg_json</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Wire</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">msg_json</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">))</span>
 
 <div class="viewcode-block" id="Server.open">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.open">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a connection; returns the snapshot messages to send it (current model state).&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
-        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a connection with its codec; returns the snapshot messages to send it.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">ids</span><span class="p">():</span>
             <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;type_name&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]))</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;type_name&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">msg</span><span class="p">))</span>
         <span class="k">return</span> <span class="n">out</span></div>
 
 
 <div class="viewcode-block" id="Server.recv">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.recv">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle an inbound message; returns messages to send, keyed by connection.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Wire</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.</span>
 
 <span class="sd">        A client patch is applied to the hosted model&#39;s value and relayed to the *other* connections,</span>
-<span class="sd">        so the server acts as a hub.</span>
+<span class="sd">        so the server acts as a hub. Each relay is encoded in the target connection&#39;s codec.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">apply_patch</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])</span>
             <span class="n">relay</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])</span>
-            <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="n">relay</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">conn</span><span class="p">}</span>
+            <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">relay</span><span class="p">)]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">conn</span><span class="p">}</span>
         <span class="k">return</span> <span class="p">{}</span></div>
 
 
 <div class="viewcode-block" id="Server.flush">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.flush">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Drain the session and return the patch messages to broadcast to every connection.&quot;&quot;&quot;</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Drain the session and return the patch messages to broadcast, encoded per connection.&quot;&quot;&quot;</span>
         <span class="n">msgs</span> <span class="o">=</span> <span class="p">[</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">drain</span><span class="p">()]</span>
-        <span class="k">if</span> <span class="ow">not</span> <span class="n">msgs</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">msgs</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{}</span>
-        <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">msgs</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">}</span></div>
+        <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">}</span></div>
 
 
 <div class="viewcode-block" id="Server.close">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.close">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span></div>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
 </div>
 
 
@@ -313,27 +323,43 @@
 <span class="c1"># --- async I/O adapters --------------------------------------------------------------------------</span>
 
 
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_send</span><span class="p">(</span><span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="n">Wire</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">msg</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
+        <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_bytes</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="starlette_endpoint">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.starlette_endpoint">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">starlette_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Server</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a Starlette WebSocket endpoint that serves `server`.</span>
 
-<span class="sd">    Wire it into an app, e.g. ``WebSocketRoute(&quot;/ws&quot;, starlette_endpoint(server))``, and run</span>
-<span class="sd">    `autoflush(server)` as a background task to stream server-side model changes to clients.</span>
+<span class="sd">    The connection&#39;s codec is read from a ``?codec=`` query param (default JSON). Wire it into an</span>
+<span class="sd">    app, e.g. ``WebSocketRoute(&quot;/ws&quot;, starlette_endpoint(server))``, and run `autoflush(server)` as a</span>
+<span class="sd">    background task to stream server-side model changes to clients.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">websocket</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.websockets</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketDisconnect</span>
 
+        <span class="n">codec</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;codec&quot;</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span>
         <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span>
-        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">websocket</span><span class="p">):</span>
-            <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
+            <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-                <span class="n">text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">receive_text</span><span class="p">()</span>
-                <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="n">frame</span> <span class="o">=</span> <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">receive</span><span class="p">()</span>
+                <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;websocket.disconnect&quot;</span><span class="p">:</span>
+                    <span class="k">break</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bytes&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="k">continue</span>
+                <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                     <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-                        <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                        <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
         <span class="k">except</span> <span class="n">WebSocketDisconnect</span><span class="p">:</span>
             <span class="k">pass</span>
         <span class="k">finally</span><span class="p">:</span>
@@ -355,7 +381,7 @@
         <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
                 <span class="k">try</span><span class="p">:</span>
-                    <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                    <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
                 <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
                     <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span></div>
 

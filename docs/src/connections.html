@@ -287,17 +287,24 @@ connected clients.</p>
 </div>
 <p>On connect, a client receives a snapshot of every hosted model, then a stream of patches. A patch a
 client sends back is applied and relayed to the <em>other</em> clients, so the server acts as a hub.</p>
+<section id="choosing-a-codec">
+<h3>Choosing a codec<a class="headerlink" href="#choosing-a-codec" title="Link to this heading">¶</a></h3>
+<p>Each connection negotiates its wire format with a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param (<code class="docutils literal notranslate"><span class="pre">json</span></code>, the default, or
+<code class="docutils literal notranslate"><span class="pre">msgpack</span></code>). The server tracks it per connection and encodes every outbound message to match — JSON
+as text frames, MessagePack as binary frames — so JSON and MessagePack clients can share one server
+and still exchange edits. See <a class="reference internal" href="codecs.html"><span class="std std-doc">Codecs</span></a>.</p>
+</section>
 </section>
 <section id="python-client">
 <h2>Python client<a class="headerlink" href="#python-client" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="api.html#transports.Client" title="transports.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">Client</span></code></a> mirrors a remote session without hosting it:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>                     <span class="c1"># or Client(codec=&quot;msgpack&quot;)</span>
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">)</span>   <span class="c1"># mirrors until the connection closes</span>
 <span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Counter</span><span class="p">)</span>                       <span class="c1"># materialize the mirrored model as a Counter</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">Client</span></code> is also usable without a live connection — feed it messages with <code class="docutils literal notranslate"><span class="pre">recv(text)</span></code> and read with
-<code class="docutils literal notranslate"><span class="pre">value(id)</span></code> / <code class="docutils literal notranslate"><span class="pre">model(id,</span> <span class="pre">cls)</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Client</span></code> is also usable without a live connection — feed it messages with <code class="docutils literal notranslate"><span class="pre">recv(data)</span></code> (a text or
+binary frame) and read with <code class="docutils literal notranslate"><span class="pre">value(id)</span></code> / <code class="docutils literal notranslate"><span class="pre">model(id,</span> <span class="pre">cls)</span></code>.</p>
 </section>
 <section id="browser-client">
 <h2>Browser client<a class="headerlink" href="#browser-client" title="Link to this heading">¶</a></h2>
@@ -382,7 +389,10 @@ python<span class="w"> </span>examples/server.py<span class="w">    </span><span
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Connections</a><ul>
-<li><a class="reference internal" href="#server">Server</a></li>
+<li><a class="reference internal" href="#server">Server</a><ul>
+<li><a class="reference internal" href="#choosing-a-codec">Choosing a codec</a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#python-client">Python client</a></li>
 <li><a class="reference internal" href="#browser-client">Browser client</a></li>
 <li><a class="reference internal" href="#runnable-example">Runnable example</a></li>

@@ -60,6 +60,10 @@ hosting.
 
 .. autofunction:: transports.decode_as
 
+.. autofunction:: transports.json_to_msgpack
+
+.. autofunction:: transports.msgpack_to_json
+
 .. autoclass:: transports.Store
    :members:
    :undoc-members:
