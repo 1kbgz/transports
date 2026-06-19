@@ -5,8 +5,8 @@
 transports is a **Rust core** with thin **Python (PyO3)** and **JavaScript (wasm)** bindings. The
 core owns the model representation, the diff/patch engine, the codecs, and the wire framing; both
 languages call into the same compiled implementation. A patch produced by Python and a patch produced
-by JavaScript for the same change are byte-identical, so either side can host a model and the other
-can mirror it.
+by JavaScript for the same change are byte-for-byte identical, so either side can host a model and the
+other can mirror it.
 
 ```text
    Python (PyO3)            JavaScript (wasm)
@@ -51,16 +51,15 @@ and lists diff positionally; a type change at a path replaces the value there wh
 The low-level {py:class}`~transports.Store` holds model values by id and, on `mutate`, diffs the new
 value against the held one, bumps the `rev`, and returns the patch. The high-level
 {py:class}`~transports.Session` wraps it with the model bridge and reactive observation, so you work
-with your own model objects and get patches automatically.
+with your own model objects and get patches automatically — see [Model bridges](bridges.md).
 
-This is the single-owner nucleus; multi-tenant sessions (fan-out to many subscribers, backpressure,
-authorization) are on the roadmap.
+## Codecs
 
-## What's next
+The wire format is pluggable. JSON is the default; **MessagePack** is a compact binary alternative.
+Both are self-describing — they need no schema — and produce identical bytes from Python and
+JavaScript. See [Codecs](codecs.md).
 
-- **Codecs.** JSON is the current wire format, behind a pluggable codec trait. MessagePack and other
-  binary codecs are planned; they change only the *bytes*, not the model or patch semantics.
-- **Connections.** A length-prefixed, codec-tagged `Frame` envelope exists in the core; the actual
-  transport adapters (WebSocket, SSE, HTTP, Jupyter comm, TCP) come next, carrying frames between
-  processes.
-```
+## Connections
+
+Patches travel between processes over a **WebSocket**: a server hosts a `Session` and a client — in
+Python or the browser — mirrors the model live. See [Connections](connections.md).

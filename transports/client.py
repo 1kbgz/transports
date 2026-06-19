@@ -15,6 +15,11 @@ from .transports import apply as _apply, diff as _diff
 
 
 class Client:
+    """Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.
+
+    Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live
+    connection via `connect(url)`, or feed it messages directly with `recv(text)`."""
+
     def __init__(self) -> None:
         self._values: Dict[int, Any] = {}
         self._rev: Dict[int, int] = {}

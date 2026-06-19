@@ -4,9 +4,9 @@ Move typed models across any wire.
 
 Define a model once — as a [pydantic](https://docs.pydantic.dev) model, a stdlib `dataclass`, or a
 [msgspec](https://jcristharif.com/msgspec/) struct — host it, and its mutations stream to peers as
-**incremental patches** (not whole-model resends). A Rust core (model representation, diff/patch,
-codecs, framing) compiles to Python (PyO3) and JavaScript (wasm), so both ends share one
-implementation byte-for-byte.
+**incremental patches** (not whole-model resends), over a WebSocket, in JSON or MessagePack. A Rust
+core (model representation, diff/patch, codecs, framing) compiles to Python (PyO3) and JavaScript
+(wasm), so both ends share one implementation.
 
 [![License](https://img.shields.io/github/license/1kbgz/transports)](https://github.com/1kbgz/transports)
 [![PyPI](https://img.shields.io/pypi/v/transports.svg)](https://pypi.python.org/pypi/transports)
@@ -33,17 +33,22 @@ for model_id, patch in session.drain():
 
 ```bash
 pip install transports
+pip install "transports[connections]"   # adds the WebSocket server/client adapters
 ```
 
 ## What you get
 
 - **Reactive models** — mutate a field, get the minimal patch. No manual diffing or `send()`.
 - **Three model kinds, one contract** — pydantic, dataclass, and msgspec all bridge to the same core.
-- **One core, two languages** — Python and JavaScript share the Rust diff/patch and codec, so a patch
-  produced on one side applies on the other.
+- **One core, two languages** — Python and JavaScript share the Rust diff/patch and codecs, so a
+  patch produced on one side applies on the other.
+- **Live sync over WebSocket** — host a model on a server and mirror it in the browser; mutate it in
+  Python and the page updates. See [Connections](docs/src/connections.md).
+- **JSON or MessagePack** — swap the wire format without touching your models. See
+  [Codecs](docs/src/codecs.md).
 
-## Status
+## Documentation
 
-Early. The Rust core (model, diff/patch with revisions, JSON codec, frame envelope, in-process store)
-and the model bridges are in. Binary codecs (MessagePack, …) and network connections (WebSocket, SSE,
-…) are on the [roadmap](https://github.com/1kbgz/transports/blob/main/ROADMAP.md).
+[Quickstart](docs/src/quickstart.md) · [Concepts](docs/src/concepts.md) ·
+[Model bridges](docs/src/bridges.md) · [Connections](docs/src/connections.md) ·
+[Codecs](docs/src/codecs.md) · [API reference](docs/src/api.md)

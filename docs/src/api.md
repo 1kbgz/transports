@@ -1,7 +1,6 @@
 # API Reference
 
-The high-level reactive session and model bridge, plus the low-level core (the compiled Rust
-extension).
+The high-level reactive session, the model bridge, the connection adapters, and the low-level core.
 
 ## Session
 
@@ -24,6 +23,24 @@ extension).
 .. autofunction:: transports.schema_to_ts
 ```
 
+## Connections
+
+```{eval-rst}
+.. autoclass:: transports.Server
+   :members:
+   :undoc-members:
+   :member-order: bysource
+
+.. autoclass:: transports.Client
+   :members:
+   :undoc-members:
+   :member-order: bysource
+
+.. autofunction:: transports.starlette_endpoint
+
+.. autofunction:: transports.autoflush
+```
+
 ## Core
 
 The low-level surface, exposed directly from the Rust core. Most users work through
@@ -38,6 +55,10 @@ hosting.
 .. autofunction:: transports.encode
 
 .. autofunction:: transports.decode
+
+.. autofunction:: transports.encode_as
+
+.. autofunction:: transports.decode_as
 
 .. autoclass:: transports.Store
    :members:
