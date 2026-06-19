@@ -1,3 +1,4 @@
+import { codecFor } from "./codecs";
 import { apply, msgpackToJson } from "./index";
 
 type SnapshotMsg = {
@@ -25,10 +26,18 @@ export class Client {
 
   constructor(private codec: string = "json") {}
 
-  /** Apply an inbound snapshot or patch frame (string JSON or binary msgpack) to the mirror. */
+  /** Apply an inbound snapshot or patch frame to the mirror.
+   *
+   * Decodes by the client's codec: a registered custom codec, else built-in JSON (text) / msgpack
+   * (binary).
+   */
   recv(data: string | Uint8Array): void {
-    const text = typeof data === "string" ? data : msgpackToJson(data);
-    const msg = JSON.parse(text) as SnapshotMsg | PatchMsg;
+    const custom = codecFor(this.codec);
+    const msg = (
+      custom
+        ? custom.decode(data)
+        : JSON.parse(typeof data === "string" ? data : msgpackToJson(data))
+    ) as SnapshotMsg | PatchMsg;
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);

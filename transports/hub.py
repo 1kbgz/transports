@@ -194,7 +194,7 @@ class Hub:
         *other* connections. A patch to a shared model (from a `WRITE` subscriber) is merged into the
         authoritative value and the resulting patch is broadcast to every subscriber connection.
         """
-        msg = protocol.decode(data)
+        msg = protocol.decode(data, self._codecs.get(conn))
         if msg.get("t") != "patch":
             return {}
         wire_id = msg["id"]

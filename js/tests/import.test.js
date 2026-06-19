@@ -8,6 +8,8 @@ import {
   decodeAs,
   jsonToMsgpack,
   msgpackToJson,
+  registerCodec,
+  unregisterCodec,
   Client,
 } from "../src/ts/index";
 import { initSync } from "../dist/pkg/transports";
@@ -77,6 +79,36 @@ test("Client mirrors a binary (msgpack) snapshot then patch", async () => {
     ),
   );
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
+});
+
+test("a registered custom codec drives a Client", async () => {
+  // toy custom *binary* codec: a 1-byte marker + utf-8 JSON
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  registerCodec(
+    "application/x-test",
+    (obj) => enc.encode("X" + JSON.stringify(obj)),
+    (data) =>
+      JSON.parse((typeof data === "string" ? data : dec.decode(data)).slice(1)),
+  );
+  try {
+    const frame = enc.encode(
+      "X" +
+        JSON.stringify({
+          t: "snapshot",
+          id: 1,
+          type: "Device",
+          rev: 0,
+          value: { Map: { on: { Bool: true } } },
+        }),
+    );
+    const c = new Client("application/x-test");
+    c.recv(frame); // decoded via the registered custom codec
+    expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
+    expect(() => registerCodec("application/json", enc, dec)).toThrow();
+  } finally {
+    unregisterCodec("application/x-test");
+  }
 });
 
 test("Client mirrors a snapshot then a patch", async () => {

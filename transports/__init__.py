@@ -2,16 +2,15 @@ from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .client import Client
 from .hub import READ, WRITE, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
+from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
 from .server import Server, autoflush, starlette_endpoint
 from .session import Session
 from .transports import (  # compiled Rust extension (rust/python)
     Store,
     apply,
     decode,
-    decode_as,
     diff,
     encode,
-    encode_as,
     json_to_msgpack,
     msgpack_to_json,
 )
@@ -30,6 +29,10 @@ __all__ = [
     "encode_as",
     "json_to_msgpack",
     "msgpack_to_json",
+    # custom wire codecs
+    "register_codec",
+    "unregister_codec",
+    "registered_codecs",
     # model bridge + reactive session (high-level)
     "Session",
     "to_value",
