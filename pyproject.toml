@@ -227,6 +227,7 @@ pages = [
     "docs/src/bridges.md",
     "docs/src/connections.md",
     "docs/src/codecs.md",
+    "docs/src/multitenancy.md",
     "docs/src/api.md",
 ]
 exclude_patterns = [

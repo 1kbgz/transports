@@ -41,6 +41,24 @@ The high-level reactive session, the model bridge, the connection adapters, and 
 .. autofunction:: transports.autoflush
 ```
 
+## Multi-tenancy & sharing
+
+```{eval-rst}
+.. autoclass:: transports.Hub
+   :members:
+   :undoc-members:
+   :member-order: bysource
+
+.. autoclass:: transports.MergeStrategy
+   :members:
+
+.. autoclass:: transports.LastWriteWins
+   :members:
+
+.. autoclass:: transports.LwwMapCrdt
+   :members:
+```
+
 ## Core
 
 The low-level surface, exposed directly from the Rust core. Most users work through
