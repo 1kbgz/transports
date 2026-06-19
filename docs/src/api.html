@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Model bridges" href="bridges.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Codecs" href="codecs.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>API Reference - transports v0.1.2</title>
@@ -200,6 +200,8 @@
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
 </ul>
 
@@ -241,8 +243,7 @@
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="api-reference">
 <h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
-<p>The high-level reactive session and model bridge, plus the low-level core (the compiled Rust
-extension).</p>
+<p>The high-level reactive session, the model bridge, the connection adapters, and the low-level core.</p>
 <section id="session">
 <h2>Session<a class="headerlink" href="#session" title="Link to this heading">¶</a></h2>
 <dl class="py class">
@@ -341,6 +342,102 @@ call <code class="docutils literal notranslate"><span class="pre">update(id)</sp
 </dd></dl>
 
 </section>
+<section id="connections">
+<h2>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.Server">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Server</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">session</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#Server"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Serves a <cite>Session</cite> to connected clients: sends a snapshot on connect, broadcasts patches, and
+relays a client’s patches to the other clients (a hub). Transport-agnostic — its methods return
+the messages to send; an adapter such as <cite>starlette_endpoint</cite> performs the I/O.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Server.open">
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.open" title="Link to this definition">¶</a></dt>
+<dd><p>Register a connection; returns the snapshot messages to send it (current model state).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Server.recv">
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.recv" title="Link to this definition">¶</a></dt>
+<dd><p>Handle an inbound message; returns messages to send, keyed by connection.</p>
+<p>A client patch is applied to the hosted model’s value and relayed to the <em>other</em> connections,
+so the server acts as a hub.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Server.flush">
+<span class="sig-name descname"><span class="pre">flush</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.flush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.flush" title="Link to this definition">¶</a></dt>
+<dd><p>Drain the session and return the patch messages to broadcast to every connection.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Server.close">
+<span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.close" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.Client">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Client</span></span><a class="reference internal" href="../../_modules/transports/client.html#Client"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Mirrors a remote <cite>Session</cite> — applies snapshot/patch messages to a local copy of each model.</p>
+<p>Read values with <cite>value(id)</cite> or materialize them with <cite>model(id, cls)</cite>. Drive it with a live
+connection via <cite>connect(url)</cite>, or feed it messages directly with <cite>recv(text)</cite>.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.recv">
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">text</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.recv" title="Link to this definition">¶</a></dt>
+<dd><p>Apply an inbound snapshot or patch message to the local mirror.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.value">
+<span class="sig-name descname"><span class="pre">value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.value" title="Link to this definition">¶</a></dt>
+<dd><p>The current mirrored core <cite>Value</cite> of a model.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.model">
+<span class="sig-name descname"><span class="pre">model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">M</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">M</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.model" title="Link to this definition">¶</a></dt>
+<dd><p>Materialize the mirrored model as an instance of <cite>cls</cite>.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.ids">
+<span class="sig-name descname"><span class="pre">ids</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.ids" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.edit">
+<span class="sig-name descname"><span class="pre">edit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.edit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.edit" title="Link to this definition">¶</a></dt>
+<dd><p>Locally edit a mirrored model and return the patch message to send to the server.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.connect">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect" title="Link to this definition">¶</a></dt>
+<dd><p>Connect to a transports server and mirror it until the connection closes.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.starlette_endpoint">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">starlette_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Server" title="transports.server.Server"><span class="pre">Server</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#starlette_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.starlette_endpoint" title="Link to this definition">¶</a></dt>
+<dd><p>Build a Starlette WebSocket endpoint that serves <cite>server</cite>.</p>
+<p>Wire it into an app, e.g. <code class="docutils literal notranslate"><span class="pre">WebSocketRoute(&quot;/ws&quot;,</span> <span class="pre">starlette_endpoint(server))</span></code>, and run
+<cite>autoflush(server)</cite> as a background task to stream server-side model changes to clients.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.autoflush">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">autoflush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Server" title="transports.server.Server"><span class="pre">Server</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#autoflush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.autoflush" title="Link to this definition">¶</a></dt>
+<dd><p>Background task: periodically flush the session and broadcast patches to all connections.</p>
+<p>Run exactly one of these per <cite>Server</cite> (not per connection), so a single drain feeds every client.</p>
+</dd></dl>
+
+</section>
 <section id="core">
 <h2>Core<a class="headerlink" href="#core" title="Link to this heading">¶</a></h2>
 <p>The low-level surface, exposed directly from the Rust core. Most users work through
@@ -368,6 +465,18 @@ hosting.</p>
 <dt class="sig sig-object py" id="transports.decode">
 <span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">decode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.decode" title="Link to this definition">¶</a></dt>
 <dd><p>Decode codec bytes back to a JSON-encoded model string.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.encode_as">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">encode_as</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.encode_as" title="Link to this definition">¶</a></dt>
+<dd><p>Encode a JSON-encoded model with the codec named by <cite>codec</cite> (e.g. <cite>“application/msgpack”</cite>).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.decode_as">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">decode_as</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.decode_as" title="Link to this definition">¶</a></dt>
+<dd><p>Decode bytes (produced by <cite>codec</cite>’s codec) back to a JSON-encoded model string.</p>
 </dd></dl>
 
 <dl class="py class">
@@ -410,14 +519,14 @@ hosting.</p>
         
         <div class="related-pages">
           
-          <a class="prev-page" href="bridges.html">
+          <a class="prev-page" href="codecs.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Model bridges</div>
+                <div class="title">Codecs</div>
                 
               </div>
             </a>
@@ -475,11 +584,34 @@ hosting.</p>
 <li><a class="reference internal" href="#transports.schema_to_ts"><code class="docutils literal notranslate"><span class="pre">schema_to_ts()</span></code></a></li>
 </ul>
 </li>
+<li><a class="reference internal" href="#connections">Connections</a><ul>
+<li><a class="reference internal" href="#transports.Server"><code class="docutils literal notranslate"><span class="pre">Server</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Server.open"><code class="docutils literal notranslate"><span class="pre">Server.open()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Server.recv"><code class="docutils literal notranslate"><span class="pre">Server.recv()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Server.flush"><code class="docutils literal notranslate"><span class="pre">Server.flush()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Server.close"><code class="docutils literal notranslate"><span class="pre">Server.close()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#transports.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.value"><code class="docutils literal notranslate"><span class="pre">Client.value()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.model"><code class="docutils literal notranslate"><span class="pre">Client.model()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.edit"><code class="docutils literal notranslate"><span class="pre">Client.edit()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#transports.starlette_endpoint"><code class="docutils literal notranslate"><span class="pre">starlette_endpoint()</span></code></a></li>
+<li><a class="reference internal" href="#transports.autoflush"><code class="docutils literal notranslate"><span class="pre">autoflush()</span></code></a></li>
+</ul>
+</li>
 <li><a class="reference internal" href="#core">Core</a><ul>
 <li><a class="reference internal" href="#transports.diff"><code class="docutils literal notranslate"><span class="pre">diff()</span></code></a></li>
 <li><a class="reference internal" href="#transports.apply"><code class="docutils literal notranslate"><span class="pre">apply()</span></code></a></li>
 <li><a class="reference internal" href="#transports.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
 <li><a class="reference internal" href="#transports.decode"><code class="docutils literal notranslate"><span class="pre">decode()</span></code></a></li>
+<li><a class="reference internal" href="#transports.encode_as"><code class="docutils literal notranslate"><span class="pre">encode_as()</span></code></a></li>
+<li><a class="reference internal" href="#transports.decode_as"><code class="docutils literal notranslate"><span class="pre">decode_as()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Store"><code class="docutils literal notranslate"><span class="pre">Store</span></code></a><ul>
 <li><a class="reference internal" href="#transports.Store.apply"><code class="docutils literal notranslate"><span class="pre">Store.apply()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Store.host"><code class="docutils literal notranslate"><span class="pre">Store.host()</span></code></a></li>

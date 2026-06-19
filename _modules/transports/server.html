@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>transports.session - transports v0.1.2</title>
+        <title>transports.server - transports v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -234,139 +234,130 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <h1>Source code for transports.session</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Reactive session: host pydantic models, observe mutations with bigbrother, emit core patches.</span>
+          <h1>Source code for transports.server</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Serve a reactive `Session` over connections (WebSocket, ...).</span>
 
-<span class="sd">Mutations are observed recursively via `bigbrother.watch(model, cb, deepstate=True)`. bigbrother&#39;s</span>
-<span class="sd">callback fires *before* the underlying mutation is applied, so the callback only marks the model</span>
-<span class="sd">dirty; `flush()` (also invoked by `drain()`/`snapshot()`) recomputes each dirty model&#39;s `Value`,</span>
-<span class="sd">diffs it against the core&#39;s held value, and emits the minimal `Patch`. Because emission is deferred</span>
-<span class="sd">to a flush, several writes between flushes coalesce into a single patch.</span>
+<span class="sd">`Server` holds the transport-agnostic logic — register connections, send snapshots on open, relay</span>
+<span class="sd">inbound patches, broadcast outbound patches — as plain synchronous methods that *return* the messages</span>
+<span class="sd">to send, keyed by connection. The actual async I/O lives in a thin adapter (`starlette_endpoint` /</span>
+<span class="sd">`autoflush`), so the protocol is testable without a network.</span>
 
-<span class="sd">This is the single-owner reactive nucleus; the Phase 4 multi-tenant session (in the Rust core) will</span>
-<span class="sd">back it with fan-out, backpressure, and authorization.</span>
+<span class="sd">A connection handle is any hashable object (the Starlette `WebSocket`, a test sentinel, ...) that the</span>
+<span class="sd">I/O adapter knows how to send on.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Set</span><span class="p">,</span> <span class="n">Tuple</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">bigbrother</span><span class="w"> </span><span class="kn">import</span> <span class="n">watch</span>
-
-<span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">schema_of</span><span class="p">,</span> <span class="n">to_value</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">Store</span> <span class="k">as</span> <span class="n">_CoreStore</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">protocol</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">Session</span>
 
 
-<div class="viewcode-block" id="Session">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session">[docs]</a>
-<span class="k">class</span><span class="w"> </span><span class="nc">Session</span><span class="p">:</span>
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_store</span> <span class="o">=</span> <span class="n">_CoreStore</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_schemas</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+<div class="viewcode-block" id="Server">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Server">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">Server</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and</span>
+<span class="sd">    relays a client&#39;s patches to the other clients (a hub). Transport-agnostic — its methods return</span>
+<span class="sd">    the messages to send; an adapter such as `starlette_endpoint` performs the I/O.&quot;&quot;&quot;</span>
 
-<div class="viewcode-block" id="Session.host">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.host">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">host</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Host a model: register its schema, store its value in the core, and watch it. Returns id.&quot;&quot;&quot;</span>
-        <span class="n">type_name</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_schemas</span><span class="p">[</span><span class="n">type_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema_of</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
-        <span class="n">mid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)))</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">session</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
-        <span class="k">def</span><span class="w"> </span><span class="nf">_watcher</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">call_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">call_kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">_mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">mid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_mid</span><span class="p">)</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">watch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">_watcher</span><span class="p">,</span> <span class="n">deepstate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">mid</span></div>
-
-
-<div class="viewcode-block" id="Session.ids">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.ids">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">ids</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The ids of all hosted models.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
-
-
-<div class="viewcode-block" id="Session.on_patch">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.on_patch">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">on_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback invoked as `fn(model_id, patch)` for each emitted patch.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span> <span class="o">=</span> <span class="n">fn</span></div>
-
-
-<div class="viewcode-block" id="Session.flush">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.flush">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Diff every dirty model against the core and emit the minimal patches. Returns them.&quot;&quot;&quot;</span>
-        <span class="n">emitted</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="p">):</span>
-            <span class="n">patch_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">])))</span>
-            <span class="k">if</span> <span class="n">patch_json</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                <span class="k">continue</span>
-            <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">patch_json</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;ops&quot;</span><span class="p">]:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">))</span>
-                <span class="n">emitted</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">))</span>
-                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
-        <span class="k">return</span> <span class="n">emitted</span></div>
-
-
-<div class="viewcode-block" id="Session.update">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.update">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Force a diff+emit for one hosted model and flush.</span>
-
-<span class="sd">        Automatic emission needs bigbrother to observe the model; models without a ``__dict__``</span>
-<span class="sd">        (``msgspec.Struct`` and other ``__slots__`` types) can&#39;t be watched, so mutate them and then</span>
-<span class="sd">        call ``update(id)`` explicitly.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span></div>
-
-
-<div class="viewcode-block" id="Session.drain">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.drain">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">drain</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Flush, then return and clear the accumulated outbox.&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-        <span class="n">out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="p">,</span> <span class="p">[]</span>
+<div class="viewcode-block" id="Server.open">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Server.open">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a connection; returns the snapshot messages to send it (current model state).&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+        <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">ids</span><span class="p">():</span>
+            <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+            <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;type_name&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]))</span>
         <span class="k">return</span> <span class="n">out</span></div>
 
 
-<div class="viewcode-block" id="Session.snapshot">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.snapshot">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;`{&quot;type_name&quot;:.., &quot;rev&quot;:.., &quot;value&quot;:..}` for a hosted model (flushes pending changes).&quot;&quot;&quot;</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
-        <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)</span></div>
+<div class="viewcode-block" id="Server.recv">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Server.recv">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">text</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle an inbound message; returns messages to send, keyed by connection.</span>
+
+<span class="sd">        A client patch is applied to the hosted model&#39;s value and relayed to the *other* connections,</span>
+<span class="sd">        so the server acts as a hub.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">parse</span><span class="p">(</span><span class="n">text</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">apply_patch</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])</span>
+            <span class="n">relay</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])</span>
+            <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="n">relay</span><span class="p">]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span> <span class="k">if</span> <span class="n">c</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">conn</span><span class="p">}</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
 
 
-<div class="viewcode-block" id="Session.value">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.value">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current core `Value` of a hosted model.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span></div>
+<div class="viewcode-block" id="Server.flush">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Server.flush">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Drain the session and return the patch messages to broadcast to every connection.&quot;&quot;&quot;</span>
+        <span class="n">msgs</span> <span class="o">=</span> <span class="p">[</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">drain</span><span class="p">()]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">msgs</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{}</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">msgs</span><span class="p">)</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="p">}</span></div>
 
 
-<div class="viewcode-block" id="Session.apply_patch">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.apply_patch">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">apply_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a remote patch to a hosted/mirrored model&#39;s core value. Returns whether id was known.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">))</span></div>
-
-
-<div class="viewcode-block" id="Session.schema">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.schema">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">schema</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_schemas</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">type_name</span><span class="p">)</span></div>
+<div class="viewcode-block" id="Server.close">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Server.close">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_conns</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span></div>
 </div>
+
+
+
+<span class="c1"># --- async I/O adapters --------------------------------------------------------------------------</span>
+
+
+<div class="viewcode-block" id="starlette_endpoint">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.starlette_endpoint">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">starlette_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Server</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a Starlette WebSocket endpoint that serves `server`.</span>
+
+<span class="sd">    Wire it into an app, e.g. ``WebSocketRoute(&quot;/ws&quot;, starlette_endpoint(server))``, and run</span>
+<span class="sd">    `autoflush(server)` as a background task to stream server-side model changes to clients.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">websocket</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.websockets</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketDisconnect</span>
+
+        <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span>
+        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">websocket</span><span class="p">):</span>
+            <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+                <span class="n">text</span> <span class="o">=</span> <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">receive_text</span><span class="p">()</span>
+                <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">text</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                    <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
+                        <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">except</span> <span class="n">WebSocketDisconnect</span><span class="p">:</span>
+            <span class="k">pass</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">websocket</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">endpoint</span></div>
+
+
+
+<div class="viewcode-block" id="autoflush">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.autoflush">[docs]</a>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Server</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Background task: periodically flush the session and broadcast patches to all connections.</span>
+
+<span class="sd">    Run exactly one of these per `Server` (not per connection), so a single drain feeds every client.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+        <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">interval</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">send_text</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                    <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span></div>
 
 </pre></div>
         </article>

@@ -107,9 +107,8 @@ bridged in Python are interchangeable on the wire.
 > [!NOTE]
 > JavaScript has a single number type, so integers and whole-valued floats both encode as `Int`.
 
-## Limitations (current)
+## Notes
 
-- Nested models are inlined as `Map`s; referencing a submodel by id (the `Submodel` variant) is a
-  later refinement.
-- The receive side (`apply_patch`) updates the core value; read it back with
-  `from_value(session.value(id))`. A live, in-place-updating mirrored model is not yet provided.
+- Nested models are inlined as `Map`s in the wire form.
+- On the receive side, `apply_patch` updates the mirrored core value; read it back with
+  `from_value(session.value(id))`.

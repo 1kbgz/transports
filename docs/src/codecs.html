@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Model bridges" href="bridges.html"><link rel="prev" title="Quickstart" href="quickstart.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API Reference" href="api.html"><link rel="prev" title="Connections" href="connections.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Concepts - transports v0.1.2</title>
+        <title>Codecs - transports v0.1.2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -198,10 +198,10 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Concepts</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
 
@@ -223,7 +223,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../../_sources/docs/src/concepts.md.txt" title="View this page">
+  <a class="muted-link" href="../../_sources/docs/src/codecs.md.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -241,66 +241,49 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="concepts">
-<h1>Concepts<a class="headerlink" href="#concepts" title="Link to this heading">¶</a></h1>
-<section id="one-core-two-bindings">
-<h2>One core, two bindings<a class="headerlink" href="#one-core-two-bindings" title="Link to this heading">¶</a></h2>
-<p>transports is a <strong>Rust core</strong> with thin <strong>Python (PyO3)</strong> and <strong>JavaScript (wasm)</strong> bindings. The
-core owns the model representation, the diff/patch engine, the codecs, and the wire framing; both
-languages call into the same compiled implementation. A patch produced by Python and a patch produced
-by JavaScript for the same change are byte-for-byte identical, so either side can host a model and the
-other can mirror it.</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>   Python (PyO3)            JavaScript (wasm)
-   ┌─────────────┐  patch   ┌─────────────┐
-   │ transports  │◄────────►│ transports  │
-   │ core (Rust) │  bytes   │ core (Rust) │
-   └─────────────┘          └─────────────┘
-        model bridge              object bridge
-   pydantic / dataclass /     plain objects /
-        msgspec                  toValue/fromValue
+          <section class="tex2jax_ignore mathjax_ignore" id="codecs">
+<h1>Codecs<a class="headerlink" href="#codecs" title="Link to this heading">¶</a></h1>
+<p>The wire format is pluggable. A <strong>codec</strong> turns a <code class="docutils literal notranslate"><span class="pre">Value</span></code> (or a patch) into bytes and back.
+transports ships two, both self-describing — they need no schema, and produce identical bytes from
+Python and JavaScript:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Codec</p></th>
+<th class="head"><p>Content type</p></th>
+<th class="head"><p></p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>JSON</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">application/json</span></code></p></td>
+<td><p>human-readable; the default</p></td>
+</tr>
+<tr class="row-odd"><td><p>MessagePack</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">application/msgpack</span></code></p></td>
+<td><p>compact binary</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<section id="encoding">
+<h2>Encoding<a class="headerlink" href="#encoding" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">encode_as</span></code> / <code class="docutils literal notranslate"><span class="pre">decode_as</span></code> take a content type. They operate on the core <code class="docutils literal notranslate"><span class="pre">Value</span></code> in its JSON text
+form (what <a class="reference internal" href="api.html#transports.to_value" title="transports.to_value"><code class="xref py py-func docutils literal notranslate"><span class="pre">to_value()</span></code></a> produces, serialized):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
+
+<span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>     <span class="c1"># a Value (dict)</span>
+<span class="n">blob</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">encode_as</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s2">&quot;application/msgpack&quot;</span><span class="p">)</span>   <span class="c1"># compact bytes</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">decode_as</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="s2">&quot;application/msgpack&quot;</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">restored</span> <span class="o">==</span> <span class="n">value</span>
 </pre></div>
 </div>
-</section>
-<section id="value">
-<h2>Value<a class="headerlink" href="#value" title="Link to this heading">¶</a></h2>
-<p>Every model is, on the wire, a <strong>Value</strong> — a small tagged union: <code class="docutils literal notranslate"><span class="pre">Null</span></code>, <code class="docutils literal notranslate"><span class="pre">Bool</span></code>, <code class="docutils literal notranslate"><span class="pre">Int</span></code>, <code class="docutils literal notranslate"><span class="pre">Float</span></code>,
-<code class="docutils literal notranslate"><span class="pre">Str</span></code>, <code class="docutils literal notranslate"><span class="pre">List</span></code>, <code class="docutils literal notranslate"><span class="pre">Map</span></code>, and <code class="docutils literal notranslate"><span class="pre">Submodel</span></code> (a reference to another model by id). The serialized form is the
-externally-tagged enum the Rust core speaks:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">},</span><span class="w"> </span><span class="nt">&quot;on&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
-</pre></div>
-</div>
-<p>You rarely write this by hand — the <a class="reference internal" href="bridges.html"><span class="std std-doc">model bridges</span></a> (<code class="docutils literal notranslate"><span class="pre">to_value</span></code>/<code class="docutils literal notranslate"><span class="pre">from_value</span></code> in Python,
-<code class="docutils literal notranslate"><span class="pre">toValue</span></code>/<code class="docutils literal notranslate"><span class="pre">fromValue</span></code> in JavaScript) convert your models to and from it.</p>
-</section>
-<section id="patch-and-revisions">
-<h2>Patch and revisions<a class="headerlink" href="#patch-and-revisions" title="Link to this heading">¶</a></h2>
-<p>A <strong>Patch</strong> is the incremental update between two values: an ordered list of operations
-(<code class="docutils literal notranslate"><span class="pre">Set</span></code>, <code class="docutils literal notranslate"><span class="pre">Remove</span></code>, <code class="docutils literal notranslate"><span class="pre">Insert</span></code>, <code class="docutils literal notranslate"><span class="pre">RemoveAt</span></code>) addressed by a path into the value, plus a <code class="docutils literal notranslate"><span class="pre">rev</span></code> (revision)
-counter. This is the core idea that distinguishes transports from “serialize the whole model and
-send it”: when one field changes, only that field’s operation travels.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;Set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;Key&quot;</span><span class="p">:</span> <span class="s2">&quot;on&quot;</span><span class="p">}],</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;Bool&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}}}]}</span>
-</pre></div>
-</div>
-<p>The engine guarantees the round-trip property <code class="docutils literal notranslate"><span class="pre">apply(old,</span> <span class="pre">diff(old,</span> <span class="pre">new))</span> <span class="pre">==</span> <span class="pre">new</span></code>. Maps diff by key
-and lists diff positionally; a type change at a path replaces the value there wholesale.</p>
-</section>
-<section id="store-and-session">
-<h2>Store and Session<a class="headerlink" href="#store-and-session" title="Link to this heading">¶</a></h2>
-<p>The low-level <a class="reference internal" href="api.html#transports.Store" title="transports.Store"><code class="xref py py-class docutils literal notranslate"><span class="pre">Store</span></code></a> holds model values by id and, on <code class="docutils literal notranslate"><span class="pre">mutate</span></code>, diffs the new
-value against the held one, bumps the <code class="docutils literal notranslate"><span class="pre">rev</span></code>, and returns the patch. The high-level
-<a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a> wraps it with the model bridge and reactive observation, so you work
-with your own model objects and get patches automatically — see <a class="reference internal" href="bridges.html"><span class="std std-doc">Model bridges</span></a>.</p>
-</section>
-<section id="codecs">
-<h2>Codecs<a class="headerlink" href="#codecs" title="Link to this heading">¶</a></h2>
-<p>The wire format is pluggable. JSON is the default; <strong>MessagePack</strong> is a compact binary alternative.
-Both are self-describing — they need no schema — and produce identical bytes from Python and
-JavaScript. See <a class="reference internal" href="codecs.html"><span class="std std-doc">Codecs</span></a>.</p>
-</section>
-<section id="connections">
-<h2>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h2>
-<p>Patches travel between processes over a <strong>WebSocket</strong>: a server hosts a <code class="docutils literal notranslate"><span class="pre">Session</span></code> and a client — in
-Python or the browser — mirrors the model live. See <a class="reference internal" href="connections.html"><span class="std std-doc">Connections</span></a>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">transports.encode(value)</span></code> / <code class="docutils literal notranslate"><span class="pre">transports.decode(bytes)</span></code> are JSON shortcuts. In JavaScript the same
+pair is <code class="docutils literal notranslate"><span class="pre">encodeAs(value,</span> <span class="pre">codec)</span></code> / <code class="docutils literal notranslate"><span class="pre">decodeAs(bytes,</span> <span class="pre">codec)</span></code>.</p>
+<p>Because a codec only changes the <em>bytes</em> — never the model, the <code class="docutils literal notranslate"><span class="pre">Value</span></code>, or the patch semantics —
+switching formats is a one-line change and never touches your models. MessagePack is typically the
+choice for production traffic; JSON is convenient for debugging.</p>
 </section>
 </section>
 
@@ -309,23 +292,23 @@ Python or the browser — mirrors the model live. See <a class="reference intern
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="bridges.html">
+          <a class="next-page" href="api.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Model bridges</div>
+                <div class="title">API Reference</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="quickstart.html">
+          <a class="prev-page" href="connections.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Quickstart</div>
+                <div class="title">Connections</div>
                 
               </div>
             </a>
@@ -359,13 +342,8 @@ Python or the browser — mirrors the model live. See <a class="reference intern
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Concepts</a><ul>
-<li><a class="reference internal" href="#one-core-two-bindings">One core, two bindings</a></li>
-<li><a class="reference internal" href="#value">Value</a></li>
-<li><a class="reference internal" href="#patch-and-revisions">Patch and revisions</a></li>
-<li><a class="reference internal" href="#store-and-session">Store and Session</a></li>
-<li><a class="reference internal" href="#codecs">Codecs</a></li>
-<li><a class="reference internal" href="#connections">Connections</a></li>
+<li><a class="reference internal" href="#">Codecs</a><ul>
+<li><a class="reference internal" href="#encoding">Encoding</a></li>
 </ul>
 </li>
 </ul>

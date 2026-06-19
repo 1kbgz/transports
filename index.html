@@ -200,6 +200,8 @@
 <li class="toctree-l1"><a class="reference internal" href="docs/src/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">Model bridges</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">Connections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">Codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API Reference</a></li>
 </ul>
 
@@ -246,9 +248,9 @@
 <p>Move typed models across any wire.</p>
 <p>Define a model once — as a <a class="reference external" href="https://docs.pydantic.dev">pydantic</a> model, a stdlib <code class="docutils literal notranslate"><span class="pre">dataclass</span></code>, or a
 <a class="reference external" href="https://jcristharif.com/msgspec/">msgspec</a> struct — host it, and its mutations stream to peers as
-<strong>incremental patches</strong> (not whole-model resends). A Rust core (model representation, diff/patch,
-codecs, framing) compiles to Python (PyO3) and JavaScript (wasm), so both ends share one
-implementation byte-for-byte.</p>
+<strong>incremental patches</strong> (not whole-model resends), over a WebSocket, in JSON or MessagePack. A Rust
+core (model representation, diff/patch, codecs, framing) compiles to Python (PyO3) and JavaScript
+(wasm), so both ends share one implementation.</p>
 <p><a class="reference external" href="https://github.com/1kbgz/transports"><img alt="License" src="https://img.shields.io/github/license/1kbgz/transports" /></a>
 <a class="reference external" href="https://pypi.python.org/pypi/transports"><img alt="PyPI" src="https://img.shields.io/pypi/v/transports.svg" /></a></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
@@ -271,6 +273,7 @@ implementation byte-for-byte.</p>
 <section id="install">
 <h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w">   </span><span class="c1"># adds the WebSocket server/client adapters</span>
 </pre></div>
 </div>
 </section>
@@ -279,15 +282,19 @@ implementation byte-for-byte.</p>
 <ul class="simple">
 <li><p><strong>Reactive models</strong> — mutate a field, get the minimal patch. No manual diffing or <code class="docutils literal notranslate"><span class="pre">send()</span></code>.</p></li>
 <li><p><strong>Three model kinds, one contract</strong> — pydantic, dataclass, and msgspec all bridge to the same core.</p></li>
-<li><p><strong>One core, two languages</strong> — Python and JavaScript share the Rust diff/patch and codec, so a patch
-produced on one side applies on the other.</p></li>
+<li><p><strong>One core, two languages</strong> — Python and JavaScript share the Rust diff/patch and codecs, so a
+patch produced on one side applies on the other.</p></li>
+<li><p><strong>Live sync over WebSocket</strong> — host a model on a server and mirror it in the browser; mutate it in
+Python and the page updates. See <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a>.</p></li>
+<li><p><strong>JSON or MessagePack</strong> — swap the wire format without touching your models. See
+<a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a>.</p></li>
 </ul>
 </section>
-<section id="status">
-<h2>Status<a class="headerlink" href="#status" title="Link to this heading">¶</a></h2>
-<p>Early. The Rust core (model, diff/patch with revisions, JSON codec, frame envelope, in-process store)
-and the model bridges are in. Binary codecs (MessagePack, …) and network connections (WebSocket, SSE,
-…) are on the <a class="reference external" href="https://github.com/1kbgz/transports/blob/main/ROADMAP.md">roadmap</a>.</p>
+<section id="documentation">
+<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
+<p><a class="reference internal" href="docs/src/quickstart.html"><span class="std std-doc">Quickstart</span></a> · <a class="reference internal" href="docs/src/concepts.html"><span class="std std-doc">Concepts</span></a> ·
+<a class="reference internal" href="docs/src/bridges.html"><span class="std std-doc">Model bridges</span></a> · <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a> ·
+<a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> · <a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a></p>
 </section>
 </section>
 

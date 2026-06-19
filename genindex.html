@@ -198,6 +198,8 @@
 <li class="toctree-l1"><a class="reference internal" href="docs/src/quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">Model bridges</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">Connections</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">Codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API Reference</a></li>
 </ul>
 
@@ -234,7 +236,7 @@
           
 <section class="genindex-section">
   <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a></div>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a></div>
 </section>
 <section id="A" class="genindex-section">
   <h2>A</h2>
@@ -250,6 +252,24 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Session.apply_patch">apply_patch() (transports.Session method)</a>
 </li>
+        <li><a href="docs/src/api.html#transports.autoflush">autoflush() (in module transports)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="C" class="genindex-section">
+  <h2>C</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Client">Client (class in transports)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Server.close">close() (transports.Server method)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.Client.connect">connect() (transports.Client method)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>
@@ -259,6 +279,8 @@
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.decode">decode() (in module transports)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.decode_as">decode_as() (in module transports)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
@@ -274,7 +296,13 @@
   <h2>E</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Client.edit">edit() (transports.Client method)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.encode">encode() (in module transports)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.encode_as">encode_as() (in module transports)</a>
 </li>
     </ul></td>
   </tr></table>
@@ -284,8 +312,12 @@
   <h2>F</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="docs/src/api.html#transports.Session.flush">flush() (transports.Session method)</a>
+        <li><a href="docs/src/api.html#transports.Server.flush">flush() (transports.Server method)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.Session.flush">(transports.Session method)</a>
 </li>
+        </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.from_value">from_value() (in module transports)</a>
@@ -312,8 +344,12 @@
   <h2>I</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="docs/src/api.html#transports.Session.ids">ids() (transports.Session method)</a>
+        <li><a href="docs/src/api.html#transports.Client.ids">ids() (transports.Client method)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.Session.ids">(transports.Session method)</a>
 </li>
+        </ul></li>
     </ul></td>
   </tr></table>
 </section>
@@ -321,6 +357,10 @@
 <section id="M" class="genindex-section">
   <h2>M</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Client.model">model() (transports.Client method)</a>
+</li>
+    </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Store.mutate">mutate() (transports.Store method)</a>
 </li>
@@ -335,6 +375,24 @@
         <li><a href="docs/src/api.html#transports.Session.on_patch">on_patch() (transports.Session method)</a>
 </li>
     </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Server.open">open() (transports.Server method)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="R" class="genindex-section">
+  <h2>R</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Client.recv">recv() (transports.Client method)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.Server.recv">(transports.Server method)</a>
+</li>
+        </ul></li>
+    </ul></td>
   </tr></table>
 </section>
 
@@ -348,6 +406,8 @@
 </li>
         <li><a href="docs/src/api.html#transports.schema_to_ts">schema_to_ts() (in module transports)</a>
 </li>
+        <li><a href="docs/src/api.html#transports.Server">Server (class in transports)</a>
+</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Session">Session (class in transports)</a>
@@ -358,6 +418,8 @@
           <li><a href="docs/src/api.html#transports.Store.snapshot">(transports.Store method)</a>
 </li>
         </ul></li>
+        <li><a href="docs/src/api.html#transports.starlette_endpoint">starlette_endpoint() (in module transports)</a>
+</li>
         <li><a href="docs/src/api.html#transports.Store">Store (class in transports)</a>
 </li>
     </ul></td>
@@ -388,8 +450,12 @@
   <h2>V</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
-        <li><a href="docs/src/api.html#transports.Session.value">value() (transports.Session method)</a>
+        <li><a href="docs/src/api.html#transports.Client.value">value() (transports.Client method)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.Session.value">(transports.Session method)</a>
 </li>
+        </ul></li>
     </ul></td>
   </tr></table>
 </section>
