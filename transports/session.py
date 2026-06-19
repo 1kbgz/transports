@@ -15,7 +15,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from bigbrother import watch
 
-from ._bridge import schema_of, to_value
+from ._bridge import _annotations, from_value, schema_of, to_value
 from .transports import Store as _CoreStore
 
 
@@ -25,6 +25,7 @@ class Session:
         self._models: Dict[int, Any] = {}
         self._schemas: Dict[str, dict] = {}
         self._dirty: Set[int] = set()
+        self._suppress: Set[int] = set()  # ids whose observation is suspended (during inbound apply)
         self.outbox: List[Tuple[int, dict]] = []
         self._on_patch: Optional[Callable[[int, dict], None]] = None
 
@@ -35,7 +36,8 @@ class Session:
         mid = self._store.host(type_name, json.dumps(to_value(model)))
 
         def _watcher(obj: object, method: str, ref: object, call_args: tuple, call_kwargs: dict, _mid: int = mid) -> None:
-            self._dirty.add(_mid)
+            if _mid not in self._suppress:  # ignore writes we make ourselves while applying inbound patches
+                self._dirty.add(_mid)
 
         self._models[mid] = watch(model, _watcher, deepstate=True)
         return mid
@@ -93,8 +95,47 @@ class Session:
         return self.snapshot(mid)["value"]
 
     def apply_patch(self, mid: int, patch: dict) -> bool:
-        """Apply a remote patch to a hosted/mirrored model's core value. Returns whether id was known."""
-        return self._store.apply(mid, json.dumps(patch))
+        """Apply an authoritative remote patch to a hosted/mirrored model (adopts the patch's `rev`).
+
+        Also refreshes the hosted Python object so the caller's own reference stays in sync — the
+        update is made under observation suppression so it doesn't echo back as a new patch.
+        """
+        return self._apply_authoritative(mid, patch)
+
+    def submit(self, mid: int, patch: dict) -> Optional[dict]:
+        """Apply a client-proposed patch *as the server*: the server owns `rev`.
+
+        The proposal's ops are applied to the hosted value, the server's `rev` is bumped (not the
+        client's guess), the hosted Python object is refreshed, and the authoritative patch (with the
+        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown.
+        """
+        snap = self._store.snapshot(mid)
+        if snap is None:
+            return None
+        cur_rev = json.loads(snap)["rev"]
+        authoritative = {"rev": cur_rev + 1, "ops": patch.get("ops", [])}
+        self._apply_authoritative(mid, authoritative)
+        return authoritative
+
+    def _apply_authoritative(self, mid: int, patch: dict) -> bool:
+        if not self._store.apply(mid, json.dumps(patch)):
+            return False
+        self._refresh_model(mid)
+        return True
+
+    def _refresh_model(self, mid: int) -> None:
+        """Rewrite the hosted Python object from the core value, without re-triggering observation."""
+        obj = self._models.get(mid)
+        snap = self._store.snapshot(mid)
+        if obj is None or snap is None:
+            return
+        fresh = from_value(json.loads(snap)["value"], type(obj))
+        self._suppress.add(mid)
+        try:
+            for name in _annotations(type(obj)):
+                setattr(obj, name, getattr(fresh, name))
+        finally:
+            self._suppress.discard(mid)
 
     def schema(self, type_name: str) -> Optional[dict]:
         return self._schemas.get(type_name)

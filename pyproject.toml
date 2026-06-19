@@ -44,21 +44,35 @@ connections = [
     "starlette",
     "websockets",
 ]
+# Server-Sent Events adapter (Starlette server stream, httpx client)
+sse = [
+    "sse-starlette",
+    "httpx-sse",
+    "httpx",
+]
+# Jupyter comm adapter (kernel-side comm channel)
+jupyter = [
+    "comm",
+]
 develop = [
     "build",
     "bump-my-version",
     "check-dist",
     "cibuildwheel",
     "codespell",
+    "comm",
     "hatch-js",
     "hatch-rs",
     "hatchling",
     "httpx",
+    "httpx-sse",
+    "ipykernel",
     "mdformat",
     "mdformat-tables>=1",
     "pytest",
     "pytest-cov",
     "ruff",
+    "sse-starlette",
     "starlette",
     "twine",
     "websockets",

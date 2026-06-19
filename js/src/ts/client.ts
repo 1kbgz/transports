@@ -1,5 +1,5 @@
 import { codecFor } from "./codecs";
-import { apply, msgpackToJson } from "./index";
+import { apply, diff, jsonToMsgpack, msgpackToJson } from "./index";
 
 type SnapshotMsg = {
   t: "snapshot";
@@ -60,6 +60,22 @@ export class Client {
     return [...this.values.keys()];
   }
 
+  /** Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
+   *
+   * Server-authoritative: the local mirror updates when the server echoes the authoritative patch
+   * back via `recv`, not optimistically.
+   */
+  edit(id: number, value: unknown): string | Uint8Array {
+    const patch = JSON.parse(
+      diff(JSON.stringify(this.values.get(id)), JSON.stringify(value)),
+    );
+    const msg = { t: "patch", id, patch };
+    const custom = codecFor(this.codec);
+    if (custom) return custom.encode(msg);
+    const s = JSON.stringify(msg);
+    return this.codec === "msgpack" ? jsonToMsgpack(s) : s;
+  }
+
   /** Connect to a transports server and mirror it. Returns the `WebSocket`. */
   connect(url: string): WebSocket {
     const sep = url.includes("?") ? "&" : "?";
@@ -72,5 +88,14 @@ export class Client {
       );
     });
     return ws;
+  }
+
+  /** Mirror a server over Server-Sent Events (receive-only, JSON). Returns the `EventSource`. */
+  connectSSE(url: string): EventSource {
+    const es = new EventSource(url);
+    es.addEventListener("message", (e) =>
+      this.recv((e as MessageEvent).data as string),
+    );
+    return es;
   }
 }

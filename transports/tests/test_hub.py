@@ -46,7 +46,7 @@ def test_private_edit_relays_only_within_tenant():
 
     edit = '{"t":"patch","id":1,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"x"}],"value":{"Int":7}}}]}}'
     out = h.recv(a1, edit)
-    assert set(out) == {a2}  # relayed to the other connection in t1, not to t2
+    assert set(out) == {a1, a2}  # server-authoritative: echoed to all of t1 (incl origin), not t2
     for m in out[a2]:
         ca2.recv(m)
     assert ca2.value(1)["Map"]["x"] == {"Int": 7}

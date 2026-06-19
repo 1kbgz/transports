@@ -134,3 +134,24 @@ test("Client mirrors a snapshot then a patch", async () => {
   );
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
+
+test("Client.edit is send-only; mirror updates on the server echo", async () => {
+  const c = new Client();
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 0,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  const frame = c.edit(1, { Map: { on: { Bool: true } } });
+  const msg = JSON.parse(frame);
+  expect(msg.t).toBe("patch");
+  // server-authoritative: edit does not mutate the local mirror...
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: false } } });
+  // ...the mirror updates when the server echoes the authoritative patch back
+  c.recv(JSON.stringify({ t: "patch", id: 1, patch: msg.patch }));
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
+});

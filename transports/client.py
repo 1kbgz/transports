@@ -52,11 +52,13 @@ class Client:
         return list(self._values)
 
     def edit(self, mid: int, new_value: Any) -> Union[str, bytes]:
-        """Locally edit a mirrored model and return the patch frame to send (encoded in this codec)."""
+        """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
+
+        Models are server-authoritative: the edit is a proposal, and the local mirror updates only
+        when the server echoes the authoritative patch back (via `recv`), not optimistically. This
+        keeps `rev` owned by the server and avoids client/server `rev` divergence.
+        """
         patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
-        patch["rev"] = self._rev[mid] + 1
-        self._values[mid] = new_value
-        self._rev[mid] = patch["rev"]
         return protocol.encode(protocol.patch_msg(mid, patch), self._codec)
 
     async def connect(self, url: str) -> None:
@@ -70,3 +72,16 @@ class Client:
         async with websockets.connect(f"{url}{sep}codec={self._codec}") as ws:
             async for frame in ws:
                 self.recv(frame)
+
+    async def connect_sse(self, url: str) -> None:
+        """Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.
+
+        SSE is a one-way server→client channel, so this only receives snapshots and patches; use
+        `connect()` (WebSocket) when the client also needs to send edits.
+        """
+        import httpx
+        from httpx_sse import aconnect_sse
+
+        async with httpx.AsyncClient() as http, aconnect_sse(http, "GET", url) as source:
+            async for event in source.aiter_sse():
+                self.recv(event.data)

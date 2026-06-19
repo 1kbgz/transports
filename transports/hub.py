@@ -190,9 +190,10 @@ class Hub:
     def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
         """Handle an inbound patch; returns messages to send, keyed by connection.
 
-        A patch to a private model is applied to the tenant's session and relayed to that tenant's
-        *other* connections. A patch to a shared model (from a `WRITE` subscriber) is merged into the
-        authoritative value and the resulting patch is broadcast to every subscriber connection.
+        A patch to a private model is applied as the server (the tenant's session owns `rev`) and the
+        authoritative patch is broadcast to *all* of that tenant's connections. A patch to a shared
+        model (from a `WRITE` subscriber) is merged into the authoritative value and broadcast to
+        every subscriber connection. Both paths are server-authoritative (origin included).
         """
         msg = protocol.decode(data, self._codecs.get(conn))
         if msg.get("t") != "patch":
@@ -208,9 +209,11 @@ class Hub:
         sess = self._tenants.get(key)
         if sess is None:
             return {}
-        sess.apply_patch(wire_id, msg["patch"])
-        relay = protocol.patch_msg(wire_id, msg["patch"])
-        return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key and c is not conn}
+        authoritative = sess.submit(wire_id, msg["patch"])
+        if authoritative is None:
+            return {}
+        relay = protocol.patch_msg(wire_id, authoritative)
+        return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key}
 
     def flush(self) -> Dict[Any, List[Wire]]:
         """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription."""
