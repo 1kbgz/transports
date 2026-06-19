@@ -76,7 +76,7 @@ Homepage = "https://github.com/1kbgz/transports"
 [tool.bumpversion]
 current_version = "0.1.2"
 commit = true
-tag = true
+tag = false 
 commit_args = "-s"
 
 [[tool.bumpversion.files]]
