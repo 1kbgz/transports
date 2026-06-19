@@ -287,7 +287,15 @@ connected clients.</p>
 </pre></div>
 </div>
 <p>On connect, a client receives a snapshot of every hosted model, then a stream of patches. A patch a
-client sends back is applied and relayed to the <em>other</em> clients, so the server acts as a hub.</p>
+client sends back is applied and broadcast, so the server acts as a hub.</p>
+<section id="server-authoritative-edits">
+<h3>Server-authoritative edits<a class="headerlink" href="#server-authoritative-edits" title="Link to this heading">¶</a></h3>
+<p>Models are <strong>server-authoritative</strong>: a client’s <code class="docutils literal notranslate"><span class="pre">edit(id,</span> <span class="pre">value)</span></code> is a <em>proposal</em>. The server applies
+it, owns the revision (<code class="docutils literal notranslate"><span class="pre">rev</span></code>), and echoes the authoritative patch to <strong>every</strong> connection — including
+the one that sent it. A client’s local mirror therefore updates when that echo arrives, not
+optimistically, so all mirrors and the server’s own hosted object stay in lock-step without <code class="docutils literal notranslate"><span class="pre">rev</span></code>
+drift. (For multi-writer convergence on shared models, see <a class="reference internal" href="multitenancy.html"><span class="std std-doc">Multi-tenancy</span></a>.)</p>
+</section>
 <section id="choosing-a-codec">
 <h3>Choosing a codec<a class="headerlink" href="#choosing-a-codec" title="Link to this heading">¶</a></h3>
 <p>Each connection negotiates its wire format with a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param (<code class="docutils literal notranslate"><span class="pre">json</span></code>, the default, or
@@ -321,6 +329,48 @@ binary frame) and read with <code class="docutils literal notranslate"><span cla
 <span class="p">});</span>
 </pre></div>
 </div>
+</section>
+<section id="server-sent-events-receive-only">
+<h2>Server-Sent Events (receive-only)<a class="headerlink" href="#server-sent-events-receive-only" title="Link to this heading">¶</a></h2>
+<p>For receive-mostly UIs (dashboards), a server can push over <strong>SSE</strong> — a one-way server→client stream.
+<a class="reference internal" href="api.html#transports.sse_endpoint" title="transports.sse_endpoint"><code class="xref py py-func docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a> builds a Starlette route; run <a class="reference internal" href="api.html#transports.autoflush" title="transports.autoflush"><code class="xref py py-func docutils literal notranslate"><span class="pre">autoflush()</span></code></a> to
+stream changes. Clients receive snapshots and patches but do not send edits back (use WebSocket for
+that).</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[sse]&quot;</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Route</span>
+
+<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">Route</span><span class="p">(</span><span class="s2">&quot;/sse&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+    <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="k">lambda</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_sse</span><span class="p">(</span><span class="s2">&quot;http://localhost:8000/sse&quot;</span><span class="p">)</span>   <span class="c1"># mirrors until the stream closes</span>
+</pre></div>
+</div>
+<p>In the browser, the JavaScript <code class="docutils literal notranslate"><span class="pre">Client</span></code> mirrors a stream with <code class="docutils literal notranslate"><span class="pre">connectSSE(url)</span></code> (native
+<code class="docutils literal notranslate"><span class="pre">EventSource</span></code>).</p>
+</section>
+<section id="jupyter-comm">
+<h2>Jupyter (comm)<a class="headerlink" href="#jupyter-comm" title="Link to this heading">¶</a></h2>
+<p>Inside a kernel, a model syncs to the frontend over a <strong>Jupyter comm</strong> — the same channel ipywidgets
+use. <a class="reference internal" href="api.html#transports.serve_comm" title="transports.serve_comm"><code class="xref py py-func docutils literal notranslate"><span class="pre">serve_comm()</span></code></a> wires a comm (the connection handle) to a <code class="docutils literal notranslate"><span class="pre">Server</span></code>/<code class="docutils literal notranslate"><span class="pre">Hub</span></code>;
+<a class="reference internal" href="api.html#transports.pump_comms" title="transports.pump_comms"><code class="xref py py-func docutils literal notranslate"><span class="pre">pump_comms()</span></code></a> pushes host-side changes after you mutate models.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[jupyter]&quot;</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">comm</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_comm</span>
+
+<span class="n">comm</span> <span class="o">=</span> <span class="n">create_comm</span><span class="p">(</span><span class="n">target_name</span><span class="o">=</span><span class="s2">&quot;transports&quot;</span><span class="p">)</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>   <span class="c1"># send snapshots, relay inbound edits</span>
+<span class="c1"># ... mutate hosted models ...</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>          <span class="c1"># push patches to the frontend</span>
+</pre></div>
+</div>
+<p>The comm carries the same messages, so the browser <code class="docutils literal notranslate"><span class="pre">Client</span></code> mirrors it unchanged.</p>
 </section>
 <section id="runnable-example">
 <h2>Runnable example<a class="headerlink" href="#runnable-example" title="Link to this heading">¶</a></h2>
@@ -391,11 +441,14 @@ python<span class="w"> </span>examples/server.py<span class="w">    </span><span
             <ul>
 <li><a class="reference internal" href="#">Connections</a><ul>
 <li><a class="reference internal" href="#server">Server</a><ul>
+<li><a class="reference internal" href="#server-authoritative-edits">Server-authoritative edits</a></li>
 <li><a class="reference internal" href="#choosing-a-codec">Choosing a codec</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#python-client">Python client</a></li>
 <li><a class="reference internal" href="#browser-client">Browser client</a></li>
+<li><a class="reference internal" href="#server-sent-events-receive-only">Server-Sent Events (receive-only)</a></li>
+<li><a class="reference internal" href="#jupyter-comm">Jupyter (comm)</a></li>
 <li><a class="reference internal" href="#runnable-example">Runnable example</a></li>
 </ul>
 </li>

@@ -305,7 +305,18 @@ call <code class="docutils literal notranslate"><span class="pre">update(id)</sp
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Session.apply_patch">
 <span class="sig-name descname"><span class="pre">apply_patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.apply_patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.apply_patch" title="Link to this definition">¶</a></dt>
-<dd><p>Apply a remote patch to a hosted/mirrored model’s core value. Returns whether id was known.</p>
+<dd><p>Apply an authoritative remote patch to a hosted/mirrored model (adopts the patch’s <cite>rev</cite>).</p>
+<p>Also refreshes the hosted Python object so the caller’s own reference stays in sync — the
+update is made under observation suppression so it doesn’t echo back as a new patch.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Session.submit">
+<span class="sig-name descname"><span class="pre">submit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.submit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.submit" title="Link to this definition">¶</a></dt>
+<dd><p>Apply a client-proposed patch <em>as the server</em>: the server owns <cite>rev</cite>.</p>
+<p>The proposal’s ops are applied to the hosted value, the server’s <cite>rev</cite> is bumped (not the
+client’s guess), the hosted Python object is refreshed, and the authoritative patch (with the
+server <cite>rev</cite>) is returned to broadcast to every connection. <cite>None</cite> if the id is unknown.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -363,8 +374,10 @@ the messages to send; an adapter such as <cite>starlette_endpoint</cite> perform
 <dt class="sig sig-object py" id="transports.Server.recv">
 <span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.recv" title="Link to this definition">¶</a></dt>
 <dd><p>Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.</p>
-<p>A client patch is applied to the hosted model’s value and relayed to the <em>other</em> connections,
-so the server acts as a hub. Each relay is encoded in the target connection’s codec.</p>
+<p>A client patch is a <em>proposal</em>: the server applies it, bumps its own authoritative <cite>rev</cite>, and
+echoes the resulting patch to <strong>every</strong> connection (including the origin), each in that
+connection’s codec. Models are server-authoritative — a client’s mirror updates when this echo
+arrives, not optimistically.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -415,7 +428,10 @@ automatically from their type (text=JSON, binary=msgpack).</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.edit">
 <span class="sig-name descname"><span class="pre">edit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.edit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.edit" title="Link to this definition">¶</a></dt>
-<dd><p>Locally edit a mirrored model and return the patch frame to send (encoded in this codec).</p>
+<dd><p>Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).</p>
+<p>Models are server-authoritative: the edit is a proposal, and the local mirror updates only
+when the server echoes the authoritative patch back (via <cite>recv</cite>), not optimistically. This
+keeps <cite>rev</cite> owned by the server and avoids client/server <cite>rev</cite> divergence.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -423,6 +439,14 @@ automatically from their type (text=JSON, binary=msgpack).</p>
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect" title="Link to this definition">¶</a></dt>
 <dd><p>Connect to a transports server and mirror it until the connection closes.</p>
 <p>Appends <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> for the client’s codec so the server frames messages to match.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.connect_sse">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect_sse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect_sse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect_sse" title="Link to this definition">¶</a></dt>
+<dd><p>Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</p>
+<p>SSE is a one-way server→client channel, so this only receives snapshots and patches; use
+<cite>connect()</cite> (WebSocket) when the client also needs to send edits.</p>
 </dd></dl>
 
 </dd></dl>
@@ -442,6 +466,31 @@ background task to stream server-side model changes to clients.</p>
 <dd><p>Background task: periodically flush and broadcast patches to all connections.</p>
 <p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
 client.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.sse_endpoint">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">sse_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/sse.html#sse_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.sse_endpoint" title="Link to this definition">¶</a></dt>
+<dd><p>Build a Starlette endpoint that streams a <cite>Server</cite>/<cite>Hub</cite> to a client over SSE.</p>
+<p>Wire it into an app as a normal route (<code class="docutils literal notranslate"><span class="pre">Route(&quot;/sse&quot;,</span> <span class="pre">sse_endpoint(server))</span></code>) and run
+<cite>autoflush(server)</cite> as a background task to stream server-side model changes to connected clients.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.serve_comm">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">serve_comm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../../_modules/transports/comm.html#serve_comm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.serve_comm" title="Link to this definition">¶</a></dt>
+<dd><p>Wire a comm to a <cite>Server</cite>/<cite>Hub</cite>: send the opening snapshots and relay inbound messages.</p>
+<p>The comm is registered as a connection; its messages (<code class="docutils literal notranslate"><span class="pre">msg[&quot;content&quot;][&quot;data&quot;]</span></code>) are fed to
+<code class="docutils literal notranslate"><span class="pre">server.recv</span></code> and any resulting messages are sent back over the relevant comms. Returns the comm
+(the connection handle), so the caller can <cite>pump_comms(server)</cite> after host-side mutations.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.pump_comms">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">pump_comms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/comm.html#pump_comms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.pump_comms" title="Link to this definition">¶</a></dt>
+<dd><p>Flush host-side changes and push the resulting patches to every connected comm.</p>
+<p>Call after mutating hosted models (e.g. at the end of a cell, or from a timer). Each connection
+handle is a comm, so the patches are delivered with <cite>comm.send</cite>.</p>
 </dd></dl>
 
 </section>
@@ -486,9 +535,10 @@ shared model gets its own instance) or an instance to reuse.</p>
 <dt class="sig sig-object py" id="transports.Hub.recv">
 <span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.recv" title="Link to this definition">¶</a></dt>
 <dd><p>Handle an inbound patch; returns messages to send, keyed by connection.</p>
-<p>A patch to a private model is applied to the tenant’s session and relayed to that tenant’s
-<em>other</em> connections. A patch to a shared model (from a <cite>WRITE</cite> subscriber) is merged into the
-authoritative value and the resulting patch is broadcast to every subscriber connection.</p>
+<p>A patch to a private model is applied as the server (the tenant’s session owns <cite>rev</cite>) and the
+authoritative patch is broadcast to <em>all</em> of that tenant’s connections. A patch to a shared
+model (from a <cite>WRITE</cite> subscriber) is merged into the authoritative value and broadcast to
+every subscriber connection. Both paths are server-authoritative (origin included).</p>
 </dd></dl>
 
 <dl class="py method">
@@ -715,6 +765,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Session.snapshot"><code class="docutils literal notranslate"><span class="pre">Session.snapshot()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.value"><code class="docutils literal notranslate"><span class="pre">Session.value()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.apply_patch"><code class="docutils literal notranslate"><span class="pre">Session.apply_patch()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Session.submit"><code class="docutils literal notranslate"><span class="pre">Session.submit()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.schema"><code class="docutils literal notranslate"><span class="pre">Session.schema()</span></code></a></li>
 </ul>
 </li>
@@ -742,10 +793,14 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.edit"><code class="docutils literal notranslate"><span class="pre">Client.edit()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.connect_sse"><code class="docutils literal notranslate"><span class="pre">Client.connect_sse()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#transports.starlette_endpoint"><code class="docutils literal notranslate"><span class="pre">starlette_endpoint()</span></code></a></li>
 <li><a class="reference internal" href="#transports.autoflush"><code class="docutils literal notranslate"><span class="pre">autoflush()</span></code></a></li>
+<li><a class="reference internal" href="#transports.sse_endpoint"><code class="docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a></li>
+<li><a class="reference internal" href="#transports.serve_comm"><code class="docutils literal notranslate"><span class="pre">serve_comm()</span></code></a></li>
+<li><a class="reference internal" href="#transports.pump_comms"><code class="docutils literal notranslate"><span class="pre">pump_comms()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#multi-tenancy-sharing">Multi-tenancy &amp; sharing</a><ul>

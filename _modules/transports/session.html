@@ -253,7 +253,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">bigbrother</span><span class="w"> </span><span class="kn">import</span> <span class="n">watch</span>
 
-<span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">schema_of</span><span class="p">,</span> <span class="n">to_value</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">_annotations</span><span class="p">,</span> <span class="n">from_value</span><span class="p">,</span> <span class="n">schema_of</span><span class="p">,</span> <span class="n">to_value</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">Store</span> <span class="k">as</span> <span class="n">_CoreStore</span>
 
 
@@ -265,6 +265,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_schemas</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="p">:</span> <span class="n">Set</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># ids whose observation is suspended (during inbound apply)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -277,7 +278,8 @@
         <span class="n">mid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)))</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">_watcher</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">call_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">call_kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">_mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">mid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_mid</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">_mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="p">:</span>  <span class="c1"># ignore writes we make ourselves while applying inbound patches</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_mid</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">watch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">_watcher</span><span class="p">,</span> <span class="n">deepstate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">mid</span></div>
@@ -359,9 +361,51 @@
 <div class="viewcode-block" id="Session.apply_patch">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.apply_patch">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a remote patch to a hosted/mirrored model&#39;s core value. Returns whether id was known.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">))</span></div>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply an authoritative remote patch to a hosted/mirrored model (adopts the patch&#39;s `rev`).</span>
 
+<span class="sd">        Also refreshes the hosted Python object so the caller&#39;s own reference stays in sync — the</span>
+<span class="sd">        update is made under observation suppression so it doesn&#39;t echo back as a new patch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Session.submit">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Session.submit">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a client-proposed patch *as the server*: the server owns `rev`.</span>
+
+<span class="sd">        The proposal&#39;s ops are applied to the hosted value, the server&#39;s `rev` is bumped (not the</span>
+<span class="sd">        client&#39;s guess), the hosted Python object is refreshed, and the authoritative patch (with the</span>
+<span class="sd">        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="n">cur_rev</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
+        <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">cur_rev</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[])}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">authoritative</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_apply_authoritative</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)):</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_model</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rewrite the hosted Python object from the core value, without re-triggering observation.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">fresh</span> <span class="o">=</span> <span class="n">from_value</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_annotations</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)):</span>
+                <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">fresh</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Session.schema">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.schema">[docs]</a>

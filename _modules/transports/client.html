@@ -306,11 +306,13 @@
 <div class="viewcode-block" id="Client.edit">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.edit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Locally edit a mirrored model and return the patch frame to send (encoded in this codec).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).</span>
+
+<span class="sd">        Models are server-authoritative: the edit is a proposal, and the local mirror updates only</span>
+<span class="sd">        when the server echoes the authoritative patch back (via `recv`), not optimistically. This</span>
+<span class="sd">        keeps `rev` owned by the server and avoids client/server `rev` divergence.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_value</span><span class="p">)))</span>
-        <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">new_value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
         <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span></div>
 
 
@@ -327,6 +329,22 @@
         <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}</span><span class="s2">codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
             <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Client.connect_sse">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect_sse">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect_sse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</span>
+
+<span class="sd">        SSE is a one-way server→client channel, so this only receives snapshots and patches; use</span>
+<span class="sd">        `connect()` (WebSocket) when the client also needs to send edits.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
+        <span class="kn">from</span><span class="w"> </span><span class="nn">httpx_sse</span><span class="w"> </span><span class="kn">import</span> <span class="n">aconnect_sse</span>
+
+        <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">http</span><span class="p">,</span> <span class="n">aconnect_sse</span><span class="p">(</span><span class="n">http</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+            <span class="k">async</span> <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">aiter_sse</span><span class="p">():</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">)</span></div>
 </div>
 
 </pre></div>
