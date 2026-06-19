@@ -457,7 +457,7 @@
 <span class="sd">        *other* connections. A patch to a shared model (from a `WRITE` subscriber) is merged into the</span>
 <span class="sd">        authoritative value and the resulting patch is broadcast to every subscriber connection.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">))</span>
         <span class="k">if</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span> <span class="o">!=</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{}</span>
         <span class="n">wire_id</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span>
