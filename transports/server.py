@@ -21,7 +21,11 @@ Wire = Union[str, bytes]
 
 
 class Broadcaster(Protocol):
-    """The structural contract `autoflush` drives — satisfied by both `Server` and `Hub`."""
+    """The structural contract the I/O adapters drive — satisfied by both `Server` and `Hub`."""
+
+    def open(self, conn: Any, codec: str = ...) -> List[Wire]: ...
+
+    def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]: ...
 
     def flush(self) -> Dict[Any, List[Wire]]: ...
 
@@ -55,14 +59,18 @@ class Server:
     def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
         """Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.
 
-        A client patch is applied to the hosted model's value and relayed to the *other* connections,
-        so the server acts as a hub. Each relay is encoded in the target connection's codec.
+        A client patch is a *proposal*: the server applies it, bumps its own authoritative `rev`, and
+        echoes the resulting patch to **every** connection (including the origin), each in that
+        connection's codec. Models are server-authoritative — a client's mirror updates when this echo
+        arrives, not optimistically.
         """
         msg = protocol.decode(data, self._codecs.get(conn))
         if msg.get("t") == "patch":
-            self._session.apply_patch(msg["id"], msg["patch"])
-            relay = protocol.patch_msg(msg["id"], msg["patch"])
-            return {c: [self._encode_for(c, relay)] for c in self._codecs if c is not conn}
+            authoritative = self._session.submit(msg["id"], msg["patch"])
+            if authoritative is None:
+                return {}
+            relay = protocol.patch_msg(msg["id"], authoritative)
+            return {c: [self._encode_for(c, relay)] for c in self._codecs}
         return {}
 
     def flush(self) -> Dict[Any, List[Wire]]:

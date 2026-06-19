@@ -1,10 +1,12 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .client import Client
+from .comm import pump_comms, serve_comm
 from .hub import READ, WRITE, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
 from .server import Server, autoflush, starlette_endpoint
 from .session import Session
+from .sse import sse_endpoint
 from .transports import (  # compiled Rust extension (rust/python)
     Store,
     apply,
@@ -39,11 +41,14 @@ __all__ = [
     "from_value",
     "schema_of",
     "schema_to_ts",
-    # connections (WebSocket)
+    # connections (WebSocket / SSE / Jupyter comm)
     "Server",
     "Client",
     "starlette_endpoint",
     "autoflush",
+    "sse_endpoint",
+    "serve_comm",
+    "pump_comms",
     "protocol",
     # multi-tenancy + sharing
     "Hub",

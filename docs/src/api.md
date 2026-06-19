@@ -39,6 +39,12 @@ The high-level reactive session, the model bridge, the connection adapters, and 
 .. autofunction:: transports.starlette_endpoint
 
 .. autofunction:: transports.autoflush
+
+.. autofunction:: transports.sse_endpoint
+
+.. autofunction:: transports.serve_comm
+
+.. autofunction:: transports.pump_comms
 ```
 
 ## Multi-tenancy & sharing

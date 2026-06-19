@@ -63,11 +63,14 @@ def test_client_edit_relays_to_other_clients():
     for m in server.open("b"):
         b.recv(m)
 
-    msg = a.edit(mid, to_value(Device(name="lamp", on=True)))  # client a edits, sends to server
+    msg = a.edit(mid, to_value(Device(name="lamp", on=True)))  # client a proposes an edit
     out = server.recv("a", msg)
-    assert set(out) == {"b"}  # relayed to b, not back to a
+    assert set(out) == {"a", "b"}  # server-authoritative: echoed to everyone, incl. the origin
+    for m in out["a"]:
+        a.recv(m)
     for m in out["b"]:
         b.recv(m)
+    assert a.model(mid, Device).on is True  # origin's mirror updates on the echo, not optimistically
     assert b.model(mid, Device).on is True
 
 
@@ -78,6 +81,39 @@ def test_flush_without_connections_is_empty():
     session.host(d)
     d.on = True
     assert server.flush() == {}
+
+
+def test_inbound_edit_updates_host_object_without_echo_loop():
+    session = Session()
+    server = Server(session)
+    d = Device(name="lamp")
+    mid = session.host(d)
+    a = Client()
+    for m in server.open("a"):
+        a.recv(m)
+
+    server.recv("a", a.edit(mid, to_value(Device(name="lamp", on=True))))
+    assert d.on is True  # the server's hosted Python object reflects the edit (no staleness)
+    assert session.snapshot(mid)["rev"] == 1  # server owns the rev
+    assert session.drain() == []  # the in-place refresh did not re-trigger observation (no echo loop)
+
+
+def test_two_clients_converge_on_server_rev():
+    session = Session()
+    server = Server(session)
+    d = Device(name="lamp")
+    mid = session.host(d)
+    a, b = Client(), Client()
+    for m in server.open("a"):
+        a.recv(m)
+    for m in server.open("b"):
+        b.recv(m)
+
+    for _conn, msgs in server.recv("a", a.edit(mid, to_value(Device(name="lamp", on=True)))).items():
+        for m in msgs:
+            (a if _conn == "a" else b).recv(m)
+    assert a._rev[mid] == b._rev[mid] == 1
+    assert a.value(mid) == b.value(mid)
 
 
 # --- codec negotiation ---------------------------------------------------------------------------
@@ -141,8 +177,9 @@ def test_msgpack_client_edit_relays_to_json_client():
     edit = m.edit(mid, to_value(Device(name="lamp", on=True)))  # msgpack client edits (binary frame)
     assert isinstance(edit, bytes)
     out = server.recv("m", edit)
-    assert set(out) == {"j"}
-    for msg in out["j"]:  # relayed to the JSON client, re-encoded as text
+    assert set(out) == {"j", "m"}  # echoed to all, each in its own codec
+    assert all(isinstance(x, bytes) for x in out["m"])  # msgpack origin gets binary
+    for msg in out["j"]:  # the JSON client gets it re-encoded as text
         assert isinstance(msg, str)
         j.recv(msg)
     assert j.model(mid, Device).on is True
