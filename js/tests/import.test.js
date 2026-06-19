@@ -6,6 +6,8 @@ import {
   fromValue,
   encodeAs,
   decodeAs,
+  jsonToMsgpack,
+  msgpackToJson,
   Client,
 } from "../src/ts/index";
 import { initSync } from "../dist/pkg/transports";
@@ -40,6 +42,41 @@ test("msgpack round-trips via encodeAs/decodeAs", async () => {
   expect(JSON.parse(decodeAs(mp, "application/msgpack"))).toEqual(
     JSON.parse(v),
   );
+});
+
+test("whole-message json<->msgpack round-trips", async () => {
+  const msg = JSON.stringify({ t: "patch", id: 7, patch: { rev: 2, ops: [] } });
+  const mp = jsonToMsgpack(msg);
+  expect(mp instanceof Uint8Array).toBe(true);
+  expect(JSON.parse(msgpackToJson(mp))).toEqual(JSON.parse(msg));
+});
+
+test("Client mirrors a binary (msgpack) snapshot then patch", async () => {
+  const c = new Client("msgpack");
+  c.recv(
+    jsonToMsgpack(
+      JSON.stringify({
+        t: "snapshot",
+        id: 1,
+        type: "Device",
+        rev: 0,
+        value: { Map: { on: { Bool: false } } },
+      }),
+    ),
+  );
+  c.recv(
+    jsonToMsgpack(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: {
+          rev: 1,
+          ops: [{ Set: { path: [{ Key: "on" }], value: { Bool: true } } }],
+        },
+      }),
+    ),
+  );
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
 
 test("Client mirrors a snapshot then a patch", async () => {

@@ -30,3 +30,24 @@ pair is `encodeAs(value, codec)` / `decodeAs(bytes, codec)`.
 Because a codec only changes the *bytes* — never the model, the `Value`, or the patch semantics —
 switching formats is a one-line change and never touches your models. MessagePack is typically the
 choice for production traffic; JSON is convenient for debugging.
+
+## On a connection
+
+A connection negotiates its codec independently, so JSON and MessagePack clients can share one
+server. Pass `codec=` when opening a client; over WebSocket the choice rides on a `?codec=` query
+param, and JSON travels as text frames while MessagePack travels as binary frames.
+
+```python
+from transports import Client
+
+await Client(codec="msgpack").connect("ws://localhost:8000/ws")   # appends ?codec=msgpack
+```
+
+```javascript
+new Client("msgpack").connect("ws://localhost:8000/ws");
+```
+
+The server encodes every outbound message in *that* connection's codec and decodes inbound frames by
+type, so a MessagePack client's edit is transparently relayed to a JSON client and vice versa — see
+[Connections](connections.md). Whole protocol messages (not just model values) are converted with
+`json_to_msgpack` / `msgpack_to_json` (`jsonToMsgpack` / `msgpackToJson` in JavaScript).

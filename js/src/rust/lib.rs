@@ -39,6 +39,18 @@ pub fn decode_as(data: &[u8], codec: &str) -> Result<String, JsError> {
     transports::decode_as(data, codec).map_err(|e| JsError::new(&e))
 }
 
+/// Convert an arbitrary JSON document to MessagePack bytes (a `Uint8Array` in JS).
+#[wasm_bindgen]
+pub fn json_to_msgpack(json: &str) -> Result<Vec<u8>, JsError> {
+    transports::json_to_msgpack(json).map_err(|e| JsError::new(&e))
+}
+
+/// Convert MessagePack bytes back to a JSON document.
+#[wasm_bindgen]
+pub fn msgpack_to_json(data: &[u8]) -> Result<String, JsError> {
+    transports::msgpack_to_json(data).map_err(|e| JsError::new(&e))
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[wasm_bindgen]
 pub struct Store {

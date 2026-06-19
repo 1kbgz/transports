@@ -7,7 +7,7 @@ network).
 """
 
 import json
-from typing import Any, Dict, List, Type
+from typing import Any, Dict, List, Type, Union
 
 from . import protocol
 from ._bridge import M, from_value
@@ -18,16 +18,19 @@ class Client:
     """Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.
 
     Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live
-    connection via `connect(url)`, or feed it messages directly with `recv(text)`."""
+    connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`
+    (`"json"` or `"msgpack"`) controls how outbound edits are framed; inbound frames are decoded
+    automatically from their type (text=JSON, binary=msgpack)."""
 
-    def __init__(self) -> None:
+    def __init__(self, codec: str = protocol.JSON) -> None:
         self._values: Dict[int, Any] = {}
         self._rev: Dict[int, int] = {}
         self._type: Dict[int, str] = {}
+        self._codec = protocol.normalize_codec(codec)
 
-    def recv(self, text: str) -> None:
-        """Apply an inbound snapshot or patch message to the local mirror."""
-        msg = protocol.parse(text)
+    def recv(self, data: Union[str, bytes]) -> None:
+        """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror."""
+        msg = protocol.decode(data)
         mid = msg["id"]
         if msg["t"] == "snapshot":
             self._values[mid] = msg["value"]
@@ -48,18 +51,22 @@ class Client:
     def ids(self) -> List[int]:
         return list(self._values)
 
-    def edit(self, mid: int, new_value: Any) -> str:
-        """Locally edit a mirrored model and return the patch message to send to the server."""
+    def edit(self, mid: int, new_value: Any) -> Union[str, bytes]:
+        """Locally edit a mirrored model and return the patch frame to send (encoded in this codec)."""
         patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
         patch["rev"] = self._rev[mid] + 1
         self._values[mid] = new_value
         self._rev[mid] = patch["rev"]
-        return protocol.patch_msg(mid, patch)
+        return protocol.encode(protocol.patch_msg(mid, patch), self._codec)
 
     async def connect(self, url: str) -> None:
-        """Connect to a transports server and mirror it until the connection closes."""
+        """Connect to a transports server and mirror it until the connection closes.
+
+        Appends ``?codec=`` for the client's codec so the server frames messages to match.
+        """
         import websockets
 
-        async with websockets.connect(url) as ws:
-            async for text in ws:
-                self.recv(text if isinstance(text, str) else text.decode())
+        sep = "&" if "?" in url else "?"
+        async with websockets.connect(f"{url}{sep}codec={self._codec}") as ws:
+            async for frame in ws:
+                self.recv(frame)

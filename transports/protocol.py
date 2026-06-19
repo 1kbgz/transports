@@ -11,7 +11,23 @@ Two message kinds:
 """
 
 import json
-from typing import Any
+from typing import Any, Union
+
+from .transports import json_to_msgpack as _json_to_msgpack, msgpack_to_json as _msgpack_to_json
+
+#: Canonical codec names. A connection negotiates one of these (e.g. via a ``?codec=`` query param);
+#: JSON travels as text frames, MessagePack as binary frames.
+JSON = "json"
+MSGPACK = "msgpack"
+
+
+def normalize_codec(name: Union[str, None]) -> str:
+    """Map a codec name or content-type to a canonical :data:`JSON` / :data:`MSGPACK`."""
+    if name in (None, "", "json", "application/json"):
+        return JSON
+    if name in ("msgpack", "application/msgpack", "x-msgpack", "application/x-msgpack"):
+        return MSGPACK
+    raise ValueError(f"unknown codec: {name}")
 
 
 def snapshot_msg(model_id: int, type_name: str, rev: int, value: Any) -> str:
@@ -20,6 +36,24 @@ def snapshot_msg(model_id: int, type_name: str, rev: int, value: Any) -> str:
 
 def patch_msg(model_id: int, patch: dict) -> str:
     return json.dumps({"t": "patch", "id": model_id, "patch": patch})
+
+
+def encode(msg_json: str, codec: str = JSON) -> Union[str, bytes]:
+    """Encode a JSON message string into the wire form for ``codec``.
+
+    Returns the string unchanged for JSON, or MessagePack ``bytes`` for the msgpack codec — so the
+    caller sends a text frame or a binary frame accordingly.
+    """
+    if normalize_codec(codec) == MSGPACK:
+        return _json_to_msgpack(msg_json)
+    return msg_json
+
+
+def decode(data: Union[str, bytes]) -> dict:
+    """Parse an inbound frame to a message dict, dispatching on frame type (str=JSON, bytes=msgpack)."""
+    if isinstance(data, (bytes, bytearray)):
+        return json.loads(_msgpack_to_json(bytes(data)))
+    return json.loads(data)
 
 
 def parse(text: str) -> dict:

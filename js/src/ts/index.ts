@@ -26,6 +26,14 @@ export const encodeAs = (model: string, codec: string): Uint8Array =>
 export const decodeAs = (bytes: Uint8Array, codec: string): string =>
   wasm.decode_as(bytes, codec);
 
+/** Convert an arbitrary JSON document to MessagePack bytes (for whole protocol messages). */
+export const jsonToMsgpack = (json: string): Uint8Array =>
+  wasm.json_to_msgpack(json);
+
+/** Convert MessagePack bytes back to a JSON document. */
+export const msgpackToJson = (bytes: Uint8Array): string =>
+  wasm.msgpack_to_json(bytes);
+
 /** In-process model store: host / mutate → patch / apply / snapshot. */
 export const Store = wasm.Store;
 

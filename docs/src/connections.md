@@ -49,18 +49,25 @@ app = Starlette(
 On connect, a client receives a snapshot of every hosted model, then a stream of patches. A patch a
 client sends back is applied and relayed to the *other* clients, so the server acts as a hub.
 
+### Choosing a codec
+
+Each connection negotiates its wire format with a `?codec=` query param (`json`, the default, or
+`msgpack`). The server tracks it per connection and encodes every outbound message to match — JSON
+as text frames, MessagePack as binary frames — so JSON and MessagePack clients can share one server
+and still exchange edits. See [Codecs](codecs.md).
+
 ## Python client
 
 {py:class}`~transports.Client` mirrors a remote session without hosting it:
 
 ```python
-client = transports.Client()
+client = transports.Client()                     # or Client(codec="msgpack")
 await client.connect("ws://localhost:8000/ws")   # mirrors until the connection closes
 client.model(mid, Counter)                       # materialize the mirrored model as a Counter
 ```
 
-`Client` is also usable without a live connection — feed it messages with `recv(text)` and read with
-`value(id)` / `model(id, cls)`.
+`Client` is also usable without a live connection — feed it messages with `recv(data)` (a text or
+binary frame) and read with `value(id)` / `model(id, cls)`.
 
 ## Browser client
 
