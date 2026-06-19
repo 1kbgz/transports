@@ -5,7 +5,7 @@ from .server import Server, autoflush, starlette_endpoint
 from .session import Session
 from .transports import Store, apply, decode, decode_as, diff, encode, encode_as  # compiled Rust extension (rust/python)
 
-__version__ = "0.1.2"
+__version__ = "0.2.0"
 
 __all__ = [
     "__version__",
