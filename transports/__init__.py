@@ -1,5 +1,6 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
+from .anywidget import flush_anywidget, serve_anywidget
 from .client import Client
 from .comm import pump_comms, serve_comm
 from .hub import READ, WRITE, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
@@ -49,6 +50,8 @@ __all__ = [
     "sse_endpoint",
     "serve_comm",
     "pump_comms",
+    "serve_anywidget",
+    "flush_anywidget",
     "protocol",
     # multi-tenancy + sharing
     "Hub",
