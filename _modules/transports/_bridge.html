@@ -318,9 +318,6 @@
 
 
 
-<span class="c1"># --- schema derivation ---------------------------------------------------------------------------</span>
-
-
 <span class="k">def</span><span class="w"> </span><span class="nf">_annotations</span><span class="p">(</span><span class="bp">cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
     <span class="k">if</span> <span class="nb">issubclass</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">field</span><span class="o">.</span><span class="n">annotation</span> <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">field</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">model_fields</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
@@ -369,8 +366,6 @@
     <span class="p">}</span></div>
 
 
-
-<span class="c1"># --- shared schema artifact: TS codegen (Phase 1.4) ----------------------------------------------</span>
 
 <span class="n">_TS_TYPES</span> <span class="o">=</span> <span class="p">{</span>
     <span class="s2">&quot;Bool&quot;</span><span class="p">:</span> <span class="s2">&quot;boolean&quot;</span><span class="p">,</span>
