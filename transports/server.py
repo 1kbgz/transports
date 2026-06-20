@@ -84,9 +84,6 @@ class Server:
         self._codecs.pop(conn, None)
 
 
-# --- async I/O adapters --------------------------------------------------------------------------
-
-
 async def _send(conn: Any, msg: Wire) -> None:
     if isinstance(msg, (bytes, bytearray)):
         await conn.send_bytes(msg)

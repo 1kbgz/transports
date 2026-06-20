@@ -110,7 +110,6 @@ impl Registry {
     }
 }
 
-/*********************************/
 #[cfg(test)]
 mod schema_tests {
     use super::*;

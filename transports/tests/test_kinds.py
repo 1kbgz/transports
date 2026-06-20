@@ -29,9 +29,6 @@ class MDevice(msgspec.Struct):
     meta: MSub = msgspec.field(default_factory=MSub)
 
 
-# --- dataclasses ---------------------------------------------------------------------------------
-
-
 def test_dataclass_round_trip():
     d = DCDevice(name="lamp", on=True, meta=DCSub(label="x", tags=["a"]))
     v = to_value(d)
@@ -56,9 +53,6 @@ def test_dataclass_reactive_auto():
     ops = patches[0][1]["ops"]
     assert {"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}} in ops
     assert {"Set": {"path": [{"Key": "meta"}, {"Key": "label"}], "value": {"Str": "b"}}} in ops
-
-
-# --- msgspec -------------------------------------------------------------------------------------
 
 
 def test_msgspec_round_trip():

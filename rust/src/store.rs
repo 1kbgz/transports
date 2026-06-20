@@ -92,7 +92,6 @@ impl Store {
     }
 }
 
-/*********************************/
 #[cfg(test)]
 mod store_tests {
     use super::*;
