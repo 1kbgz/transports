@@ -10,9 +10,6 @@ class Device(BaseModel):
     on: bool = False
 
 
-# --- transport-agnostic logic (no network) -------------------------------------------------------
-
-
 def test_snapshot_then_patch_mirrors_server():
     session = Session()
     server = Server(session)
@@ -116,9 +113,6 @@ def test_two_clients_converge_on_server_rev():
     assert a.value(mid) == b.value(mid)
 
 
-# --- codec negotiation ---------------------------------------------------------------------------
-
-
 def test_msgpack_connection_mirrors_with_binary_frames():
     session = Session()
     server = Server(session)
@@ -205,9 +199,6 @@ def test_starlette_msgpack_connection():
         edit = client.edit(mid, to_value(Device(name="lamp", on=True)))
         assert isinstance(edit, bytes)
         ws.send_bytes(edit)
-
-
-# --- real Starlette WebSocket I/O ----------------------------------------------------------------
 
 
 def test_starlette_connect_snapshot_and_relay():

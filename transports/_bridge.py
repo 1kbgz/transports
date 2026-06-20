@@ -74,9 +74,6 @@ def from_value(value: Any, cls: Type[M]) -> M:
     return msgspec.convert(plain, cls)  # dataclass or msgspec.Struct
 
 
-# --- schema derivation ---------------------------------------------------------------------------
-
-
 def _annotations(cls: type) -> dict:
     if issubclass(cls, BaseModel):
         return {name: field.annotation for name, field in cls.model_fields.items()}
@@ -122,8 +119,6 @@ def schema_of(cls: type) -> dict:
         "fields": [{"name": name, "ty": _field_type(ann)} for name, ann in _annotations(cls).items()],
     }
 
-
-# --- shared schema artifact: TS codegen (Phase 1.4) ----------------------------------------------
 
 _TS_TYPES = {
     "Bool": "boolean",

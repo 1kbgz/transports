@@ -182,7 +182,6 @@ fn apply_op(root: &mut Value, op: &Op) {
     }
 }
 
-/*********************************/
 #[cfg(test)]
 mod diff_tests {
     use super::*;
@@ -260,8 +259,6 @@ mod diff_tests {
         let v = Value::map([("a", Value::from(1i64)), ("b", Value::from(vec!["x"]))]);
         assert!(diff(&v, &v).is_empty());
     }
-
-    // ---- deterministic property-based fuzz ----
 
     struct Lcg(u64);
     impl Lcg {

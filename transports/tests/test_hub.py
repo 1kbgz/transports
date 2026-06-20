@@ -13,9 +13,6 @@ def hub() -> Hub:
     return Hub(key=lambda c: c[0])
 
 
-# --- tenant routing + isolation ------------------------------------------------------------------
-
-
 def test_private_models_are_tenant_isolated():
     h = hub()
     h.tenant("t1").host(Doc(x=1))
@@ -52,9 +49,6 @@ def test_private_edit_relays_only_within_tenant():
     assert ca2.value(1)["Map"]["x"] == {"Int": 7}
 
 
-# --- 1-N: one shared model, many READ subscribers ------------------------------------------------
-
-
 def test_shared_read_fanout_to_many_tenants():
     h = hub()
     sid = h.share(Doc())
@@ -87,9 +81,6 @@ def test_read_only_subscriber_cannot_write():
     edit = '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"x"}],"value":{"Int":9}}}]}}' % sid
     assert h.recv(c, edit) == {}  # write ignored
     assert h._shared[sid].value["Map"]["x"] == {"Int": 0}  # authoritative value untouched
-
-
-# --- N-1 / N-N: many WRITE subscribers -----------------------------------------------------------
 
 
 def test_shared_write_relays_to_other_writers():
@@ -130,9 +121,6 @@ def test_n_by_n_routes_each_connection_its_subscribed_set():
     assert len(out[c2]) == 1  # only b
 
 
-# --- merge strategies ----------------------------------------------------------------------------
-
-
 def test_crdt_converges_regardless_of_order():
     base = {"Map": {"x": {"Int": 0}}}
     # two writes to the same key from the same base revision, different origins
@@ -160,9 +148,6 @@ def test_crdt_preserves_concurrent_edits_to_different_keys():
     merged = crdt.merge(crdt.merge(base, px, "A"), py, "B")
     assert merged["Map"]["x"] == {"Int": 1}
     assert merged["Map"]["y"] == {"Int": 1}  # neither write clobbered the other
-
-
-# --- real Starlette WebSockets -------------------------------------------------------------------
 
 
 def test_starlette_two_tenants_share_over_mixed_codecs():

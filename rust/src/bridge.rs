@@ -111,7 +111,6 @@ impl JsonStore {
     }
 }
 
-/*********************************/
 #[cfg(test)]
 mod bridge_tests {
     use super::*;

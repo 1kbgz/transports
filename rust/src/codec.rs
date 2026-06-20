@@ -89,7 +89,6 @@ pub fn codec_for(content_type: &str) -> Option<Box<dyn Codec>> {
     }
 }
 
-/*********************************/
 #[cfg(test)]
 mod codec_tests {
     use super::*;

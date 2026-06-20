@@ -35,9 +35,6 @@ WRITE = "write"
 SHARED_ID_BASE = 1 << 40
 
 
-# --- merge strategies ----------------------------------------------------------------------------
-
-
 class MergeStrategy:
     """How a write to a shared model is reconciled into its authoritative value.
 
@@ -99,9 +96,6 @@ class LwwMapCrdt(MergeStrategy):
         return new
 
 
-# --- hub ------------------------------------------------------------------------------------------
-
-
 class _Shared:
     """Authoritative state for a shared data structure."""
 
@@ -130,8 +124,6 @@ class Hub:
         self._conn_key: Dict[Any, Any] = {}
         self._codecs: Dict[Any, str] = {}
         self._shared_outbox: List[tuple] = []  # (sid, fan_patch) from host-side writes
-
-    # --- registration ----------------------------------------------------------------------------
 
     def tenant(self, key: Any) -> Session:
         """Get (or create) the `Session` holding a tenant's private models."""
@@ -165,12 +157,8 @@ class Hub:
         self.tenant(tenant_key)  # ensure the tenant exists
         self._shared[sid].subs[tenant_key] = mode
 
-    # --- per-connection encoding -----------------------------------------------------------------
-
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self._default_codec))
-
-    # --- connection lifecycle --------------------------------------------------------------------
 
     def open(self, conn: Any, codec: Optional[str] = None) -> List[Wire]:
         """Register a connection; returns the snapshots of its tenant's private + subscribed shared models."""
@@ -246,8 +234,6 @@ class Hub:
         self._conn_key.pop(conn, None)
         self._codecs.pop(conn, None)
 
-    # --- shared write internals ------------------------------------------------------------------
-
     def _write_shared(self, sid: int, patch: dict, origin: Any) -> Optional[dict]:
         """Merge a write into a shared model; return the authoritative fan-out patch (or None)."""
         sh = self._shared[sid]
@@ -264,8 +250,6 @@ class Hub:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
         return {c: [self._encode_for(c, msg)] for c, k in self._conn_key.items() if k in sh.subs}
-
-    # --- async I/O adapter -----------------------------------------------------------------------
 
     def endpoint(self):
         """Build a Starlette WebSocket endpoint that serves this hub (tenant from `key(websocket)`)."""

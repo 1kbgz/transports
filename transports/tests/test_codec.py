@@ -40,8 +40,6 @@ def test_unknown_codec_raises():
         encode_as(MODEL, "application/protobuf")
 
 
-# --- whole-message JSON <-> msgpack (protocol framing) -------------------------------------------
-
 MSG = json.dumps({"t": "patch", "id": 7, "patch": {"rev": 2, "ops": []}})
 
 
@@ -69,8 +67,6 @@ def test_normalize_codec_aliases():
     with pytest.raises(ValueError):
         protocol.normalize_codec("application/protobuf")
 
-
-# --- custom codec registration -------------------------------------------------------------------
 
 CUSTOM = "application/x-test"
 

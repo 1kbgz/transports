@@ -120,7 +120,6 @@ fn read_u32(bytes: &[u8], at: usize) -> Result<u32, FrameError> {
     Ok(u32::from_be_bytes([slice[0], slice[1], slice[2], slice[3]]))
 }
 
-/*********************************/
 #[cfg(test)]
 mod frame_tests {
     use super::*;
