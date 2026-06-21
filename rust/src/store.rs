@@ -67,15 +67,16 @@ impl Store {
         Some(patch)
     }
 
-    /// Apply a peer's patch to a mirrored model, adopting the patch's `rev`.
-    pub fn apply(&mut self, id: ModelId, patch: &Patch) -> bool {
+    /// Apply a peer's patch to a mirrored model, adopting the patch's `rev`. `Err` if the patch is
+    /// malformed (so an untrusted proposal can be rejected rather than panicking the core).
+    pub fn apply(&mut self, id: ModelId, patch: &Patch) -> Result<bool, String> {
         match self.models.get_mut(&id) {
             Some(held) => {
-                apply_patch(&mut held.value, patch);
+                apply_patch(&mut held.value, patch)?;
                 held.rev = patch.rev;
-                true
+                Ok(true)
             }
-            None => false,
+            None => Ok(false),
         }
     }
 
@@ -138,7 +139,7 @@ mod store_tests {
         let patch = server
             .mutate(id, Value::map([("on", Value::from(true))]))
             .unwrap();
-        client.apply(cid, &patch);
+        client.apply(cid, &patch).unwrap();
         assert_eq!(
             client.snapshot(cid).unwrap().1,
             &Value::map([("on", Value::from(true))])

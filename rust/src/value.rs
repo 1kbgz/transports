@@ -36,20 +36,20 @@ pub enum Value {
 }
 
 impl Value {
-    /// Borrow as a map, panicking if this value is not a map. Used by [`crate::apply`] where the
-    /// patch path guarantees the type.
-    pub fn as_map_mut(&mut self) -> &mut BTreeMap<String, Value> {
+    /// Borrow as a map, or `Err` if this value is not a map. Used by [`crate::apply`] to reject a
+    /// patch whose path descends into the wrong type instead of panicking.
+    pub fn try_as_map_mut(&mut self) -> Result<&mut BTreeMap<String, Value>, String> {
         match self {
-            Value::Map(m) => m,
-            other => panic!("expected Value::Map, found {other:?}"),
+            Value::Map(m) => Ok(m),
+            other => Err(format!("expected Value::Map, found {other:?}")),
         }
     }
 
-    /// Borrow as a list, panicking if this value is not a list.
-    pub fn as_list_mut(&mut self) -> &mut Vec<Value> {
+    /// Borrow as a list, or `Err` if this value is not a list.
+    pub fn try_as_list_mut(&mut self) -> Result<&mut Vec<Value>, String> {
         match self {
-            Value::List(l) => l,
-            other => panic!("expected Value::List, found {other:?}"),
+            Value::List(l) => Ok(l),
+            other => Err(format!("expected Value::List, found {other:?}")),
         }
     }
 

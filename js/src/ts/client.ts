@@ -42,6 +42,10 @@ export class Client {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);
     } else if (msg.t === "patch") {
+      // rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. one
+      // the opening snapshot already captured, which the server then also broadcasts).
+      const seen = this.revs.get(msg.id);
+      if (seen !== undefined && msg.patch.rev <= seen) return;
       const cur = JSON.stringify(this.values.get(msg.id));
       this.values.set(
         msg.id,

@@ -22,6 +22,7 @@ transports.flush_anywidget(server)              # push host-side changes to the 
 
 from typing import Any
 
+from . import protocol
 from .server import Broadcaster
 
 
@@ -44,6 +45,8 @@ def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json") -> _W
     and any ``{"wire": <wire>}`` is relayed to ``server.recv`` (a client's edits), with results sent back
     over the relevant widgets.
     """
+    if protocol.normalize_codec(codec) != protocol.JSON:
+        raise ValueError(f"the anywidget transport carries JSON-able data only; codec {codec!r} is not supported")
     conn = _WidgetConn(widget)
     opened = []
 

@@ -67,11 +67,14 @@ pub fn diff(old: &Value, new: &Value) -> Patch {
     Patch { rev: 0, ops }
 }
 
-/// Apply a patch to `value` in place.
-pub fn apply(value: &mut Value, patch: &Patch) {
+/// Apply a patch to `value` in place. Returns `Err` if the patch is malformed (a path descends into
+/// the wrong type, an index is out of bounds, or a key is missing) so callers can reject untrusted
+/// proposals instead of panicking.
+pub fn apply(value: &mut Value, patch: &Patch) -> Result<(), String> {
     for op in &patch.ops {
-        apply_op(value, op);
+        apply_op(value, op)?;
     }
+    Ok(())
 }
 
 fn child_path(path: &Path, seg: PathSeg) -> Path {
@@ -135,51 +138,74 @@ fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
     }
 }
 
-fn value_at_mut<'a>(root: &'a mut Value, path: &[PathSeg]) -> &'a mut Value {
+fn value_at_mut<'a>(root: &'a mut Value, path: &[PathSeg]) -> Result<&'a mut Value, String> {
     let mut cur = root;
     for seg in path {
         cur = match seg {
-            PathSeg::Key(k) => cur.as_map_mut().get_mut(k).expect("path key exists"),
-            PathSeg::Index(i) => &mut cur.as_list_mut()[*i],
+            PathSeg::Key(k) => cur
+                .try_as_map_mut()?
+                .get_mut(k)
+                .ok_or_else(|| format!("path key {k:?} not found"))?,
+            PathSeg::Index(i) => cur
+                .try_as_list_mut()?
+                .get_mut(*i)
+                .ok_or_else(|| format!("path index {i} out of bounds"))?,
         };
     }
-    cur
+    Ok(cur)
 }
 
-fn apply_op(root: &mut Value, op: &Op) {
+fn apply_op(root: &mut Value, op: &Op) -> Result<(), String> {
     match op {
         Op::Set { path, value } => {
             if path.is_empty() {
                 *root = value.clone();
-                return;
+                return Ok(());
             }
-            let (last, parent) = path.split_last().unwrap();
-            let container = value_at_mut(root, parent);
+            let (last, parent) = path.split_last().unwrap(); // non-empty: checked just above
+            let container = value_at_mut(root, parent)?;
             match last {
                 PathSeg::Key(k) => {
-                    container.as_map_mut().insert(k.clone(), value.clone());
+                    container.try_as_map_mut()?.insert(k.clone(), value.clone());
                 }
                 PathSeg::Index(i) => {
-                    container.as_list_mut()[*i] = value.clone();
+                    let slot = container
+                        .try_as_list_mut()?
+                        .get_mut(*i)
+                        .ok_or_else(|| format!("set index {i} out of bounds"))?;
+                    *slot = value.clone();
                 }
             }
         }
         Op::Remove { path } => {
-            let (last, parent) = path.split_last().expect("remove path is non-empty");
-            let container = value_at_mut(root, parent);
+            let (last, parent) = path.split_last().ok_or("remove path is empty")?;
+            let container = value_at_mut(root, parent)?;
             if let PathSeg::Key(k) = last {
-                container.as_map_mut().remove(k);
+                container.try_as_map_mut()?.remove(k);
             }
         }
         Op::Insert { path, index, value } => {
-            value_at_mut(root, path)
-                .as_list_mut()
-                .insert(*index, value.clone());
+            let list = value_at_mut(root, path)?.try_as_list_mut()?;
+            if *index > list.len() {
+                return Err(format!(
+                    "insert index {index} out of bounds (len {})",
+                    list.len()
+                ));
+            }
+            list.insert(*index, value.clone());
         }
         Op::RemoveAt { path, index } => {
-            value_at_mut(root, path).as_list_mut().remove(*index);
+            let list = value_at_mut(root, path)?.try_as_list_mut()?;
+            if *index >= list.len() {
+                return Err(format!(
+                    "remove index {index} out of bounds (len {})",
+                    list.len()
+                ));
+            }
+            list.remove(*index);
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -190,7 +216,7 @@ mod diff_tests {
     fn round_trip(old: &Value, new: &Value) -> Patch {
         let patch = diff(old, new);
         let mut got = old.clone();
-        apply(&mut got, &patch);
+        apply(&mut got, &patch).unwrap();
         assert_eq!(
             &got, new,
             "round-trip failed\n old={old:#?}\n new={new:#?}\n patch={patch:#?}"
@@ -301,7 +327,7 @@ mod diff_tests {
             let new = gen_value(&mut rng, 4);
             let patch = diff(&old, &new);
             let mut got = old.clone();
-            apply(&mut got, &patch);
+            apply(&mut got, &patch).unwrap();
             assert_eq!(
                 got, new,
                 "fuzz failed\n old={old:#?}\n new={new:#?}\n patch={patch:#?}"

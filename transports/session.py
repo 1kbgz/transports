@@ -114,12 +114,16 @@ class Session:
             return None
         cur_rev = json.loads(snap)["rev"]
         authoritative = {"rev": cur_rev + 1, "ops": patch.get("ops", [])}
-        self._apply_authoritative(mid, authoritative)
+        if not self._apply_authoritative(mid, authoritative):
+            return None  # reject a malformed proposal (bad path/type/index) without crashing the host
         return authoritative
 
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
-        if not self._store.apply(mid, json.dumps(patch)):
-            return False
+        try:
+            if not self._store.apply(mid, json.dumps(patch)):
+                return False
+        except ValueError:
+            return False  # the core rejected a malformed patch (bad path/type/index)
         self._refresh_model(mid)
         return True
 
