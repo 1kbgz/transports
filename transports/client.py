@@ -37,8 +37,13 @@ class Client:
             self._type[mid] = msg["type"]
             self._rev[mid] = msg["rev"]
         elif msg["t"] == "patch":
+            rev = msg["patch"]["rev"]
+            # rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a
+            # patch the opening snapshot already captured, which the server then also broadcasts).
+            if mid in self._rev and rev <= self._rev[mid]:
+                return
             self._values[mid] = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
-            self._rev[mid] = msg["patch"]["rev"]
+            self._rev[mid] = rev
 
     def value(self, mid: int) -> Any:
         """The current mirrored core `Value` of a model."""

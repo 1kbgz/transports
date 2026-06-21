@@ -35,6 +35,8 @@ def serve_comm(server: Broadcaster, comm: Any, codec: str = protocol.JSON) -> An
     ``server.recv`` and any resulting messages are sent back over the relevant comms. Returns the comm
     (the connection handle), so the caller can `pump_comms(server)` after host-side mutations.
     """
+    if protocol.normalize_codec(codec) != protocol.JSON:
+        raise ValueError(f"the comm transport carries JSON-able data only; codec {codec!r} is not supported")
     for wire in server.open(comm, codec):
         comm.send(data=wire)
 

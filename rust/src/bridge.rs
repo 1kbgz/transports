@@ -21,7 +21,7 @@ pub fn diff_json(old: &str, new: &str) -> Result<String, String> {
 pub fn apply_json(value: &str, patch: &str) -> Result<String, String> {
     let mut value: Value = serde_json::from_str(value).map_err(|e| e.to_string())?;
     let patch: Patch = serde_json::from_str(patch).map_err(|e| e.to_string())?;
-    apply(&mut value, &patch);
+    apply(&mut value, &patch)?;
     serde_json::to_string(&value).map_err(|e| e.to_string())
 }
 
@@ -107,7 +107,7 @@ impl JsonStore {
     /// Apply a JSON patch to a mirrored model; returns whether the id was known.
     pub fn apply(&mut self, id: u64, patch_json: &str) -> Result<bool, String> {
         let patch: Patch = serde_json::from_str(patch_json).map_err(|e| e.to_string())?;
-        Ok(self.inner.apply(ModelId(id), &patch))
+        self.inner.apply(ModelId(id), &patch)
     }
 }
 
