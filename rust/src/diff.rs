@@ -187,14 +187,20 @@ fn apply_op(root: &mut Value, op: &Op) -> Result<(), String> {
         Op::Insert { path, index, value } => {
             let list = value_at_mut(root, path)?.try_as_list_mut()?;
             if *index > list.len() {
-                return Err(format!("insert index {index} out of bounds (len {})", list.len()));
+                return Err(format!(
+                    "insert index {index} out of bounds (len {})",
+                    list.len()
+                ));
             }
             list.insert(*index, value.clone());
         }
         Op::RemoveAt { path, index } => {
             let list = value_at_mut(root, path)?.try_as_list_mut()?;
             if *index >= list.len() {
-                return Err(format!("remove index {index} out of bounds (len {})", list.len()));
+                return Err(format!(
+                    "remove index {index} out of bounds (len {})",
+                    list.len()
+                ));
             }
             list.remove(*index);
         }
