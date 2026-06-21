@@ -153,6 +153,8 @@ test("Client.edit is send-only; mirror updates on the server echo", async () => 
   expect(c.value(1)).toEqual({ Map: { on: { Bool: false } } });
   // ...the mirror updates when the server echoes the authoritative patch back. The server owns rev
   // and bumps it past the mirror's; a patch at or below the mirror's rev is ignored as already-applied.
-  c.recv(JSON.stringify({ t: "patch", id: 1, patch: { ...msg.patch, rev: 1 } }));
+  c.recv(
+    JSON.stringify({ t: "patch", id: 1, patch: { ...msg.patch, rev: 1 } }),
+  );
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
