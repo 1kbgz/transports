@@ -275,6 +275,8 @@
 <span class="sd">    ``server.recv`` and any resulting messages are sent back over the relevant comms. Returns the comm</span>
 <span class="sd">    (the connection handle), so the caller can `pump_comms(server)` after host-side mutations.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span> <span class="o">!=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;the comm transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported&quot;</span><span class="p">)</span>
     <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
         <span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">wire</span><span class="p">)</span>
 
