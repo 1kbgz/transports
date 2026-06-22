@@ -1,19 +1,17 @@
-# Connections
+# How to connect live clients
 
-Patches travel between processes over a **WebSocket**. A server hosts a
-{py:class}`~transports.Session` and broadcasts its patches; a client — in Python or the browser —
-mirrors the model live.
+This guide shows you how to serve a `Session` or `Hub` over the connection adapters transports ships
+today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom messages.
+
+## Serve a session over WebSocket
+
+Install the WebSocket dependencies:
 
 ```bash
-pip install "transports[connections]"
+pip install "transports[connections]" uvicorn
 ```
 
-## Server
-
-A {py:class}`~transports.Server` wraps a `Session`. Its logic is transport-agnostic — it returns the
-messages to send — and {py:func}`~transports.starlette_endpoint` adapts it to a Starlette WebSocket
-route. Run {py:func}`~transports.autoflush` as a background task to stream server-side changes to
-connected clients.
+Create a Starlette app:
 
 ```python
 import asyncio
@@ -34,7 +32,7 @@ server = transports.Server(session)
 async def ticker():
     while True:
         await asyncio.sleep(1)
-        counter.tick += 1               # mutate the model; clients receive the patch
+        counter.tick += 1
 
 async def startup():
     asyncio.create_task(transports.autoflush(server))
@@ -46,109 +44,164 @@ app = Starlette(
 )
 ```
 
-On connect, a client receives a snapshot of every hosted model, then a stream of patches. A patch a
-client sends back is applied and broadcast, so the server acts as a hub.
+Run it:
 
-### Server-authoritative edits
-
-Models are **server-authoritative**: a client's `edit(id, value)` is a *proposal*. The server applies
-it, owns the revision (`rev`), and echoes the authoritative patch to **every** connection — including
-the one that sent it. A client's local mirror therefore updates when that echo arrives, not
-optimistically, so all mirrors and the server's own hosted object stay in lock-step without `rev`
-drift. (For multi-writer convergence on shared models, see [Multi-tenancy](multitenancy.md).)
-
-### Choosing a codec
-
-Each connection negotiates its wire format with a `?codec=` query param (`json`, the default, or
-`msgpack`). The server tracks it per connection and encodes every outbound message to match — JSON
-as text frames, MessagePack as binary frames — so JSON and MessagePack clients can share one server
-and still exchange edits. See [Codecs](codecs.md).
-
-## Python client
-
-{py:class}`~transports.Client` mirrors a remote session without hosting it:
-
-```python
-client = transports.Client()                     # or Client(codec="msgpack")
-await client.connect("ws://localhost:8000/ws")   # mirrors until the connection closes
-client.model(mid, Counter)                       # materialize the mirrored model as a Counter
+```bash
+uvicorn app:app --reload
 ```
 
-`Client` is also usable without a live connection — feed it messages with `recv(data)` (a text or
-binary frame) and read with `value(id)` / `model(id, cls)`.
+Run one `autoflush` task per `Server` or `Hub`. It drains host-side mutations and broadcasts the
+resulting patches to all open connections.
 
-## Browser client
+## Mirror the server in a browser
 
-The JavaScript `Client` applies patches with the wasm core (initialize the wasm first):
+Initialize the wasm package, connect, and render whenever a message arrives.
 
 ```ts
-import init, { Client } from "transports";
+import init, { Client, fromValue } from "transports";
+
 await init();
 
 const client = new Client();
-const ws = new WebSocket("ws://localhost:8000/ws");
-ws.addEventListener("message", (e) => {
-  client.recv(e.data);
-  render(client.value(1)); // your render function
+const ws = client.connect("ws://127.0.0.1:8000/ws");
+
+ws.addEventListener("message", () => {
+  const [id] = client.ids();
+  if (id === undefined) return;
+  render(fromValue(client.value(id)));
 });
 ```
 
-## Server-Sent Events (receive-only)
+To send an edit, create the next core `Value` and send the encoded proposal frame:
 
-For receive-mostly UIs (dashboards), a server can push over **SSE** — a one-way server→client stream.
-{py:func}`~transports.sse_endpoint` builds a Starlette route; run {py:func}`~transports.autoflush` to
-stream changes. Clients receive snapshots and patches but do not send edits back (use WebSocket for
-that).
+```ts
+import { toValue } from "transports";
+
+const [id] = client.ids();
+ws.send(client.edit(id, toValue({ tick: 10 })));
+```
+
+The local mirror updates when the server echoes the authoritative patch.
+
+## Mirror the server in Python
+
+`Client.connect()` runs a receive loop until the WebSocket closes.
+
+```python
+client = transports.Client()
+await client.connect("ws://127.0.0.1:8000/ws")
+```
+
+For Python clients that also send edits, manage the WebSocket loop directly and send the frame
+returned by `client.edit(id, value)`.
+
+## Use MessagePack on a connection
+
+Pass `codec="msgpack"` on the client. The client appends `?codec=msgpack`; the server sends binary
+frames to that connection and can still serve JSON clients at the same time.
+
+```python
+client = transports.Client(codec="msgpack")
+await client.connect("ws://127.0.0.1:8000/ws")
+```
+
+```ts
+const client = new Client("msgpack");
+const ws = client.connect("ws://127.0.0.1:8000/ws");
+```
+
+## Stream receive-only updates over SSE
+
+Use SSE for dashboards and other receive-only clients.
 
 ```bash
 pip install "transports[sse]"
 ```
 
 ```python
+import asyncio
+from starlette.applications import Starlette
 from starlette.routing import Route
+
+async def startup():
+    asyncio.create_task(transports.autoflush(server))
 
 app = Starlette(
     routes=[Route("/sse", transports.sse_endpoint(server))],
-    on_startup=[lambda: asyncio.create_task(transports.autoflush(server))],
+    on_startup=[startup],
 )
 ```
 
+Python client:
+
 ```python
 client = transports.Client()
-await client.connect_sse("http://localhost:8000/sse")   # mirrors until the stream closes
+await client.connect_sse("http://127.0.0.1:8000/sse")
 ```
 
-In the browser, the JavaScript `Client` mirrors a stream with `connectSSE(url)` (native
-`EventSource`).
+Browser client:
 
-## Jupyter (comm)
+```ts
+const client = new Client();
+const events = client.connectSSE("http://127.0.0.1:8000/sse");
+```
 
-Inside a kernel, a model syncs to the frontend over a **Jupyter comm** — the same channel ipywidgets
-use. {py:func}`~transports.serve_comm` wires a comm (the connection handle) to a `Server`/`Hub`;
-{py:func}`~transports.pump_comms` pushes host-side changes after you mutate models.
+SSE is JSON/text and server-to-client only. Use WebSocket when clients need to send edits.
+
+## Use a Jupyter comm
+
+Install the comm dependency:
 
 ```bash
 pip install "transports[jupyter]"
 ```
 
+Wire a kernel comm to a `Server` or `Hub`:
+
 ```python
 from comm import create_comm
 
 comm = create_comm(target_name="transports")
-transports.serve_comm(server, comm)   # send snapshots, relay inbound edits
-# ... mutate hosted models ...
-transports.pump_comms(server)          # push patches to the frontend
+transports.serve_comm(server, comm)
+
+# after mutating hosted models
+transports.pump_comms(server)
 ```
 
-The comm carries the same messages, so the browser `Client` mirrors it unchanged.
+The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON codecs.
 
-## Runnable example
+## Use anywidget custom messages
 
-A complete example — a Python server hosting a counter and a browser page that displays it updating
-live — is in [`examples/`](https://github.com/1kbgz/transports/tree/main/examples):
+`serve_anywidget` uses an anywidget-style `send` / `on_msg` object. The frontend sends
+`{"ready": true}` before snapshots are delivered.
 
-```bash
-pip install "transports[connections]" uvicorn
-(cd js && pnpm build)        # build the wasm the page loads
-python examples/server.py    # open http://127.0.0.1:8000
+```python
+conn = transports.serve_anywidget(server, widget)
+
+# after mutating hosted models
+transports.flush_anywidget(server)
+```
+
+Frontend messages use the same client protocol:
+
+```ts
+const client = new Client();
+
+model.on("msg:custom", (content) => {
+  if (content.wire) client.recv(content.wire);
+});
+
+model.send({ ready: true });
+```
+
+Use `model.send({ wire: client.edit(id, value) })` to send an edit from the frontend.
+
+## Serve a Hub
+
+A `Hub` satisfies the same connection contract as `Server`. Use `hub.endpoint()` for WebSocket,
+`transports.sse_endpoint(hub)` for SSE, and the same comm or anywidget helpers for Jupyter.
+
+```python
+hub = transports.Hub(key=lambda ws: ws.path_params["tenant"])
+app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", hub.endpoint())])
 ```
