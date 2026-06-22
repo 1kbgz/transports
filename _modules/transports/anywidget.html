@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>transports.comm - transports v0.3.0</title>
+        <title>transports.anywidget - transports v0.3.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -236,28 +236,26 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <h1>Source code for transports.comm</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Serve a `Session`/`Hub` over a Jupyter comm channel.</span>
+          <h1>Source code for transports.anywidget</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Serve a `Server`/`Hub` over an anywidget (ipywidgets `DOMWidget`) — the widget *is* the connection.</span>
 
-<span class="sd">A Jupyter **comm** is a bidirectional message channel between a kernel and a frontend (the transport</span>
-<span class="sd">behind ipywidgets). It carries JSON-able data natively, so transports rides it by sending the wire</span>
-<span class="sd">*string* as the comm&#39;s ``data`` — no extra framing, and the same `Client.recv`/`edit` work unchanged.</span>
-<span class="sd">The comm object itself is the connection handle.</span>
+<span class="sd">Like `serve_comm`, but for an anywidget&#39;s custom-message channel rather than a raw Jupyter comm: the</span>
+<span class="sd">wire rides ``widget.send({&quot;wire&quot;: &lt;wire&gt;})`` outbound and the widget&#39;s ``on_msg`` inbound. The frontend</span>
+<span class="sd">signals ``{&quot;ready&quot;: true}`` once its view exists; only then are the opening snapshots sent (a view that</span>
+<span class="sd">isn&#39;t listening yet would miss them). The same `Client.recv`/`edit` run unchanged on the frontend.</span>
 
-<span class="sd">This adapter never imports `comm`/`ipykernel`: you pass in a comm (created by your widget, or</span>
-<span class="sd">`comm.create_comm(...)`), keeping the Jupyter dependency optional. It is therefore also testable with</span>
-<span class="sd">a duck-typed fake comm exposing ``send`` / ``on_msg`` / ``on_close``.</span>
+<span class="sd">This never imports `anywidget`/`ipywidgets`: it duck-types the widget (``send`` / ``on_msg``), so it is</span>
+<span class="sd">testable with a fake widget and keeps the Jupyter dependency on the caller.</span>
 
 <span class="sd">```python</span>
 <span class="sd">import transports</span>
 
-<span class="sd">session = transports.Session()</span>
-<span class="sd">session.host(model)</span>
+<span class="sd">session = transports.Session(); session.host(model)</span>
 <span class="sd">server = transports.Server(session)</span>
 
-<span class="sd">transports.serve_comm(server, my_comm)   # sends snapshots, wires inbound messages</span>
+<span class="sd">transports.serve_anywidget(server, my_widget)   # wires ready-&gt;snapshots + inbound</span>
 <span class="sd"># ... mutate model(s) ...</span>
-<span class="sd">transports.pump_comms(server)            # push host-side changes to every comm</span>
+<span class="sd">transports.flush_anywidget(server)              # push host-side changes to the widget(s)</span>
 <span class="sd">```</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
@@ -267,42 +265,58 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">Broadcaster</span>
 
 
-<div class="viewcode-block" id="serve_comm">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.serve_comm">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">comm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a comm to a `Server`/`Hub`: send the opening snapshots and relay inbound messages.</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">_WidgetConn</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;An anywidget as a transports connection handle: a wire becomes ``widget.send({&quot;wire&quot;: wire})``.&quot;&quot;&quot;</span>
 
-<span class="sd">    The comm is registered as a connection; its messages (``msg[&quot;content&quot;][&quot;data&quot;]``) are fed to</span>
-<span class="sd">    ``server.recv`` and any resulting messages are sent back over the relevant comms. Returns the comm</span>
-<span class="sd">    (the connection handle), so the caller can `pump_comms(server)` after host-side mutations.</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;widget&quot;</span><span class="p">,)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">widget</span> <span class="o">=</span> <span class="n">widget</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">widget</span><span class="o">.</span><span class="n">send</span><span class="p">({</span><span class="s2">&quot;wire&quot;</span><span class="p">:</span> <span class="n">wire</span><span class="p">})</span>
+
+
+<div class="viewcode-block" id="serve_anywidget">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.serve_anywidget">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_WidgetConn</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a widget to a `Server`/`Hub`. Returns the connection handle (pass it to `flush_anywidget`).</span>
+
+<span class="sd">    The widget&#39;s custom messages drive the protocol: ``{&quot;ready&quot;: true}`` triggers the opening snapshots,</span>
+<span class="sd">    and any ``{&quot;wire&quot;: &lt;wire&gt;}`` is relayed to ``server.recv`` (a client&#39;s edits), with results sent back</span>
+<span class="sd">    over the relevant widgets.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span> <span class="o">!=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;the comm transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported&quot;</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
-        <span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">wire</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;the anywidget transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported&quot;</span><span class="p">)</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">_WidgetConn</span><span class="p">(</span><span class="n">widget</span><span class="p">)</span>
+    <span class="n">opened</span> <span class="o">=</span> <span class="p">[]</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_on_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-            <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-                <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_on_msg</span><span class="p">(</span><span class="n">_widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_buffers</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">return</span>
+        <span class="k">if</span> <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ready&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">opened</span><span class="p">:</span>
+            <span class="n">opened</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
+                <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="s2">&quot;wire&quot;</span> <span class="ow">in</span> <span class="n">content</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;wire&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
+                    <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 
-    <span class="n">comm</span><span class="o">.</span><span class="n">on_msg</span><span class="p">(</span><span class="n">_on_msg</span><span class="p">)</span>
-    <span class="n">comm</span><span class="o">.</span><span class="n">on_close</span><span class="p">(</span><span class="k">lambda</span> <span class="n">_msg</span><span class="p">:</span> <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">comm</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">comm</span></div>
+    <span class="n">widget</span><span class="o">.</span><span class="n">on_msg</span><span class="p">(</span><span class="n">_on_msg</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">conn</span></div>
 
 
 
-<div class="viewcode-block" id="pump_comms">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.pump_comms">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flush host-side changes and push the resulting patches to every connected comm.</span>
+<div class="viewcode-block" id="flush_anywidget">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.flush_anywidget">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">flush_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flush host-side changes and push the resulting patches to every connected widget.</span>
 
-<span class="sd">    Call after mutating hosted models (e.g. at the end of a cell, or from a timer). Each connection</span>
-<span class="sd">    handle is a comm, so the patches are delivered with `comm.send`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">comm</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-            <span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">m</span><span class="p">)</span></div>
+<span class="sd">    Call after mutating hosted models (e.g. from a kernel-loop timer, or at the end of a cell).&quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
+            <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
 
 </pre></div>
         </article>

@@ -196,12 +196,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -237,7 +238,7 @@
           
 <section class="genindex-section">
   <h1 id="index">Index</h1>
-  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#J"><strong>J</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a></div>
+  <div class="genindex-jumpbox"><a href="#A"><strong>A</strong></a> | <a href="#C"><strong>C</strong></a> | <a href="#D"><strong>D</strong></a> | <a href="#E"><strong>E</strong></a> | <a href="#F"><strong>F</strong></a> | <a href="#H"><strong>H</strong></a> | <a href="#I"><strong>I</strong></a> | <a href="#J"><strong>J</strong></a> | <a href="#L"><strong>L</strong></a> | <a href="#M"><strong>M</strong></a> | <a href="#N"><strong>N</strong></a> | <a href="#O"><strong>O</strong></a> | <a href="#P"><strong>P</strong></a> | <a href="#R"><strong>R</strong></a> | <a href="#S"><strong>S</strong></a> | <a href="#T"><strong>T</strong></a> | <a href="#U"><strong>U</strong></a> | <a href="#V"><strong>V</strong></a> | <a href="#W"><strong>W</strong></a></div>
 </section>
 <section id="A" class="genindex-section">
   <h2>A</h2>
@@ -286,11 +287,15 @@
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.decode">decode() (in module transports)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.protocol.decode">(in module transports.protocol)</a>
 </li>
-        <li><a href="docs/src/api.html#transports.decode_as">decode_as() (in module transports)</a>
-</li>
+        </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.decode_as">decode_as() (in module transports)</a>
+</li>
         <li><a href="docs/src/api.html#transports.diff">diff() (in module transports)</a>
 </li>
         <li><a href="docs/src/api.html#transports.Session.drain">drain() (transports.Session method)</a>
@@ -306,7 +311,11 @@
         <li><a href="docs/src/api.html#transports.Client.edit">edit() (transports.Client method)</a>
 </li>
         <li><a href="docs/src/api.html#transports.encode">encode() (in module transports)</a>
+
+        <ul>
+          <li><a href="docs/src/api.html#transports.protocol.encode">(in module transports.protocol)</a>
 </li>
+        </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.encode_as">encode_as() (in module transports)</a>
@@ -331,6 +340,8 @@
         </ul></li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.flush_anywidget">flush_anywidget() (in module transports)</a>
+</li>
         <li><a href="docs/src/api.html#transports.from_value">from_value() (in module transports)</a>
 </li>
     </ul></td>
@@ -411,6 +422,16 @@
   </tr></table>
 </section>
 
+<section id="N" class="genindex-section">
+  <h2>N</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.protocol.normalize_codec">normalize_codec() (in module transports.protocol)</a>
+</li>
+    </ul></td>
+  </tr></table>
+</section>
+
 <section id="O" class="genindex-section">
   <h2>O</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
@@ -433,6 +454,10 @@
   <h2>P</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.protocol.patch_msg">patch_msg() (in module transports.protocol)</a>
+</li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.pump_comms">pump_comms() (in module transports)</a>
 </li>
     </ul></td>
@@ -443,6 +468,8 @@
   <h2>R</h2>
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.READ">READ (in module transports)</a>
+</li>
         <li><a href="docs/src/api.html#transports.Client.recv">recv() (transports.Client method)</a>
 
         <ul>
@@ -471,6 +498,8 @@
 </li>
         <li><a href="docs/src/api.html#transports.schema_to_ts">schema_to_ts() (in module transports)</a>
 </li>
+        <li><a href="docs/src/api.html#transports.serve_anywidget">serve_anywidget() (in module transports)</a>
+</li>
         <li><a href="docs/src/api.html#transports.serve_comm">serve_comm() (in module transports)</a>
 </li>
         <li><a href="docs/src/api.html#transports.Server">Server (class in transports)</a>
@@ -489,6 +518,8 @@
           <li><a href="docs/src/api.html#transports.Store.snapshot">(transports.Store method)</a>
 </li>
         </ul></li>
+        <li><a href="docs/src/api.html#transports.protocol.snapshot_msg">snapshot_msg() (in module transports.protocol)</a>
+</li>
         <li><a href="docs/src/api.html#transports.sse_endpoint">sse_endpoint() (in module transports)</a>
 </li>
         <li><a href="docs/src/api.html#transports.starlette_endpoint">starlette_endpoint() (in module transports)</a>
@@ -541,6 +572,16 @@
           <li><a href="docs/src/api.html#transports.Session.value">(transports.Session method)</a>
 </li>
         </ul></li>
+    </ul></td>
+  </tr></table>
+</section>
+
+<section id="W" class="genindex-section">
+  <h2>W</h2>
+  <table style="width: 100%" class="indextable genindextable"><tr>
+    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.WRITE">WRITE (in module transports)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>

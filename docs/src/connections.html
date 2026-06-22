@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Codecs" href="codecs.html"><link rel="prev" title="Model bridges" href="bridges.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="How to use codecs" href="codecs.html"><link rel="prev" title="How to bridge models and objects" href="bridges.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Connections - transports v0.3.0</title>
+        <title>How to connect live clients - transports v0.3.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -198,12 +198,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -242,20 +243,17 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="connections">
-<h1>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h1>
-<p>Patches travel between processes over a <strong>WebSocket</strong>. A server hosts a
-<a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a> and broadcasts its patches; a client — in Python or the browser —
-mirrors the model live.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span>
+          <section class="tex2jax_ignore mathjax_ignore" id="how-to-connect-live-clients">
+<h1>How to connect live clients<a class="headerlink" href="#how-to-connect-live-clients" title="Link to this heading">¶</a></h1>
+<p>This guide shows you how to serve a <code class="docutils literal notranslate"><span class="pre">Session</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code> over the connection adapters transports ships
+today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom messages.</p>
+<section id="serve-a-session-over-websocket">
+<h2>Serve a session over WebSocket<a class="headerlink" href="#serve-a-session-over-websocket" title="Link to this heading">¶</a></h2>
+<p>Install the WebSocket dependencies:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w"> </span>uvicorn
 </pre></div>
 </div>
-<section id="server">
-<h2>Server<a class="headerlink" href="#server" title="Link to this heading">¶</a></h2>
-<p>A <a class="reference internal" href="api.html#transports.Server" title="transports.Server"><code class="xref py py-class docutils literal notranslate"><span class="pre">Server</span></code></a> wraps a <code class="docutils literal notranslate"><span class="pre">Session</span></code>. Its logic is transport-agnostic — it returns the
-messages to send — and <a class="reference internal" href="api.html#transports.starlette_endpoint" title="transports.starlette_endpoint"><code class="xref py py-func docutils literal notranslate"><span class="pre">starlette_endpoint()</span></code></a> adapts it to a Starlette WebSocket
-route. Run <a class="reference internal" href="api.html#transports.autoflush" title="transports.autoflush"><code class="xref py py-func docutils literal notranslate"><span class="pre">autoflush()</span></code></a> as a background task to stream server-side changes to
-connected clients.</p>
+<p>Create a Starlette app:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
@@ -274,7 +272,7 @@ connected clients.</p>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">ticker</span><span class="p">():</span>
     <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
         <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
-        <span class="n">counter</span><span class="o">.</span><span class="n">tick</span> <span class="o">+=</span> <span class="mi">1</span>               <span class="c1"># mutate the model; clients receive the patch</span>
+        <span class="n">counter</span><span class="o">.</span><span class="n">tick</span> <span class="o">+=</span> <span class="mi">1</span>
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">startup</span><span class="p">():</span>
     <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
@@ -286,99 +284,139 @@ connected clients.</p>
 <span class="p">)</span>
 </pre></div>
 </div>
-<p>On connect, a client receives a snapshot of every hosted model, then a stream of patches. A patch a
-client sends back is applied and broadcast, so the server acts as a hub.</p>
-<section id="server-authoritative-edits">
-<h3>Server-authoritative edits<a class="headerlink" href="#server-authoritative-edits" title="Link to this heading">¶</a></h3>
-<p>Models are <strong>server-authoritative</strong>: a client’s <code class="docutils literal notranslate"><span class="pre">edit(id,</span> <span class="pre">value)</span></code> is a <em>proposal</em>. The server applies
-it, owns the revision (<code class="docutils literal notranslate"><span class="pre">rev</span></code>), and echoes the authoritative patch to <strong>every</strong> connection — including
-the one that sent it. A client’s local mirror therefore updates when that echo arrives, not
-optimistically, so all mirrors and the server’s own hosted object stay in lock-step without <code class="docutils literal notranslate"><span class="pre">rev</span></code>
-drift. (For multi-writer convergence on shared models, see <a class="reference internal" href="multitenancy.html"><span class="std std-doc">Multi-tenancy</span></a>.)</p>
-</section>
-<section id="choosing-a-codec">
-<h3>Choosing a codec<a class="headerlink" href="#choosing-a-codec" title="Link to this heading">¶</a></h3>
-<p>Each connection negotiates its wire format with a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param (<code class="docutils literal notranslate"><span class="pre">json</span></code>, the default, or
-<code class="docutils literal notranslate"><span class="pre">msgpack</span></code>). The server tracks it per connection and encodes every outbound message to match — JSON
-as text frames, MessagePack as binary frames — so JSON and MessagePack clients can share one server
-and still exchange edits. See <a class="reference internal" href="codecs.html"><span class="std std-doc">Codecs</span></a>.</p>
-</section>
-</section>
-<section id="python-client">
-<h2>Python client<a class="headerlink" href="#python-client" title="Link to this heading">¶</a></h2>
-<p><a class="reference internal" href="api.html#transports.Client" title="transports.Client"><code class="xref py py-class docutils literal notranslate"><span class="pre">Client</span></code></a> mirrors a remote session without hosting it:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>                     <span class="c1"># or Client(codec=&quot;msgpack&quot;)</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">)</span>   <span class="c1"># mirrors until the connection closes</span>
-<span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Counter</span><span class="p">)</span>                       <span class="c1"># materialize the mirrored model as a Counter</span>
+<p>Run it:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uvicorn<span class="w"> </span>app:app<span class="w"> </span>--reload
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">Client</span></code> is also usable without a live connection — feed it messages with <code class="docutils literal notranslate"><span class="pre">recv(data)</span></code> (a text or
-binary frame) and read with <code class="docutils literal notranslate"><span class="pre">value(id)</span></code> / <code class="docutils literal notranslate"><span class="pre">model(id,</span> <span class="pre">cls)</span></code>.</p>
+<p>Run one <code class="docutils literal notranslate"><span class="pre">autoflush</span></code> task per <code class="docutils literal notranslate"><span class="pre">Server</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code>. It drains host-side mutations and broadcasts the
+resulting patches to all open connections.</p>
 </section>
-<section id="browser-client">
-<h2>Browser client<a class="headerlink" href="#browser-client" title="Link to this heading">¶</a></h2>
-<p>The JavaScript <code class="docutils literal notranslate"><span class="pre">Client</span></code> applies patches with the wasm core (initialize the wasm first):</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+<section id="mirror-the-server-in-a-browser">
+<h2>Mirror the server in a browser<a class="headerlink" href="#mirror-the-server-in-a-browser" title="Link to this heading">¶</a></h2>
+<p>Initialize the wasm package, connect, and render whenever a message arrives.</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+
 <span class="k">await</span><span class="w"> </span><span class="nx">init</span><span class="p">();</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">WebSocket</span><span class="p">(</span><span class="s2">&quot;ws://localhost:8000/ws&quot;</span><span class="p">);</span>
-<span class="nx">ws</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">e</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
-<span class="w">  </span><span class="nx">render</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">value</span><span class="p">(</span><span class="mf">1</span><span class="p">));</span><span class="w"> </span><span class="c1">// your render function</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">);</span>
+
+<span class="nx">ws</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">id</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">undefined</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<span class="w">  </span><span class="nx">render</span><span class="p">(</span><span class="nx">fromValue</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">value</span><span class="p">(</span><span class="nx">id</span><span class="p">)));</span>
 <span class="p">});</span>
 </pre></div>
 </div>
+<p>To send an edit, create the next core <code class="docutils literal notranslate"><span class="pre">Value</span></code> and send the encoded proposal frame:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
+<span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">})));</span>
+</pre></div>
+</div>
+<p>The local mirror updates when the server echoes the authoritative patch.</p>
 </section>
-<section id="server-sent-events-receive-only">
-<h2>Server-Sent Events (receive-only)<a class="headerlink" href="#server-sent-events-receive-only" title="Link to this heading">¶</a></h2>
-<p>For receive-mostly UIs (dashboards), a server can push over <strong>SSE</strong> — a one-way server→client stream.
-<a class="reference internal" href="api.html#transports.sse_endpoint" title="transports.sse_endpoint"><code class="xref py py-func docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a> builds a Starlette route; run <a class="reference internal" href="api.html#transports.autoflush" title="transports.autoflush"><code class="xref py py-func docutils literal notranslate"><span class="pre">autoflush()</span></code></a> to
-stream changes. Clients receive snapshots and patches but do not send edits back (use WebSocket for
-that).</p>
+<section id="mirror-the-server-in-python">
+<h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code> runs a receive loop until the WebSocket closes.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For Python clients that also send edits, manage the WebSocket loop directly and send the frame
+returned by <code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code>.</p>
+</section>
+<section id="use-messagepack-on-a-connection">
+<h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>
+<p>Pass <code class="docutils literal notranslate"><span class="pre">codec=&quot;msgpack&quot;</span></code> on the client. The client appends <code class="docutils literal notranslate"><span class="pre">?codec=msgpack</span></code>; the server sends binary
+frames to that connection and can still serve JSON clients at the same time.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">&quot;msgpack&quot;</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">&quot;msgpack&quot;</span><span class="p">);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+</section>
+<section id="stream-receive-only-updates-over-sse">
+<h2>Stream receive-only updates over SSE<a class="headerlink" href="#stream-receive-only-updates-over-sse" title="Link to this heading">¶</a></h2>
+<p>Use SSE for dashboards and other receive-only clients.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[sse]&quot;</span>
 </pre></div>
 </div>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Route</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">starlette.applications</span><span class="w"> </span><span class="kn">import</span> <span class="n">Starlette</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Route</span>
+
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">startup</span><span class="p">():</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
     <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">Route</span><span class="p">(</span><span class="s2">&quot;/sse&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
-    <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="k">lambda</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+    <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
 </div>
+<p>Python client:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_sse</span><span class="p">(</span><span class="s2">&quot;http://localhost:8000/sse&quot;</span><span class="p">)</span>   <span class="c1"># mirrors until the stream closes</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_sse</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8000/sse&quot;</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>In the browser, the JavaScript <code class="docutils literal notranslate"><span class="pre">Client</span></code> mirrors a stream with <code class="docutils literal notranslate"><span class="pre">connectSSE(url)</span></code> (native
-<code class="docutils literal notranslate"><span class="pre">EventSource</span></code>).</p>
+<p>Browser client:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connectSSE</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8000/sse&quot;</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>SSE is JSON/text and server-to-client only. Use WebSocket when clients need to send edits.</p>
 </section>
-<section id="jupyter-comm">
-<h2>Jupyter (comm)<a class="headerlink" href="#jupyter-comm" title="Link to this heading">¶</a></h2>
-<p>Inside a kernel, a model syncs to the frontend over a <strong>Jupyter comm</strong> — the same channel ipywidgets
-use. <a class="reference internal" href="api.html#transports.serve_comm" title="transports.serve_comm"><code class="xref py py-func docutils literal notranslate"><span class="pre">serve_comm()</span></code></a> wires a comm (the connection handle) to a <code class="docutils literal notranslate"><span class="pre">Server</span></code>/<code class="docutils literal notranslate"><span class="pre">Hub</span></code>;
-<a class="reference internal" href="api.html#transports.pump_comms" title="transports.pump_comms"><code class="xref py py-func docutils literal notranslate"><span class="pre">pump_comms()</span></code></a> pushes host-side changes after you mutate models.</p>
+<section id="use-a-jupyter-comm">
+<h2>Use a Jupyter comm<a class="headerlink" href="#use-a-jupyter-comm" title="Link to this heading">¶</a></h2>
+<p>Install the comm dependency:</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[jupyter]&quot;</span>
 </pre></div>
 </div>
+<p>Wire a kernel comm to a <code class="docutils literal notranslate"><span class="pre">Server</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">comm</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_comm</span>
 
 <span class="n">comm</span> <span class="o">=</span> <span class="n">create_comm</span><span class="p">(</span><span class="n">target_name</span><span class="o">=</span><span class="s2">&quot;transports&quot;</span><span class="p">)</span>
-<span class="n">transports</span><span class="o">.</span><span class="n">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>   <span class="c1"># send snapshots, relay inbound edits</span>
-<span class="c1"># ... mutate hosted models ...</span>
-<span class="n">transports</span><span class="o">.</span><span class="n">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>          <span class="c1"># push patches to the frontend</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>
+
+<span class="c1"># after mutating hosted models</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The comm carries the same messages, so the browser <code class="docutils literal notranslate"><span class="pre">Client</span></code> mirrors it unchanged.</p>
+<p>The comm carries JSON wire strings in <code class="docutils literal notranslate"><span class="pre">data</span></code>, so <code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> rejects non-JSON codecs.</p>
 </section>
-<section id="runnable-example">
-<h2>Runnable example<a class="headerlink" href="#runnable-example" title="Link to this heading">¶</a></h2>
-<p>A complete example — a Python server hosting a counter and a browser page that displays it updating
-live — is in <a class="reference external" href="https://github.com/1kbgz/transports/tree/main/examples"><code class="docutils literal notranslate"><span class="pre">examples/</span></code></a>:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w"> </span>uvicorn
-<span class="o">(</span><span class="nb">cd</span><span class="w"> </span>js<span class="w"> </span><span class="o">&amp;&amp;</span><span class="w"> </span>pnpm<span class="w"> </span>build<span class="o">)</span><span class="w">        </span><span class="c1"># build the wasm the page loads</span>
-python<span class="w"> </span>examples/server.py<span class="w">    </span><span class="c1"># open http://127.0.0.1:8000</span>
+<section id="use-anywidget-custom-messages">
+<h2>Use anywidget custom messages<a class="headerlink" href="#use-anywidget-custom-messages" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> uses an anywidget-style <code class="docutils literal notranslate"><span class="pre">send</span></code> / <code class="docutils literal notranslate"><span class="pre">on_msg</span></code> object. The frontend sends
+<code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> before snapshots are delivered.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conn</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">widget</span><span class="p">)</span>
+
+<span class="c1"># after mutating hosted models</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">flush_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Frontend messages use the same client protocol:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
+
+<span class="nx">model</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;msg:custom&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">)</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">);</span>
+<span class="p">});</span>
+
+<span class="nx">model</span><span class="p">.</span><span class="nx">send</span><span class="p">({</span><span class="w"> </span><span class="nx">ready</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">model.send({</span> <span class="pre">wire:</span> <span class="pre">client.edit(id,</span> <span class="pre">value)</span> <span class="pre">})</span></code> to send an edit from the frontend.</p>
+</section>
+<section id="serve-a-hub">
+<h2>Serve a Hub<a class="headerlink" href="#serve-a-hub" title="Link to this heading">¶</a></h2>
+<p>A <code class="docutils literal notranslate"><span class="pre">Hub</span></code> satisfies the same connection contract as <code class="docutils literal notranslate"><span class="pre">Server</span></code>. Use <code class="docutils literal notranslate"><span class="pre">hub.endpoint()</span></code> for WebSocket,
+<code class="docutils literal notranslate"><span class="pre">transports.sse_endpoint(hub)</span></code> for SSE, and the same comm or anywidget helpers for Jupyter.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">&quot;tenant&quot;</span><span class="p">])</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hub</span><span class="o">.</span><span class="n">endpoint</span><span class="p">())])</span>
 </pre></div>
 </div>
 </section>
@@ -394,7 +432,7 @@ python<span class="w"> </span>examples/server.py<span class="w">    </span><span
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Codecs</div>
+                <div class="title">How to use codecs</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
@@ -405,7 +443,7 @@ python<span class="w"> </span>examples/server.py<span class="w">    </span><span
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Model bridges</div>
+                <div class="title">How to bridge models and objects</div>
                 
               </div>
             </a>
@@ -439,17 +477,15 @@ python<span class="w"> </span>examples/server.py<span class="w">    </span><span
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Connections</a><ul>
-<li><a class="reference internal" href="#server">Server</a><ul>
-<li><a class="reference internal" href="#server-authoritative-edits">Server-authoritative edits</a></li>
-<li><a class="reference internal" href="#choosing-a-codec">Choosing a codec</a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#python-client">Python client</a></li>
-<li><a class="reference internal" href="#browser-client">Browser client</a></li>
-<li><a class="reference internal" href="#server-sent-events-receive-only">Server-Sent Events (receive-only)</a></li>
-<li><a class="reference internal" href="#jupyter-comm">Jupyter (comm)</a></li>
-<li><a class="reference internal" href="#runnable-example">Runnable example</a></li>
+<li><a class="reference internal" href="#">How to connect live clients</a><ul>
+<li><a class="reference internal" href="#serve-a-session-over-websocket">Serve a session over WebSocket</a></li>
+<li><a class="reference internal" href="#mirror-the-server-in-a-browser">Mirror the server in a browser</a></li>
+<li><a class="reference internal" href="#mirror-the-server-in-python">Mirror the server in Python</a></li>
+<li><a class="reference internal" href="#use-messagepack-on-a-connection">Use MessagePack on a connection</a></li>
+<li><a class="reference internal" href="#stream-receive-only-updates-over-sse">Stream receive-only updates over SSE</a></li>
+<li><a class="reference internal" href="#use-a-jupyter-comm">Use a Jupyter comm</a></li>
+<li><a class="reference internal" href="#use-anywidget-custom-messages">Use anywidget custom messages</a></li>
+<li><a class="reference internal" href="#serve-a-hub">Serve a Hub</a></li>
 </ul>
 </li>
 </ul>

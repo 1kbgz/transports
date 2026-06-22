@@ -1,89 +1,102 @@
-# Codecs
+# How to use codecs
 
-The wire format is pluggable. A **codec** turns a `Value` (or a patch) into bytes and back.
-transports ships two, both self-describing — they need no schema, and produce identical bytes from
-Python and JavaScript:
+This guide shows you how to encode values and protocol messages as JSON, MessagePack, or a registered
+custom format.
 
-| Codec | Content type | |
-|---|---|---|
-| JSON | `application/json` | human-readable; the default |
-| MessagePack | `application/msgpack` | compact binary |
+## Encode a model value
 
-## Encoding
-
-`encode_as` / `decode_as` take a content type. They operate on the core `Value` in its JSON text
-form (what {py:func}`~transports.to_value` produces, serialized):
+`encode_as` and `decode_as` operate on a JSON string containing a core `Value`.
 
 ```python
 import json
 import transports
+from pydantic import BaseModel
 
-value = transports.to_value(Device(name="lamp", on=True))     # a Value (dict)
-blob = transports.encode_as(json.dumps(value), "application/msgpack")   # compact bytes
+class Device(BaseModel):
+    name: str
+    on: bool = False
+
+value = transports.to_value(Device(name="lamp", on=True))
+blob = transports.encode_as(json.dumps(value), "application/msgpack")
 restored = json.loads(transports.decode_as(blob, "application/msgpack"))
+
 assert restored == value
 ```
 
-`transports.encode(value)` / `transports.decode(bytes)` are JSON shortcuts. In JavaScript the same
-pair is `encodeAs(value, codec)` / `decodeAs(bytes, codec)`.
+`transports.encode(value_json)` and `transports.decode(bytes)` are JSON-codec shortcuts for model
+values.
 
-Because a codec only changes the *bytes* — never the model, the `Value`, or the patch semantics —
-switching formats is a one-line change and never touches your models. MessagePack is typically the
-choice for production traffic; JSON is convenient for debugging.
+## Select a connection codec
 
-## On a connection
-
-A connection negotiates its codec independently, so JSON and MessagePack clients can share one
-server. Pass `codec=` when opening a client; over WebSocket the choice rides on a `?codec=` query
-param, and JSON travels as text frames while MessagePack travels as binary frames.
+Use JSON when you want readable text frames. Use MessagePack when you want compact binary frames.
 
 ```python
-from transports import Client
-
-await Client(codec="msgpack").connect("ws://localhost:8000/ws")   # appends ?codec=msgpack
+client = transports.Client(codec="msgpack")
+await client.connect("ws://127.0.0.1:8000/ws")
 ```
 
-```javascript
-new Client("msgpack").connect("ws://localhost:8000/ws");
+```ts
+const client = new Client("msgpack");
+const ws = client.connect("ws://127.0.0.1:8000/ws");
 ```
 
-The server encodes every outbound message in *that* connection's codec and decodes inbound frames by
-type, so a MessagePack client's edit is transparently relayed to a JSON client and vice versa — see
-[Connections](connections.md). Whole protocol messages (not just model values) are converted with
-`json_to_msgpack` / `msgpack_to_json` (`jsonToMsgpack` / `msgpackToJson` in JavaScript).
+The server stores the codec per connection. JSON and MessagePack clients can connect to the same
+server, send edits, and receive frames encoded for their own connection.
 
-## Registering your own codec
+## Convert whole protocol messages
 
-Beyond the built-ins, you can register a codec under any content type. A codec is just a pair of
-functions over a JSON-able object — a protocol message or a model `Value`:
+Use `json_to_msgpack` and `msgpack_to_json` for whole snapshot or patch messages.
 
 ```python
+msg = transports.protocol.snapshot_msg(1, "Device", 0, value)
+wire = transports.json_to_msgpack(msg)
+round_trip = transports.msgpack_to_json(wire)
+```
+
+## Register a custom Python codec
+
+A custom codec maps a JSON-able object to `bytes` or `str`, and maps that wire value back to a
+JSON-able object.
+
+```python
+import json
+import zlib
 import transports
 
-transports.register_codec(
-    "application/protobuf",
-    encode=lambda obj: my_proto_encode(obj),   # object -> bytes (or str)
-    decode=lambda data: my_proto_decode(data),  # bytes (or str) -> object
-)
+def encode_zlib(obj):
+    return zlib.compress(json.dumps(obj).encode())
+
+def decode_zlib(data):
+    return json.loads(zlib.decompress(bytes(data)).decode())
+
+transports.register_codec("application/x-json-zlib", encode_zlib, decode_zlib)
 ```
 
-Once registered, the content type works anywhere a codec name is accepted — `Client(codec=...)`, a
-`?codec=` query param, and {py:func}`~transports.encode_as` / {py:func}`~transports.decode_as`. A
-codec returning `bytes` travels as a binary frame; returning `str` travels as a text frame. The
-built-in `json` / `msgpack` codecs cannot be overridden.
+Once registered, the content type works wherever a codec name is accepted:
 
-Register the matching implementation in every binding that participates. JavaScript has its own
-`registerCodec`:
-
-```javascript
-import { registerCodec, Client } from "transports";
-
-registerCodec("application/protobuf", encode, decode);
-new Client("application/protobuf").connect("ws://localhost:8000/ws");
+```python
+client = transports.Client(codec="application/x-json-zlib")
+blob = transports.encode_as(json.dumps(value), "application/x-json-zlib")
 ```
 
-```{note}
-JSON and MessagePack are *self-describing*, so they encode the dynamic `Value` with no schema.
-Schema-driven formats such as Protobuf or FlatBuffers need a descriptor per model — your `encode` /
-`decode` are where that mapping lives.
+Register the same content type on every process that needs to read or write it. Built-in JSON and
+MessagePack names cannot be overridden.
+
+## Register a custom JavaScript codec
+
+```ts
+import { registerCodec } from "transports";
+
+registerCodec("application/x-json-zlib", encodeZlib, decodeZlib);
+const client = new Client("application/x-json-zlib");
+```
+
+Custom codecs for browser WebSockets may return `string` or `Uint8Array`. A `string` is sent as a
+text frame; bytes are sent as a binary frame.
+
+## Remove a custom codec
+
+```python
+transports.unregister_codec("application/x-json-zlib")
+print(transports.registered_codecs())
 ```

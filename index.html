@@ -198,12 +198,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="docs/src/multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="docs/src/api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="docs/src/concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -246,12 +247,11 @@
 </div>
 <section class="tex2jax_ignore mathjax_ignore" id="transports">
 <h1>transports<a class="headerlink" href="#transports" title="Link to this heading">¶</a></h1>
-<p>Move typed models across any wire.</p>
-<p>Define a model once — as a <a class="reference external" href="https://docs.pydantic.dev">pydantic</a> model, a stdlib <code class="docutils literal notranslate"><span class="pre">dataclass</span></code>, or a
-<a class="reference external" href="https://jcristharif.com/msgspec/">msgspec</a> struct — host it, and its mutations stream to peers as
-<strong>incremental patches</strong> (not whole-model resends), over a WebSocket, in JSON or MessagePack. A Rust
-core (model representation, diff/patch, codecs, framing) compiles to Python (PyO3) and JavaScript
-(wasm), so both ends share one implementation.</p>
+<p>Move typed models across any wire as incremental patches.</p>
+<p>Define a model once as a <a class="reference external" href="https://docs.pydantic.dev">pydantic</a> model, stdlib <code class="docutils literal notranslate"><span class="pre">dataclass</span></code>, or
+<a class="reference external" href="https://jcristharif.com/msgspec/">msgspec</a> struct. Host it in Python, mutate it normally, and send
+only the patch needed to update a remote mirror. The same Rust core drives Python (PyO3) and
+JavaScript (wasm), so both sides use the same <code class="docutils literal notranslate"><span class="pre">Value</span></code>, diff, patch, and codec machinery.</p>
 <p><a class="reference external" href="https://github.com/1kbgz/transports"><img alt="License" src="https://img.shields.io/github/license/1kbgz/transports" /></a>
 <a class="reference external" href="https://pypi.python.org/pypi/transports"><img alt="PyPI" src="https://img.shields.io/pypi/v/transports.svg" /></a></p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
@@ -263,39 +263,47 @@ core (model representation, diff/patch, codecs, framing) compiles to Python (PyO
 
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
 <span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
-<span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
+<span class="n">model_id</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
 
-<span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>                       <span class="c1"># just mutate the model...</span>
-<span class="k">for</span> <span class="n">model_id</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">():</span>
-    <span class="nb">print</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
-    <span class="c1"># {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]}</span>
+<span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
+<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]})]</span>
 </pre></div>
 </div>
 <section id="install">
 <h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w">   </span><span class="c1"># adds the WebSocket server/client adapters</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w">   </span><span class="c1"># WebSocket server/client adapters</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[sse]&quot;</span><span class="w">           </span><span class="c1"># Server-Sent Events adapter</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[jupyter]&quot;</span><span class="w">       </span><span class="c1"># Jupyter comm adapter</span>
 </pre></div>
 </div>
 </section>
-<section id="what-you-get">
-<h2>What you get<a class="headerlink" href="#what-you-get" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p><strong>Reactive models</strong> — mutate a field, get the minimal patch. No manual diffing or <code class="docutils literal notranslate"><span class="pre">send()</span></code>.</p></li>
-<li><p><strong>Three model kinds, one contract</strong> — pydantic, dataclass, and msgspec all bridge to the same core.</p></li>
-<li><p><strong>One core, two languages</strong> — Python and JavaScript share the Rust diff/patch and codecs, so a
-patch produced on one side applies on the other.</p></li>
-<li><p><strong>Live sync over WebSocket</strong> — host a model on a server and mirror it in the browser; mutate it in
-Python and the page updates. See <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a>.</p></li>
-<li><p><strong>JSON or MessagePack</strong> — swap the wire format without touching your models. See
-<a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a>.</p></li>
-</ul>
-</section>
 <section id="documentation">
 <h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
-<p><a class="reference internal" href="docs/src/quickstart.html"><span class="std std-doc">Quickstart</span></a> · <a class="reference internal" href="docs/src/concepts.html"><span class="std std-doc">Concepts</span></a> ·
-<a class="reference internal" href="docs/src/bridges.html"><span class="std std-doc">Model bridges</span></a> · <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a> ·
-<a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> · <a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a></p>
+<section id="tutorial">
+<h3>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="docs/src/quickstart.html"><span class="std std-doc">Quickstart</span></a> builds one hosted model and mirrors it with the in-process
+server/client protocol.</p>
+</section>
+<section id="how-to-guides">
+<h3>How-to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="docs/src/bridges.html"><span class="std std-doc">Model bridges</span></a> covers pydantic, dataclasses, msgspec, schemas, and plain
+JavaScript objects. <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a> covers WebSocket, SSE, Jupyter comm, and
+anywidget adapters. <a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> covers JSON, MessagePack, and custom codecs.
+<a class="reference internal" href="docs/src/multitenancy.html"><span class="std std-doc">Multi-tenancy and sharing</span></a> covers tenant isolation, shared models, and
+merge strategies.</p>
+</section>
+<section id="reference">
+<h3>Reference<a class="headerlink" href="#reference" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a> lists the Python API. <a class="reference internal" href="docs/src/protocol-reference.html"><span class="std std-doc">Wire protocol reference</span></a>
+describes <code class="docutils literal notranslate"><span class="pre">Value</span></code>, patch operations, protocol messages, codecs, and model ids.</p>
+</section>
+<section id="explanation">
+<h3>Explanation<a class="headerlink" href="#explanation" title="Link to this heading">¶</a></h3>
+<p><a class="reference internal" href="docs/src/concepts.html"><span class="std std-doc">Concepts</span></a> explains why transports uses incremental patches, server-owned
+revisions, a shared Rust core, and transport-agnostic adapters.</p>
+</section>
 </section>
 </section>
 

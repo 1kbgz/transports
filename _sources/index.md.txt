@@ -8,8 +8,6 @@ hidden: true
 
 docs/src/quickstart.md
 
-docs/src/concepts.md
-
 docs/src/bridges.md
 
 docs/src/connections.md
@@ -20,18 +18,21 @@ docs/src/multitenancy.md
 
 docs/src/api.md
 
+docs/src/protocol-reference.md
+
+docs/src/concepts.md
+
 
 ```
 
 # transports
 
-Move typed models across any wire.
+Move typed models across any wire as incremental patches.
 
-Define a model once — as a [pydantic](https://docs.pydantic.dev) model, a stdlib `dataclass`, or a
-[msgspec](https://jcristharif.com/msgspec/) struct — host it, and its mutations stream to peers as
-**incremental patches** (not whole-model resends), over a WebSocket, in JSON or MessagePack. A Rust
-core (model representation, diff/patch, codecs, framing) compiles to Python (PyO3) and JavaScript
-(wasm), so both ends share one implementation.
+Define a model once as a [pydantic](https://docs.pydantic.dev) model, stdlib `dataclass`, or
+[msgspec](https://jcristharif.com/msgspec/) struct. Host it in Python, mutate it normally, and send
+only the patch needed to update a remote mirror. The same Rust core drives Python (PyO3) and
+JavaScript (wasm), so both sides use the same `Value`, diff, patch, and codec machinery.
 
 [![License](https://img.shields.io/github/license/1kbgz/transports)](https://github.com/1kbgz/transports)
 [![PyPI](https://img.shields.io/pypi/v/transports.svg)](https://pypi.python.org/pypi/transports)
@@ -46,34 +47,43 @@ class Device(BaseModel):
 
 session = transports.Session()
 lamp = Device(name="lamp")
-session.host(lamp)
+model_id = session.host(lamp)
 
-lamp.on = True                       # just mutate the model...
-for model_id, patch in session.drain():
-    print(patch)
-    # {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'on'}], 'value': {'Bool': True}}}]}
+lamp.on = True
+print(session.drain())
+# [(1, {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'on'}], 'value': {'Bool': True}}}]})]
 ```
 
 ## Install
 
 ```bash
 pip install transports
-pip install "transports[connections]"   # adds the WebSocket server/client adapters
+pip install "transports[connections]"   # WebSocket server/client adapters
+pip install "transports[sse]"           # Server-Sent Events adapter
+pip install "transports[jupyter]"       # Jupyter comm adapter
 ```
-
-## What you get
-
-- **Reactive models** — mutate a field, get the minimal patch. No manual diffing or `send()`.
-- **Three model kinds, one contract** — pydantic, dataclass, and msgspec all bridge to the same core.
-- **One core, two languages** — Python and JavaScript share the Rust diff/patch and codecs, so a
-  patch produced on one side applies on the other.
-- **Live sync over WebSocket** — host a model on a server and mirror it in the browser; mutate it in
-  Python and the page updates. See [Connections](docs/src/connections.md).
-- **JSON or MessagePack** — swap the wire format without touching your models. See
-  [Codecs](docs/src/codecs.md).
 
 ## Documentation
 
-[Quickstart](docs/src/quickstart.md) · [Concepts](docs/src/concepts.md) ·
-[Model bridges](docs/src/bridges.md) · [Connections](docs/src/connections.md) ·
-[Codecs](docs/src/codecs.md) · [API reference](docs/src/api.md)
+### Tutorial
+
+[Quickstart](docs/src/quickstart.md) builds one hosted model and mirrors it with the in-process
+server/client protocol.
+
+### How-to guides
+
+[Model bridges](docs/src/bridges.md) covers pydantic, dataclasses, msgspec, schemas, and plain
+JavaScript objects. [Connections](docs/src/connections.md) covers WebSocket, SSE, Jupyter comm, and
+anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, and custom codecs.
+[Multi-tenancy and sharing](docs/src/multitenancy.md) covers tenant isolation, shared models, and
+merge strategies.
+
+### Reference
+
+[API reference](docs/src/api.md) lists the Python API. [Wire protocol reference](docs/src/protocol-reference.md)
+describes `Value`, patch operations, protocol messages, codecs, and model ids.
+
+### Explanation
+
+[Concepts](docs/src/concepts.md) explains why transports uses incremental patches, server-owned
+revisions, a shared Rust core, and transport-agnostic adapters.

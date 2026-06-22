@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Connections" href="connections.html"><link rel="prev" title="Concepts" href="concepts.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="How to connect live clients" href="connections.html"><link rel="prev" title="Quickstart" href="quickstart.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Model bridges - transports v0.3.0</title>
+        <title>How to bridge models and objects - transports v0.3.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -198,12 +198,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -242,15 +243,12 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="model-bridges">
-<h1>Model bridges<a class="headerlink" href="#model-bridges" title="Link to this heading">¶</a></h1>
-<p>transports speaks to three Python model libraries through one contract, plus plain objects in
-JavaScript. A <em>bridge</em> does three things: convert an instance to/from the core
-<a class="reference internal" href="concepts.html"><span class="std std-doc"><code class="docutils literal notranslate"><span class="pre">Value</span></code></span></a>, derive a core schema from the class, and (for reactive hosting) observe
-mutations.</p>
-<section id="conversion">
-<h2>Conversion<a class="headerlink" href="#conversion" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">to_value</span></code> / <code class="docutils literal notranslate"><span class="pre">from_value</span></code> move an instance to and from the wire form:</p>
+          <section class="tex2jax_ignore mathjax_ignore" id="how-to-bridge-models-and-objects">
+<h1>How to bridge models and objects<a class="headerlink" href="#how-to-bridge-models-and-objects" title="Link to this heading">¶</a></h1>
+<p>This guide shows you how to convert supported Python models and JavaScript objects to the core
+<code class="docutils literal notranslate"><span class="pre">Value</span></code> form, host them in a <code class="docutils literal notranslate"><span class="pre">Session</span></code>, and generate TypeScript interfaces from Python types.</p>
+<section id="use-pydantic-models">
+<h2>Use pydantic models<a class="headerlink" href="#use-pydantic-models" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
 
@@ -258,98 +256,112 @@ mutations.</p>
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
-<span class="n">v</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-<span class="c1"># {&#39;Map&#39;: {&#39;name&#39;: {&#39;Str&#39;: &#39;lamp&#39;}, &#39;on&#39;: {&#39;Bool&#39;: True}}}</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
+<span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Device</span><span class="p">)</span>
 
-<span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="n">Device</span><span class="p">)</span>
-<span class="c1"># Device(name=&#39;lamp&#39;, on=True)</span>
+<span class="k">assert</span> <span class="n">restored</span> <span class="o">==</span> <span class="n">model</span>
 </pre></div>
 </div>
-<p>The same calls work for dataclasses and <code class="docutils literal notranslate"><span class="pre">msgspec.Struct</span></code>s. Conversion routes JSON-native python
-through each library’s serializer (pydantic <code class="docutils literal notranslate"><span class="pre">model_dump(mode=&quot;json&quot;)</span></code>, otherwise msgspec), so rich
-field types (datetimes, enums, …) are normalized for you.</p>
-</section>
-<section id="reactive-observation">
-<h2>Reactive observation<a class="headerlink" href="#reactive-observation" title="Link to this heading">¶</a></h2>
-<p>Hosting a model with a <a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a> installs a mutation watcher (via
-<a class="reference external" href="https://github.com/1kbgz/bigbrother">bigbrother</a>). Watching is <strong>recursive</strong> — nested models, lists,
-and dicts are observed too — so deep edits produce nested-path patches:</p>
+<p>Pydantic models are observed automatically when hosted:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">d</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
-<span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">d</span><span class="p">)</span>
-
-<span class="n">d</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>
-<span class="c1"># [(mid, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]})]</span>
+<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">model</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="n">patches</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>
 </pre></div>
 </div>
-<p>Observation marks the model dirty; the patch is computed on the next <code class="docutils literal notranslate"><span class="pre">flush()</span></code> (which <code class="docutils literal notranslate"><span class="pre">drain()</span></code> and
-<code class="docutils literal notranslate"><span class="pre">snapshot()</span></code> call for you). Deferring to a flush is what makes writes coalesce.</p>
-<section id="pydantic-and-dataclasses-automatic">
-<h3>pydantic and dataclasses: automatic<a class="headerlink" href="#pydantic-and-dataclasses-automatic" title="Link to this heading">¶</a></h3>
-<p>Both store their state in <code class="docutils literal notranslate"><span class="pre">__dict__</span></code>, so the watcher fires on every assignment — including nested
-mutations like <code class="docutils literal notranslate"><span class="pre">d.meta.tags.append(&quot;x&quot;)</span></code>. Just mutate and <code class="docutils literal notranslate"><span class="pre">drain()</span></code>.</p>
 </section>
-<section id="msgspec-explicit-update">
-<h3>msgspec: explicit <code class="docutils literal notranslate"><span class="pre">update()</span></code><a class="headerlink" href="#msgspec-explicit-update" title="Link to this heading">¶</a></h3>
-<p><code class="docutils literal notranslate"><span class="pre">msgspec.Struct</span></code>s use <code class="docutils literal notranslate"><span class="pre">__slots__</span></code> and have no <code class="docutils literal notranslate"><span class="pre">__dict__</span></code>, so they can’t be observed automatically.
-Mutate them and call <a class="reference internal" href="api.html#transports.Session.update" title="transports.Session.update"><code class="xref py py-meth docutils literal notranslate"><span class="pre">update()</span></code></a> to emit:</p>
+<section id="use-dataclasses">
+<h2>Use dataclasses<a class="headerlink" href="#use-dataclasses" title="Link to this heading">¶</a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">dataclasses</span><span class="w"> </span><span class="kn">import</span> <span class="n">dataclass</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
+
+<span class="nd">@dataclass</span>
+<span class="k">class</span><span class="w"> </span><span class="nc">Reading</span><span class="p">:</span>
+    <span class="n">sensor</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
+<span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+<span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">reading</span><span class="p">)</span>
+
+<span class="n">reading</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mf">21.5</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
+</pre></div>
+</div>
+<p>Dataclasses are observed automatically, including nested lists, dicts, and model fields.</p>
+</section>
+<section id="use-msgspec-structs">
+<h2>Use msgspec structs<a class="headerlink" href="#use-msgspec-structs" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">msgspec.Struct</span></code> instances use slots, so automatic mutation watching is not available. Mutate the
+struct and call <code class="docutils literal notranslate"><span class="pre">Session.update(id)</span></code>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">msgspec</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Reading</span><span class="p">(</span><span class="n">msgspec</span><span class="o">.</span><span class="n">Struct</span><span class="p">):</span>
     <span class="n">sensor</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
 
+<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">r</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
-<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">r</span><span class="p">)</span>
+<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">reading</span><span class="p">)</span>
 
-<span class="n">r</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mf">21.5</span>
-<span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">()</span>         <span class="c1"># [] — not observed automatically</span>
-<span class="n">session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>     <span class="c1"># [(mid, {&#39;rev&#39;: 1, &#39;ops&#39;: [...]})]</span>
+<span class="n">reading</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="mf">21.5</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
+<span class="c1"># []</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">mid</span><span class="p">))</span>
+<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [...]})]</span>
 </pre></div>
 </div>
 </section>
+<section id="convert-values-manually">
+<h2>Convert values manually<a class="headerlink" href="#convert-values-manually" title="Link to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">to_value</span></code> when a lower-level API expects the core wire value. Use <code class="docutils literal notranslate"><span class="pre">from_value</span></code> to materialize a
+mirrored value as a Python model.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="c1"># {&#39;Map&#39;: {&#39;name&#39;: {&#39;Str&#39;: &#39;lamp&#39;}, &#39;on&#39;: {&#39;Bool&#39;: True}}}</span>
+
+<span class="n">model</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Device</span><span class="p">)</span>
+</pre></div>
+</div>
 </section>
-<section id="schemas-and-one-schema-for-both-languages">
-<h2>Schemas, and one schema for both languages<a class="headerlink" href="#schemas-and-one-schema-for-both-languages" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">schema_of</span></code> derives a core schema from any supported class; <code class="docutils literal notranslate"><span class="pre">schema_to_ts</span></code> renders that schema as a
-TypeScript interface — one definition, both languages:</p>
+<section id="generate-typescript-from-a-python-model">
+<h2>Generate TypeScript from a Python model<a class="headerlink" href="#generate-typescript-from-a-python-model" title="Link to this heading">¶</a></h2>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">schema</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">schema_of</span><span class="p">(</span><span class="n">Device</span><span class="p">)</span>
-<span class="c1"># {&#39;type_name&#39;: &#39;Device&#39;, &#39;fields&#39;: [{&#39;name&#39;: &#39;name&#39;, &#39;ty&#39;: &#39;Str&#39;}, {&#39;name&#39;: &#39;on&#39;, &#39;ty&#39;: &#39;Bool&#39;}]}</span>
-
 <span class="nb">print</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">schema_to_ts</span><span class="p">(</span><span class="n">schema</span><span class="p">))</span>
-<span class="c1"># export interface Device {</span>
-<span class="c1">#   name: string;</span>
-<span class="c1">#   on: boolean;</span>
-<span class="c1"># }</span>
+</pre></div>
+</div>
+<p>Output:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">export</span><span class="w"> </span><span class="kd">interface</span><span class="w"> </span><span class="nx">Device</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="p">;</span>
+<span class="w">  </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">boolean</span><span class="p">;</span>
+<span class="p">}</span>
 </pre></div>
 </div>
 </section>
-<section id="javascript-plain-objects">
-<h2>JavaScript: plain objects<a class="headerlink" href="#javascript-plain-objects" title="Link to this heading">¶</a></h2>
-<p>On the JS side, the bridge maps plain objects to and from the same <code class="docutils literal notranslate"><span class="pre">Value</span></code> wire form:</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+<section id="bridge-plain-javascript-objects">
+<h2>Bridge plain JavaScript objects<a class="headerlink" href="#bridge-plain-javascript-objects" title="Link to this heading">¶</a></h2>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
 
-<span class="kd">const</span><span class="w"> </span><span class="nx">v</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
 <span class="c1">// { Map: { name: { Str: &quot;lamp&quot; }, on: { Bool: true } } }</span>
-<span class="nx">fromValue</span><span class="p">(</span><span class="nx">v</span><span class="p">);</span><span class="w"> </span><span class="c1">// { name: &quot;lamp&quot;, on: true }</span>
+
+<span class="kd">const</span><span class="w"> </span><span class="nx">object</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">(</span><span class="nx">value</span><span class="p">);</span>
+<span class="c1">// { name: &quot;lamp&quot;, on: true }</span>
 </pre></div>
 </div>
-<p>Because both bridges target the same core <code class="docutils literal notranslate"><span class="pre">Value</span></code>, an object bridged in JavaScript and a model
-bridged in Python are interchangeable on the wire.</p>
-<div class="admonition note">
-<p class="admonition-title">Note</p>
-<p>JavaScript has a single number type, so integers and whole-valued floats both encode as <code class="docutils literal notranslate"><span class="pre">Int</span></code>.</p>
+<p>Use the JavaScript bridge before calling <code class="docutils literal notranslate"><span class="pre">Client.edit</span></code>, because edits compare core <code class="docutils literal notranslate"><span class="pre">Value</span></code> objects:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="w"> </span><span class="p">})));</span>
+</pre></div>
 </div>
 </section>
-<section id="notes">
-<h2>Notes<a class="headerlink" href="#notes" title="Link to this heading">¶</a></h2>
-<ul class="simple">
-<li><p>Nested models are inlined as <code class="docutils literal notranslate"><span class="pre">Map</span></code>s in the wire form.</p></li>
-<li><p>On the receive side, <code class="docutils literal notranslate"><span class="pre">apply_patch</span></code> updates the mirrored core value; read it back with
-<code class="docutils literal notranslate"><span class="pre">from_value(session.value(id))</span></code>.</p></li>
-</ul>
+<section id="current-bridge-limits">
+<h2>Current bridge limits<a class="headerlink" href="#current-bridge-limits" title="Link to this heading">¶</a></h2>
+<p>Nested Python models are currently inlined as <code class="docutils literal notranslate"><span class="pre">Map</span></code> values. The Rust core has a <code class="docutils literal notranslate"><span class="pre">Submodel</span></code> value,
+but the Python and JavaScript bridges do not yet emit submodel-by-id references.</p>
+<p>JavaScript has one number type. Whole-valued JavaScript numbers encode as <code class="docutils literal notranslate"><span class="pre">Int</span></code>; other numbers
+encode as <code class="docutils literal notranslate"><span class="pre">Float</span></code>.</p>
 </section>
 </section>
 
@@ -363,18 +375,18 @@ bridged in Python are interchangeable on the wire.</p>
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Connections</div>
+                <div class="title">How to connect live clients</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="concepts.html">
+          <a class="prev-page" href="quickstart.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Concepts</div>
+                <div class="title">Quickstart</div>
                 
               </div>
             </a>
@@ -408,16 +420,14 @@ bridged in Python are interchangeable on the wire.</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Model bridges</a><ul>
-<li><a class="reference internal" href="#conversion">Conversion</a></li>
-<li><a class="reference internal" href="#reactive-observation">Reactive observation</a><ul>
-<li><a class="reference internal" href="#pydantic-and-dataclasses-automatic">pydantic and dataclasses: automatic</a></li>
-<li><a class="reference internal" href="#msgspec-explicit-update">msgspec: explicit <code class="docutils literal notranslate"><span class="pre">update()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#schemas-and-one-schema-for-both-languages">Schemas, and one schema for both languages</a></li>
-<li><a class="reference internal" href="#javascript-plain-objects">JavaScript: plain objects</a></li>
-<li><a class="reference internal" href="#notes">Notes</a></li>
+<li><a class="reference internal" href="#">How to bridge models and objects</a><ul>
+<li><a class="reference internal" href="#use-pydantic-models">Use pydantic models</a></li>
+<li><a class="reference internal" href="#use-dataclasses">Use dataclasses</a></li>
+<li><a class="reference internal" href="#use-msgspec-structs">Use msgspec structs</a></li>
+<li><a class="reference internal" href="#convert-values-manually">Convert values manually</a></li>
+<li><a class="reference internal" href="#generate-typescript-from-a-python-model">Generate TypeScript from a Python model</a></li>
+<li><a class="reference internal" href="#bridge-plain-javascript-objects">Bridge plain JavaScript objects</a></li>
+<li><a class="reference internal" href="#current-bridge-limits">Current bridge limits</a></li>
 </ul>
 </li>
 </ul>

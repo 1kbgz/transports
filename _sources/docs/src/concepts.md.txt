@@ -1,65 +1,73 @@
 # Concepts
 
-## One core, two bindings
+## Why patches instead of whole models?
 
-transports is a **Rust core** with thin **Python (PyO3)** and **JavaScript (wasm)** bindings. The
-core owns the model representation, the diff/patch engine, the codecs, and the wire framing; both
-languages call into the same compiled implementation. A patch produced by Python and a patch produced
-by JavaScript for the same change are byte-for-byte identical, so either side can host a model and the
-other can mirror it.
+transports is built around one constraint: a changed field should not require resending the whole
+model. Whole-model messages are simple at first, but they make every participant reason about stale
+copies, large payloads, and accidental overwrites. A patch keeps the update narrow. It says which
+path changed, what operation happened there, and which revision the model reached.
+
+That design matters most when several runtimes participate. A Python process can host a pydantic
+model, a browser can mirror it as a JavaScript object, and another client can propose an edit. They do
+not need to agree on a Python class or JavaScript prototype. They only need to agree on the core
+`Value` and patch format.
+
+## Why a Rust core?
+
+The core representation, diff engine, patch application, codecs, framing, and store live in Rust.
+Python and JavaScript bindings call into the same implementation. This keeps the round-trip property
+in one place:
 
 ```text
-   Python (PyO3)            JavaScript (wasm)
-   ┌─────────────┐  patch   ┌─────────────┐
-   │ transports  │◄────────►│ transports  │
-   │ core (Rust) │  bytes   │ core (Rust) │
-   └─────────────┘          └─────────────┘
-        model bridge              object bridge
-   pydantic / dataclass /     plain objects /
-        msgspec                  toValue/fromValue
+apply(old, diff(old, new)) == new
 ```
 
-## Value
+The bridge code at the edge is deliberately thin. Python model libraries and JavaScript objects are
+converted into `Value`; after that, both languages use the same machinery.
 
-Every model is, on the wire, a **Value** — a small tagged union: `Null`, `Bool`, `Int`, `Float`,
-`Str`, `List`, `Map`, and `Submodel` (a reference to another model by id). The serialized form is the
-externally-tagged enum the Rust core speaks:
+## Why a `Value` layer?
 
-```json
-{"Map": {"name": {"Str": "lamp"}, "on": {"Bool": true}}}
-```
+Application models carry library-specific behavior: pydantic validation, dataclass defaults,
+msgspec slots, JavaScript number semantics. The wire needs something smaller and more stable than any
+one of those object systems. `Value` is that common form: tagged nulls, scalars, lists, maps, and core
+submodel references.
 
-You rarely write this by hand — the [model bridges](bridges.md) (`to_value`/`from_value` in Python,
-`toValue`/`fromValue` in JavaScript) convert your models to and from it.
+The bridges hide the tags for normal application code. They become useful when you need a stable
+protocol boundary, a custom codec, or a language-neutral client.
 
-## Patch and revisions
+## Why server-owned revisions?
 
-A **Patch** is the incremental update between two values: an ordered list of operations
-(`Set`, `Remove`, `Insert`, `RemoveAt`) addressed by a path into the value, plus a `rev` (revision)
-counter. This is the core idea that distinguishes transports from "serialize the whole model and
-send it": when one field changes, only that field's operation travels.
+A client edit is a proposal, not an optimistic local commit. The server applies the proposed ops,
+assigns the next revision, refreshes its hosted Python object, and echoes the authoritative patch to
+every connection. The origin updates from that echo just like every other client.
 
-```python
-{"rev": 1, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]}
-```
+This avoids two common sync problems. First, clients do not invent revisions that later conflict with
+the server's sequence. Second, the server's hosted object cannot become stale after it accepts a
+remote edit.
 
-The engine guarantees the round-trip property `apply(old, diff(old, new)) == new`. Maps diff by key
-and lists diff positionally; a type change at a path replaces the value there wholesale.
+## Why transport-agnostic adapters?
 
-## Store and Session
+`Server` and `Hub` are synchronous protocol objects. Their methods accept opaque connection handles
+and return the messages each connection should receive. WebSocket, SSE, Jupyter comm, and anywidget
+support are thin adapters around that contract.
 
-The low-level {py:class}`~transports.Store` holds model values by id and, on `mutate`, diffs the new
-value against the held one, bumps the `rev`, and returns the patch. The high-level
-{py:class}`~transports.Session` wraps it with the model bridge and reactive observation, so you work
-with your own model objects and get patches automatically — see [Model bridges](bridges.md).
+The practical result is that most behavior can be tested without a network. A test can call
+`server.open`, `server.recv`, and `server.flush` directly, then feed the returned frames into a
+`Client`.
 
-## Codecs
+## Why a Hub for multi-tenancy?
 
-The wire format is pluggable. JSON is the default; **MessagePack** is a compact binary alternative.
-Both are self-describing — they need no schema — and produce identical bytes from Python and
-JavaScript. See [Codecs](codecs.md).
+A single `Session` is a good fit for one owner and many mirrors. A multi-tenant service needs a
+second routing layer: private state must stay tenant-local, while selected shared state must fan out
+to many tenants. `Hub` provides that layer without changing the client protocol.
 
-## Connections
+Shared models use ids above a reserved base so they do not collide with tenant-local session ids.
+Subscribers receive the same snapshot and patch messages as any other client. The difference is on
+the server: the hub decides who can see the model, who can write it, and how concurrent shared writes
+are reconciled.
 
-Patches travel between processes over a **WebSocket**: a server hosts a `Session` and a client — in
-Python or the browser — mirrors the model live. See [Connections](connections.md).
+## Why pluggable codecs?
+
+The patch semantics do not depend on JSON, MessagePack, or any custom encoding. Codecs only change
+how a message becomes bytes or text on the wire. That separation lets JSON remain convenient for
+debugging while MessagePack or a registered custom codec carries production traffic.

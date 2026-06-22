@@ -1,81 +1,102 @@
 # Quickstart
 
+In this tutorial, we will host one Python model, mirror it with a `Client`, send one server-side
+change, and send one client proposal back to the server.
+
 ## Install
 
 ```bash
 pip install transports
 ```
 
-## Host a model and react to changes
+## Create a model
 
-A {py:class}`~transports.Session` hosts models and turns their mutations into incremental patches.
+Create a file or Python session with this model:
 
 ```python
-import transports
 from pydantic import BaseModel
 
 class Device(BaseModel):
     name: str
     on: bool = False
+```
+
+## Host it
+
+Host the model in a `Session`. The returned id names this model on the wire.
+
+```python
+import transports
 
 session = transports.Session()
 lamp = Device(name="lamp")
-mid = session.host(lamp)        # registers the schema, stores the value, watches the model
+mid = session.host(lamp)
 
-lamp.on = True                  # mutate normally — no .send(), no manual diff
-patches = session.drain()       # -> [(mid, {'rev': 1, 'ops': [...]})]
+print(mid)
+# 1
 ```
 
-`drain()` returns (and clears) every patch accumulated since the last drain. Each patch is the
-**minimal** set of operations — flipping `on` produces a single `Set`, not a whole-model resend.
-
-## Patches coalesce
-
-Emission is deferred to a flush (triggered by `drain()`, `snapshot()`, or an explicit `flush()`), so
-several writes between flushes collapse into one patch:
+Mutate the model and drain the session:
 
 ```python
-lamp.on = False
-lamp.name = "desk lamp"
-session.drain()   # one patch, two ops
-```
-
-## Mirror a model
-
-Patches are portable: apply them to a copy of the model hosted elsewhere (here, a second in-process
-session; in a real app the patch travels over a connection).
-
-```python
-server = transports.Session()
-lamp = Device(name="lamp")
-sid = server.host(lamp)
-
-client = transports.Session()
-mirror = transports.from_value(server.snapshot(sid)["value"], Device)
-cid = client.host(mirror)
-
 lamp.on = True
-for _mid, patch in server.drain():
-    client.apply_patch(cid, patch)
-
-assert transports.from_value(client.value(cid), Device).on is True
+print(session.drain())
+# [(1, {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'on'}], 'value': {'Bool': True}}}]})]
 ```
 
-## Any model kind
+Notice that only `on` is present in the patch.
 
-The same API works for dataclasses and msgspec structs — see [Model bridges](bridges.md).
+## Mirror it with a client
+
+Create an in-process server and client. This uses the same messages as a real WebSocket connection,
+but no network is needed for the tutorial.
 
 ```python
-from dataclasses import dataclass
+server = transports.Server(session)
+client = transports.Client()
 
-@dataclass
-class Reading:
-    sensor: str
-    value: float = 0.0
+for frame in server.open("browser"):
+    client.recv(frame)
 
-s = transports.Session()
-r = Reading(sensor="temp")
-s.host(r)
-r.value = 21.5
-s.drain()   # [(mid, {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'value'}], 'value': {'Float': 21.5}}}]})]
+print(client.model(mid, Device))
+# name='lamp' on=True
 ```
+
+## Send another server-side change
+
+Mutate the hosted model again, flush the server, and feed the outbound frame to the client.
+
+```python
+lamp.name = "desk lamp"
+
+for frame in server.flush()["browser"]:
+    client.recv(frame)
+
+print(client.model(mid, Device))
+# name='desk lamp' on=True
+```
+
+## Send a client proposal
+
+A client edit is a proposal. The server applies it, assigns the revision, and echoes the
+accepted patch back.
+
+```python
+next_value = transports.to_value(Device(name="desk lamp", on=False))
+proposal = client.edit(mid, next_value)
+
+for _conn, frames in server.recv("browser", proposal).items():
+    for frame in frames:
+        client.recv(frame)
+
+print(lamp.on)
+# False
+print(client.model(mid, Device))
+# name='desk lamp' on=False
+```
+
+You have now hosted a model, mirrored it, streamed a patch, and sent a client edit through the same
+server-authoritative path used by live connections.
+
+Next: use [model bridges](bridges.md) for dataclasses and msgspec, or [connections](connections.md)
+for WebSocket, SSE, Jupyter comm, and anywidget adapters.

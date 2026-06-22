@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Model bridges" href="bridges.html"><link rel="prev" title="Quickstart" href="quickstart.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Wire protocol reference" href="protocol-reference.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>Concepts - transports v0.3.0</title>
@@ -198,12 +198,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Concepts</a></li>
 </ul>
 
 </div>
@@ -244,64 +245,70 @@
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="concepts">
 <h1>Concepts<a class="headerlink" href="#concepts" title="Link to this heading">¶</a></h1>
-<section id="one-core-two-bindings">
-<h2>One core, two bindings<a class="headerlink" href="#one-core-two-bindings" title="Link to this heading">¶</a></h2>
-<p>transports is a <strong>Rust core</strong> with thin <strong>Python (PyO3)</strong> and <strong>JavaScript (wasm)</strong> bindings. The
-core owns the model representation, the diff/patch engine, the codecs, and the wire framing; both
-languages call into the same compiled implementation. A patch produced by Python and a patch produced
-by JavaScript for the same change are byte-for-byte identical, so either side can host a model and the
-other can mirror it.</p>
-<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>   Python (PyO3)            JavaScript (wasm)
-   ┌─────────────┐  patch   ┌─────────────┐
-   │ transports  │◄────────►│ transports  │
-   │ core (Rust) │  bytes   │ core (Rust) │
-   └─────────────┘          └─────────────┘
-        model bridge              object bridge
-   pydantic / dataclass /     plain objects /
-        msgspec                  toValue/fromValue
+<section id="why-patches-instead-of-whole-models">
+<h2>Why patches instead of whole models?<a class="headerlink" href="#why-patches-instead-of-whole-models" title="Link to this heading">¶</a></h2>
+<p>transports is built around one constraint: a changed field should not require resending the whole
+model. Whole-model messages are simple at first, but they make every participant reason about stale
+copies, large payloads, and accidental overwrites. A patch keeps the update narrow. It says which
+path changed, what operation happened there, and which revision the model reached.</p>
+<p>That design matters most when several runtimes participate. A Python process can host a pydantic
+model, a browser can mirror it as a JavaScript object, and another client can propose an edit. They do
+not need to agree on a Python class or JavaScript prototype. They only need to agree on the core
+<code class="docutils literal notranslate"><span class="pre">Value</span></code> and patch format.</p>
+</section>
+<section id="why-a-rust-core">
+<h2>Why a Rust core?<a class="headerlink" href="#why-a-rust-core" title="Link to this heading">¶</a></h2>
+<p>The core representation, diff engine, patch application, codecs, framing, and store live in Rust.
+Python and JavaScript bindings call into the same implementation. This keeps the round-trip property
+in one place:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>apply(old, diff(old, new)) == new
 </pre></div>
 </div>
+<p>The bridge code at the edge is deliberately thin. Python model libraries and JavaScript objects are
+converted into <code class="docutils literal notranslate"><span class="pre">Value</span></code>; after that, both languages use the same machinery.</p>
 </section>
-<section id="value">
-<h2>Value<a class="headerlink" href="#value" title="Link to this heading">¶</a></h2>
-<p>Every model is, on the wire, a <strong>Value</strong> — a small tagged union: <code class="docutils literal notranslate"><span class="pre">Null</span></code>, <code class="docutils literal notranslate"><span class="pre">Bool</span></code>, <code class="docutils literal notranslate"><span class="pre">Int</span></code>, <code class="docutils literal notranslate"><span class="pre">Float</span></code>,
-<code class="docutils literal notranslate"><span class="pre">Str</span></code>, <code class="docutils literal notranslate"><span class="pre">List</span></code>, <code class="docutils literal notranslate"><span class="pre">Map</span></code>, and <code class="docutils literal notranslate"><span class="pre">Submodel</span></code> (a reference to another model by id). The serialized form is the
-externally-tagged enum the Rust core speaks:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">},</span><span class="w"> </span><span class="nt">&quot;on&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
-</pre></div>
-</div>
-<p>You rarely write this by hand — the <a class="reference internal" href="bridges.html"><span class="std std-doc">model bridges</span></a> (<code class="docutils literal notranslate"><span class="pre">to_value</span></code>/<code class="docutils literal notranslate"><span class="pre">from_value</span></code> in Python,
-<code class="docutils literal notranslate"><span class="pre">toValue</span></code>/<code class="docutils literal notranslate"><span class="pre">fromValue</span></code> in JavaScript) convert your models to and from it.</p>
+<section id="why-a-value-layer">
+<h2>Why a <code class="docutils literal notranslate"><span class="pre">Value</span></code> layer?<a class="headerlink" href="#why-a-value-layer" title="Link to this heading">¶</a></h2>
+<p>Application models carry library-specific behavior: pydantic validation, dataclass defaults,
+msgspec slots, JavaScript number semantics. The wire needs something smaller and more stable than any
+one of those object systems. <code class="docutils literal notranslate"><span class="pre">Value</span></code> is that common form: tagged nulls, scalars, lists, maps, and core
+submodel references.</p>
+<p>The bridges hide the tags for normal application code. They become useful when you need a stable
+protocol boundary, a custom codec, or a language-neutral client.</p>
 </section>
-<section id="patch-and-revisions">
-<h2>Patch and revisions<a class="headerlink" href="#patch-and-revisions" title="Link to this heading">¶</a></h2>
-<p>A <strong>Patch</strong> is the incremental update between two values: an ordered list of operations
-(<code class="docutils literal notranslate"><span class="pre">Set</span></code>, <code class="docutils literal notranslate"><span class="pre">Remove</span></code>, <code class="docutils literal notranslate"><span class="pre">Insert</span></code>, <code class="docutils literal notranslate"><span class="pre">RemoveAt</span></code>) addressed by a path into the value, plus a <code class="docutils literal notranslate"><span class="pre">rev</span></code> (revision)
-counter. This is the core idea that distinguishes transports from “serialize the whole model and
-send it”: when one field changes, only that field’s operation travels.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;Set&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;path&quot;</span><span class="p">:</span> <span class="p">[{</span><span class="s2">&quot;Key&quot;</span><span class="p">:</span> <span class="s2">&quot;on&quot;</span><span class="p">}],</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;Bool&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">}}}]}</span>
-</pre></div>
-</div>
-<p>The engine guarantees the round-trip property <code class="docutils literal notranslate"><span class="pre">apply(old,</span> <span class="pre">diff(old,</span> <span class="pre">new))</span> <span class="pre">==</span> <span class="pre">new</span></code>. Maps diff by key
-and lists diff positionally; a type change at a path replaces the value there wholesale.</p>
+<section id="why-server-owned-revisions">
+<h2>Why server-owned revisions?<a class="headerlink" href="#why-server-owned-revisions" title="Link to this heading">¶</a></h2>
+<p>A client edit is a proposal, not an optimistic local commit. The server applies the proposed ops,
+assigns the next revision, refreshes its hosted Python object, and echoes the authoritative patch to
+every connection. The origin updates from that echo just like every other client.</p>
+<p>This avoids two common sync problems. First, clients do not invent revisions that later conflict with
+the server’s sequence. Second, the server’s hosted object cannot become stale after it accepts a
+remote edit.</p>
 </section>
-<section id="store-and-session">
-<h2>Store and Session<a class="headerlink" href="#store-and-session" title="Link to this heading">¶</a></h2>
-<p>The low-level <a class="reference internal" href="api.html#transports.Store" title="transports.Store"><code class="xref py py-class docutils literal notranslate"><span class="pre">Store</span></code></a> holds model values by id and, on <code class="docutils literal notranslate"><span class="pre">mutate</span></code>, diffs the new
-value against the held one, bumps the <code class="docutils literal notranslate"><span class="pre">rev</span></code>, and returns the patch. The high-level
-<a class="reference internal" href="api.html#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">Session</span></code></a> wraps it with the model bridge and reactive observation, so you work
-with your own model objects and get patches automatically — see <a class="reference internal" href="bridges.html"><span class="std std-doc">Model bridges</span></a>.</p>
+<section id="why-transport-agnostic-adapters">
+<h2>Why transport-agnostic adapters?<a class="headerlink" href="#why-transport-agnostic-adapters" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Server</span></code> and <code class="docutils literal notranslate"><span class="pre">Hub</span></code> are synchronous protocol objects. Their methods accept opaque connection handles
+and return the messages each connection should receive. WebSocket, SSE, Jupyter comm, and anywidget
+support are thin adapters around that contract.</p>
+<p>The practical result is that most behavior can be tested without a network. A test can call
+<code class="docutils literal notranslate"><span class="pre">server.open</span></code>, <code class="docutils literal notranslate"><span class="pre">server.recv</span></code>, and <code class="docutils literal notranslate"><span class="pre">server.flush</span></code> directly, then feed the returned frames into a
+<code class="docutils literal notranslate"><span class="pre">Client</span></code>.</p>
 </section>
-<section id="codecs">
-<h2>Codecs<a class="headerlink" href="#codecs" title="Link to this heading">¶</a></h2>
-<p>The wire format is pluggable. JSON is the default; <strong>MessagePack</strong> is a compact binary alternative.
-Both are self-describing — they need no schema — and produce identical bytes from Python and
-JavaScript. See <a class="reference internal" href="codecs.html"><span class="std std-doc">Codecs</span></a>.</p>
+<section id="why-a-hub-for-multi-tenancy">
+<h2>Why a Hub for multi-tenancy?<a class="headerlink" href="#why-a-hub-for-multi-tenancy" title="Link to this heading">¶</a></h2>
+<p>A single <code class="docutils literal notranslate"><span class="pre">Session</span></code> is a good fit for one owner and many mirrors. A multi-tenant service needs a
+second routing layer: private state must stay tenant-local, while selected shared state must fan out
+to many tenants. <code class="docutils literal notranslate"><span class="pre">Hub</span></code> provides that layer without changing the client protocol.</p>
+<p>Shared models use ids above a reserved base so they do not collide with tenant-local session ids.
+Subscribers receive the same snapshot and patch messages as any other client. The difference is on
+the server: the hub decides who can see the model, who can write it, and how concurrent shared writes
+are reconciled.</p>
 </section>
-<section id="connections">
-<h2>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h2>
-<p>Patches travel between processes over a <strong>WebSocket</strong>: a server hosts a <code class="docutils literal notranslate"><span class="pre">Session</span></code> and a client — in
-Python or the browser — mirrors the model live. See <a class="reference internal" href="connections.html"><span class="std std-doc">Connections</span></a>.</p>
+<section id="why-pluggable-codecs">
+<h2>Why pluggable codecs?<a class="headerlink" href="#why-pluggable-codecs" title="Link to this heading">¶</a></h2>
+<p>The patch semantics do not depend on JSON, MessagePack, or any custom encoding. Codecs only change
+how a message becomes bytes or text on the wire. That separation lets JSON remain convenient for
+debugging while MessagePack or a registered custom codec carries production traffic.</p>
 </section>
 </section>
 
@@ -310,23 +317,15 @@ Python or the browser — mirrors the model live. See <a class="reference intern
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="bridges.html">
-              <div class="page-info">
-                <div class="context">
-                  <span>Next</span>
-                </div>
-                <div class="title">Model bridges</div>
-              </div>
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-            </a>
-          <a class="prev-page" href="quickstart.html">
+          
+          <a class="prev-page" href="protocol-reference.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Quickstart</div>
+                <div class="title">Wire protocol reference</div>
                 
               </div>
             </a>
@@ -361,12 +360,13 @@ Python or the browser — mirrors the model live. See <a class="reference intern
           <div class="toc-tree">
             <ul>
 <li><a class="reference internal" href="#">Concepts</a><ul>
-<li><a class="reference internal" href="#one-core-two-bindings">One core, two bindings</a></li>
-<li><a class="reference internal" href="#value">Value</a></li>
-<li><a class="reference internal" href="#patch-and-revisions">Patch and revisions</a></li>
-<li><a class="reference internal" href="#store-and-session">Store and Session</a></li>
-<li><a class="reference internal" href="#codecs">Codecs</a></li>
-<li><a class="reference internal" href="#connections">Connections</a></li>
+<li><a class="reference internal" href="#why-patches-instead-of-whole-models">Why patches instead of whole models?</a></li>
+<li><a class="reference internal" href="#why-a-rust-core">Why a Rust core?</a></li>
+<li><a class="reference internal" href="#why-a-value-layer">Why a <code class="docutils literal notranslate"><span class="pre">Value</span></code> layer?</a></li>
+<li><a class="reference internal" href="#why-server-owned-revisions">Why server-owned revisions?</a></li>
+<li><a class="reference internal" href="#why-transport-agnostic-adapters">Why transport-agnostic adapters?</a></li>
+<li><a class="reference internal" href="#why-a-hub-for-multi-tenancy">Why a Hub for multi-tenancy?</a></li>
+<li><a class="reference internal" href="#why-pluggable-codecs">Why pluggable codecs?</a></li>
 </ul>
 </li>
 </ul>

@@ -1,86 +1,106 @@
-# Multi-tenancy & sharing
+# How to isolate tenants and share models
 
-A single process often serves many independent tenants, and some data is **shared** between them. A
-{py:class}`~transports.Hub` handles both: it routes each connection to its tenant and lets any number
-of tenants subscribe to a shared data structure.
+This guide shows you how to route connections to tenant-local sessions, subscribe tenants to shared
+models, and choose a merge strategy for shared writes.
 
-## Tenants
+## Create a hub
 
-Each tenant's models live in their own {py:class}`~transports.Session`, so tenants are fully
-isolated — one tenant never sees another's models. The `Hub` maps a connection to a tenant with a
-`key` function you provide:
+A `Hub` maps each connection handle to a tenant key. With Starlette, the connection handle is the
+`WebSocket`.
 
 ```python
 import transports
 
 hub = transports.Hub(key=lambda ws: ws.path_params["tenant"])
-
-# a tenant's private models
-hub.tenant("alice").host(Document(title="notes"))
 ```
 
-A connection only ever receives its own tenant's private models (plus any shared models it
-subscribes to), and a private edit is relayed only to that tenant's other connections.
+## Host private tenant models
 
-## Shared data structures
-
-A **shared** model's authoritative state lives in the hub. Register it with `share()`, then connect
-tenants to it with `subscribe()` and an access mode — `READ` or `WRITE`. The sharing shape is just
-the set of subscriptions:
+Each tenant has its own `Session`. Private model ids can overlap between tenants because each tenant
+has an isolated store.
 
 ```python
-from transports import READ, WRITE
+from pydantic import BaseModel
 
-doc = hub.share(Document(title="roadmap"))   # returns a shared id
-hub.subscribe("alice", doc, WRITE)
-hub.subscribe("bob", doc, READ)              # bob mirrors it but cannot write
+class Document(BaseModel):
+    title: str
+    body: str = ""
+
+hub.tenant("alice").host(Document(title="Alice notes"))
+hub.tenant("bob").host(Document(title="Bob notes"))
 ```
 
-- **One model, many readers** — subscribe many tenants `READ` (broadcast / fan-out).
-- **Many writers, one model** — subscribe many tenants `WRITE` (collaborative editing).
-- **Many models, many tenants** — any mix of the above; each connection receives exactly the models
-  it subscribes to.
+A connection for `alice` receives only Alice's private snapshots. A private edit is echoed only to
+other Alice connections.
 
-Shared models are **server-authoritative**: a writer sends its edit and receives the reconciled
-patch back, and every subscriber is kept in sync. Write to a shared model from the host side with
-`set_shared(id, value)`; the change is broadcast on the next flush.
+## Share a model read-only
 
-## Reconciling concurrent writes
-
-When several tenants write the same shared model, a {py:class}`~transports.MergeStrategy` decides how
-the writes combine. Pass one per shared model:
+Register a shared model and subscribe tenants with `READ` access.
 
 ```python
-from transports import LastWriteWins, LwwMapCrdt
+from transports import READ
 
-hub.share(Document(), merge=LastWriteWins)   # default: apply writes in arrival order
-hub.share(Document(), merge=LwwMapCrdt)      # conflict-free per-field resolution
+sid = hub.share(Document(title="Roadmap"))
+hub.subscribe("alice", sid, READ)
+hub.subscribe("bob", sid, READ)
 ```
 
-- {py:class}`~transports.LastWriteWins` (the default) applies each write as it arrives.
-- {py:class}`~transports.LwwMapCrdt` resolves per top-level field: concurrent edits to *different*
-  fields both survive, and conflicting edits to the *same* field converge to the same value
-  regardless of the order the writes arrive in.
+Write to the shared model from the host side with `set_shared`. Subscribers receive the patch on the
+next `flush` or `autoflush` tick.
 
-To plug in your own reconciliation, implement `merge(current, patch, origin) -> value` and pass the
-class to `share(merge=...)`.
+```python
+hub.set_shared(sid, Document(title="Roadmap", body="Updated"))
+```
 
-## Serving it
+## Allow shared writes
 
-`Hub.endpoint()` adapts the hub to a Starlette WebSocket route, reusing the same per-connection
-[codec negotiation](codecs.md) as a single-tenant server. Run one
-{py:func}`~transports.autoflush` task to stream host-side changes to every connection.
+Subscribe writers with `WRITE` access.
+
+```python
+from transports import WRITE
+
+hub.subscribe("alice", sid, WRITE)
+hub.subscribe("bob", sid, WRITE)
+```
+
+A write from one subscriber is merged into the authoritative shared value and echoed to every
+subscriber, including the origin.
+
+## Choose a merge strategy
+
+Use `LastWriteWins` for arrival-order writes. Use `LwwMapCrdt` when top-level map fields should
+converge independent of arrival order.
+
+```python
+sid = hub.share(Document(title="Shared"), merge=transports.LwwMapCrdt)
+```
+
+For custom reconciliation, implement `merge(current, patch, origin) -> value` on a `MergeStrategy`
+subclass and pass the class to `share`.
+
+```python
+class MyMerge(transports.MergeStrategy):
+    def merge(self, current, patch, origin):
+        ...
+
+sid = hub.share(Document(title="Shared"), merge=MyMerge)
+```
+
+## Serve the hub over WebSocket
 
 ```python
 import asyncio
 from starlette.applications import Starlette
 from starlette.routing import WebSocketRoute
 
+async def startup():
+    asyncio.create_task(transports.autoflush(hub))
+
 app = Starlette(
     routes=[WebSocketRoute("/ws/{tenant}", hub.endpoint())],
-    on_startup=[lambda: asyncio.create_task(transports.autoflush(hub))],
+    on_startup=[startup],
 )
 ```
 
-On the client side nothing changes — a {py:class}`~transports.Client` mirrors whatever models the
-hub sends it, private or shared.
+Clients use the same `Client` API as single-tenant servers. The hub decides which private and shared
+model snapshots each tenant receives.

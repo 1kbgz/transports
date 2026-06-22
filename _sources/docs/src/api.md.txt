@@ -1,6 +1,6 @@
 # API Reference
 
-The high-level reactive session, the model bridge, the connection adapters, and the low-level core.
+This reference lists the Python surface exposed by `transports`.
 
 ## Session
 
@@ -45,11 +45,19 @@ The high-level reactive session, the model bridge, the connection adapters, and 
 .. autofunction:: transports.serve_comm
 
 .. autofunction:: transports.pump_comms
+
+.. autofunction:: transports.serve_anywidget
+
+.. autofunction:: transports.flush_anywidget
 ```
 
-## Multi-tenancy & sharing
+## Multi-tenancy and sharing
 
 ```{eval-rst}
+.. autodata:: transports.READ
+
+.. autodata:: transports.WRITE
+
 .. autoclass:: transports.Hub
    :members:
    :undoc-members:
@@ -65,11 +73,25 @@ The high-level reactive session, the model bridge, the connection adapters, and 
    :members:
 ```
 
-## Core
+## Protocol helpers
 
-The low-level surface, exposed directly from the Rust core. Most users work through
-{py:class}`transports.Session`; these are useful for stateless diff/apply, encoding, and custom
-hosting.
+```{eval-rst}
+.. autofunction:: transports.protocol.normalize_codec
+
+.. autofunction:: transports.protocol.snapshot_msg
+
+.. autofunction:: transports.protocol.patch_msg
+
+.. autofunction:: transports.protocol.encode
+
+.. autofunction:: transports.protocol.decode
+```
+
+The codec registry functions (``encode_as``, ``decode_as``, ``register_codec``,
+``unregister_codec``, ``registered_codecs``) are re-exported at the top level and listed under
+**Core** below.
+
+## Core
 
 ```{eval-rst}
 .. autofunction:: transports.diff

@@ -3,7 +3,7 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Multi-tenancy &amp; sharing" href="multitenancy.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Wire protocol reference" href="protocol-reference.html"><link rel="prev" title="How to isolate tenants and share models" href="multitenancy.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
         <title>API Reference - transports v0.3.0</title>
@@ -198,12 +198,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="bridges.html">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -244,7 +245,7 @@
         <article role="main" id="furo-main-content">
           <section class="tex2jax_ignore mathjax_ignore" id="api-reference">
 <h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
-<p>The high-level reactive session, the model bridge, the connection adapters, and the low-level core.</p>
+<p>This reference lists the Python surface exposed by <code class="docutils literal notranslate"><span class="pre">transports</span></code>.</p>
 <section id="session">
 <h2>Session<a class="headerlink" href="#session" title="Link to this heading">¶</a></h2>
 <dl class="py class">
@@ -493,9 +494,53 @@ client.</p>
 handle is a comm, so the patches are delivered with <cite>comm.send</cite>.</p>
 </dd></dl>
 
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.serve_anywidget">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">serve_anywidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">widget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_WidgetConn</span></span></span><a class="reference internal" href="../../_modules/transports/anywidget.html#serve_anywidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.serve_anywidget" title="Link to this definition">¶</a></dt>
+<dd><p>Wire a widget to a <cite>Server</cite>/<cite>Hub</cite>. Returns the connection handle (pass it to <cite>flush_anywidget</cite>).</p>
+<p>The widget’s custom messages drive the protocol: <code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> triggers the opening snapshots,
+and any <code class="docutils literal notranslate"><span class="pre">{&quot;wire&quot;:</span> <span class="pre">&lt;wire&gt;}</span></code> is relayed to <code class="docutils literal notranslate"><span class="pre">server.recv</span></code> (a client’s edits), with results sent back
+over the relevant widgets.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.flush_anywidget">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">flush_anywidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/anywidget.html#flush_anywidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.flush_anywidget" title="Link to this definition">¶</a></dt>
+<dd><p>Flush host-side changes and push the resulting patches to every connected widget.</p>
+<p>Call after mutating hosted models (e.g. from a kernel-loop timer, or at the end of a cell).</p>
+</dd></dl>
+
 </section>
-<section id="multi-tenancy-sharing">
-<h2>Multi-tenancy &amp; sharing<a class="headerlink" href="#multi-tenancy-sharing" title="Link to this heading">¶</a></h2>
+<section id="multi-tenancy-and-sharing">
+<h2>Multi-tenancy and sharing<a class="headerlink" href="#multi-tenancy-and-sharing" title="Link to this heading">¶</a></h2>
+<dl class="py data">
+<dt class="sig sig-object py" id="transports.READ">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">READ</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'read'</span></em><a class="headerlink" href="#transports.READ" title="Link to this definition">¶</a></dt>
+<dd><p>str(object=’’) -&gt; str
+str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<p>Create a new string object from the given object. If encoding or
+errors is specified, then the object must expose a data buffer
+that will be decoded using the given encoding and error handler.
+Otherwise, returns the result of object.__str__() (if defined)
+or repr(object).
+encoding defaults to sys.getdefaultencoding().
+errors defaults to ‘strict’.</p>
+</dd></dl>
+
+<dl class="py data">
+<dt class="sig sig-object py" id="transports.WRITE">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">WRITE</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'write'</span></em><a class="headerlink" href="#transports.WRITE" title="Link to this definition">¶</a></dt>
+<dd><p>str(object=’’) -&gt; str
+str(bytes_or_buffer[, encoding[, errors]]) -&gt; str</p>
+<p>Create a new string object from the given object. If encoding or
+errors is specified, then the object must expose a data buffer
+that will be decoded using the given encoding and error handler.
+Otherwise, returns the result of object.__str__() (if defined)
+or repr(object).
+encoding defaults to sys.getdefaultencoding().
+errors defaults to ‘strict’.</p>
+</dd></dl>
+
 <dl class="py class">
 <dt class="sig sig-object py" id="transports.Hub">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Hub</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub" title="Link to this definition">¶</a></dt>
@@ -596,11 +641,47 @@ arrival order). Nested or list ops fall back to a direct apply, stamped by their
 </dd></dl>
 
 </section>
+<section id="protocol-helpers">
+<h2>Protocol helpers<a class="headerlink" href="#protocol-helpers" title="Link to this heading">¶</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.protocol.normalize_codec">
+<span class="sig-prename descclassname"><span class="pre">transports.protocol.</span></span><span class="sig-name descname"><span class="pre">normalize_codec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/protocol.html#normalize_codec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.protocol.normalize_codec" title="Link to this definition">¶</a></dt>
+<dd><p>Map a codec name or content-type to a canonical name (<code class="xref py py-data docutils literal notranslate"><span class="pre">JSON</span></code>, <code class="xref py py-data docutils literal notranslate"><span class="pre">MSGPACK</span></code>, or a
+registered custom content type).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.protocol.snapshot_msg">
+<span class="sig-prename descclassname"><span class="pre">transports.protocol.</span></span><span class="sig-name descname"><span class="pre">snapshot_msg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rev</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/protocol.html#snapshot_msg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.protocol.snapshot_msg" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.protocol.patch_msg">
+<span class="sig-prename descclassname"><span class="pre">transports.protocol.</span></span><span class="sig-name descname"><span class="pre">patch_msg</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">patch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/protocol.html#patch_msg"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.protocol.patch_msg" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.protocol.encode">
+<span class="sig-prename descclassname"><span class="pre">transports.protocol.</span></span><span class="sig-name descname"><span class="pre">encode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">msg_json</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></span><a class="reference internal" href="../../_modules/transports/protocol.html#encode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.protocol.encode" title="Link to this definition">¶</a></dt>
+<dd><p>Encode a JSON message string into the wire form for <code class="docutils literal notranslate"><span class="pre">codec</span></code>.</p>
+<p>Returns the string unchanged for JSON, MessagePack <code class="docutils literal notranslate"><span class="pre">bytes</span></code> for the msgpack codec, or whatever a
+registered custom codec produces — so the caller sends a text or binary frame accordingly.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.protocol.decode">
+<span class="sig-prename descclassname"><span class="pre">transports.protocol.</span></span><span class="sig-name descname"><span class="pre">decode</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span></span></span><a class="reference internal" href="../../_modules/transports/protocol.html#decode"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.protocol.decode" title="Link to this definition">¶</a></dt>
+<dd><p>Parse an inbound frame to a message dict.</p>
+<p>Pass the connection’s <code class="docutils literal notranslate"><span class="pre">codec</span></code> to select the decoder (required for custom codecs). With no
+<code class="docutils literal notranslate"><span class="pre">codec</span></code> the built-ins are inferred from the frame type (str=JSON, bytes=msgpack).</p>
+</dd></dl>
+
+<p>The codec registry functions (<code class="docutils literal notranslate"><span class="pre">encode_as</span></code>, <code class="docutils literal notranslate"><span class="pre">decode_as</span></code>, <code class="docutils literal notranslate"><span class="pre">register_codec</span></code>,
+<code class="docutils literal notranslate"><span class="pre">unregister_codec</span></code>, <code class="docutils literal notranslate"><span class="pre">registered_codecs</span></code>) are re-exported at the top level and listed under
+<strong>Core</strong> below.</p>
+</section>
 <section id="core">
 <h2>Core<a class="headerlink" href="#core" title="Link to this heading">¶</a></h2>
-<p>The low-level surface, exposed directly from the Rust core. Most users work through
-<a class="reference internal" href="#transports.Session" title="transports.Session"><code class="xref py py-class docutils literal notranslate"><span class="pre">transports.Session</span></code></a>; these are useful for stateless diff/apply, encoding, and custom
-hosting.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.diff">
 <span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.diff" title="Link to this definition">¶</a></dt>
@@ -711,7 +792,15 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
       <footer>
         
         <div class="related-pages">
-          
+          <a class="next-page" href="protocol-reference.html">
+              <div class="page-info">
+                <div class="context">
+                  <span>Next</span>
+                </div>
+                <div class="title">Wire protocol reference</div>
+              </div>
+              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
+            </a>
           <a class="prev-page" href="multitenancy.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
@@ -719,7 +808,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Multi-tenancy &amp; sharing</div>
+                <div class="title">How to isolate tenants and share models</div>
                 
               </div>
             </a>
@@ -801,9 +890,13 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.sse_endpoint"><code class="docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a></li>
 <li><a class="reference internal" href="#transports.serve_comm"><code class="docutils literal notranslate"><span class="pre">serve_comm()</span></code></a></li>
 <li><a class="reference internal" href="#transports.pump_comms"><code class="docutils literal notranslate"><span class="pre">pump_comms()</span></code></a></li>
+<li><a class="reference internal" href="#transports.serve_anywidget"><code class="docutils literal notranslate"><span class="pre">serve_anywidget()</span></code></a></li>
+<li><a class="reference internal" href="#transports.flush_anywidget"><code class="docutils literal notranslate"><span class="pre">flush_anywidget()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#multi-tenancy-sharing">Multi-tenancy &amp; sharing</a><ul>
+<li><a class="reference internal" href="#multi-tenancy-and-sharing">Multi-tenancy and sharing</a><ul>
+<li><a class="reference internal" href="#transports.READ"><code class="docutils literal notranslate"><span class="pre">READ</span></code></a></li>
+<li><a class="reference internal" href="#transports.WRITE"><code class="docutils literal notranslate"><span class="pre">WRITE</span></code></a></li>
 <li><a class="reference internal" href="#transports.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
 <li><a class="reference internal" href="#transports.Hub.tenant"><code class="docutils literal notranslate"><span class="pre">Hub.tenant()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Hub.share"><code class="docutils literal notranslate"><span class="pre">Hub.share()</span></code></a></li>
@@ -819,6 +912,14 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.MergeStrategy"><code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a></li>
 <li><a class="reference internal" href="#transports.LastWriteWins"><code class="docutils literal notranslate"><span class="pre">LastWriteWins</span></code></a></li>
 <li><a class="reference internal" href="#transports.LwwMapCrdt"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#protocol-helpers">Protocol helpers</a><ul>
+<li><a class="reference internal" href="#transports.protocol.normalize_codec"><code class="docutils literal notranslate"><span class="pre">normalize_codec()</span></code></a></li>
+<li><a class="reference internal" href="#transports.protocol.snapshot_msg"><code class="docutils literal notranslate"><span class="pre">snapshot_msg()</span></code></a></li>
+<li><a class="reference internal" href="#transports.protocol.patch_msg"><code class="docutils literal notranslate"><span class="pre">patch_msg()</span></code></a></li>
+<li><a class="reference internal" href="#transports.protocol.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
+<li><a class="reference internal" href="#transports.protocol.decode"><code class="docutils literal notranslate"><span class="pre">decode()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#core">Core</a><ul>

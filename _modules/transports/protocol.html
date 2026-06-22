@@ -197,12 +197,13 @@
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../docs/src/concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../docs/src/bridges.html">Model bridges</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../docs/src/connections.html">Connections</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../docs/src/codecs.html">Codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="../../docs/src/multitenancy.html">Multi-tenancy &amp; sharing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/bridges.html">How to bridge models and objects</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/connections.html">How to connect live clients</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/codecs.html">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/api.html">API Reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/protocol-reference.html">Wire protocol reference</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/concepts.html">Concepts</a></li>
 </ul>
 
 </div>
@@ -273,7 +274,7 @@
 
 
 <div class="viewcode-block" id="register_codec">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.register_codec">[docs]</a>
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.register_codec">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">register_codec</span><span class="p">(</span><span class="n">content_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">encode</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]],</span> <span class="n">decode</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]],</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Register a custom wire codec under ``content_type``.</span>
 
@@ -290,7 +291,7 @@
 
 
 <div class="viewcode-block" id="unregister_codec">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.unregister_codec">[docs]</a>
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.unregister_codec">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">unregister_codec</span><span class="p">(</span><span class="n">content_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Remove a previously registered custom codec.&quot;&quot;&quot;</span>
     <span class="n">_CODECS</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">content_type</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span></div>
@@ -298,13 +299,15 @@
 
 
 <div class="viewcode-block" id="registered_codecs">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.registered_codecs">[docs]</a>
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.registered_codecs">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">registered_codecs</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;The content types of the currently registered custom codecs.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">_CODECS</span><span class="p">)</span></div>
 
 
 
+<div class="viewcode-block" id="normalize_codec">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.normalize_codec">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">normalize_codec</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`, or a</span>
 <span class="sd">    registered custom content type).&quot;&quot;&quot;</span>
@@ -314,17 +317,26 @@
         <span class="k">return</span> <span class="n">MSGPACK</span>
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_CODECS</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">name</span>  <span class="c1"># a registered content type is its own canonical name</span>
-    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown codec: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown codec: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
+
+<div class="viewcode-block" id="snapshot_msg">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.snapshot_msg">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">snapshot_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;snapshot&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span> <span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;snapshot&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span> <span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">value</span><span class="p">})</span></div>
 
 
+
+<div class="viewcode-block" id="patch_msg">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.patch_msg">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">patch_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;patch&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="p">})</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;patch&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="p">})</span></div>
 
 
+
+<div class="viewcode-block" id="encode">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.encode">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">encode</span><span class="p">(</span><span class="n">msg_json</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">]:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Encode a JSON message string into the wire form for ``codec``.</span>
 
@@ -336,9 +348,12 @@
         <span class="k">return</span> <span class="n">_CODECS</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="mi">0</span><span class="p">](</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">msg_json</span><span class="p">))</span>
     <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">MSGPACK</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_json_to_msgpack</span><span class="p">(</span><span class="n">msg_json</span><span class="p">)</span>
-    <span class="k">return</span> <span class="n">msg_json</span>
+    <span class="k">return</span> <span class="n">msg_json</span></div>
 
 
+
+<div class="viewcode-block" id="decode">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.decode">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">decode</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">codec</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Parse an inbound frame to a message dict.</span>
 
@@ -353,11 +368,12 @@
             <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
         <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_msgpack_to_json</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
-    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
+
 
 
 <div class="viewcode-block" id="encode_as">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.encode_as">[docs]</a>
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.encode_as">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">encode_as</span><span class="p">(</span><span class="n">value_json</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">content_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bytes</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Encode a model ``Value`` (JSON string) to bytes with the named codec (built-in or registered).&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">content_type</span> <span class="ow">in</span> <span class="n">_CODECS</span><span class="p">:</span>
@@ -368,7 +384,7 @@
 
 
 <div class="viewcode-block" id="decode_as">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.decode_as">[docs]</a>
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.decode_as">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">decode_as</span><span class="p">(</span><span class="n">data</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">content_type</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Decode bytes back to a model ``Value`` (JSON string) with the named codec (built-in or registered).&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">content_type</span> <span class="ow">in</span> <span class="n">_CODECS</span><span class="p">:</span>
