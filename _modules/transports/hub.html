@@ -251,18 +251,19 @@
 <span class="sd">Writes to a shared model are reconciled by a pluggable :class:`MergeStrategy` (default</span>
 <span class="sd">:class:`LastWriteWins`; :class:`LwwMapCrdt` is a conflict-free reference). Like `Server`, the hub&#39;s</span>
 <span class="sd">logic is synchronous and transport-agnostic — its methods *return* the messages to send, keyed by</span>
-<span class="sd">connection — so it is unit-testable without a network; `Hub.endpoint()` adapts it to Starlette.</span>
+<span class="sd">connection — so it is unit-testable without a network. It satisfies the same `Broadcaster` contract as</span>
+<span class="sd">`Server`, so the same adapters serve it: `ws_endpoint(hub)`, `sse_endpoint(hub)`, `serve_comm`, etc.</span>
 
 <span class="sd">Shared models are **server-authoritative**: a writer sends its edit and receives the authoritative</span>
 <span class="sd">patch back.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Optional</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">protocol</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_value</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wire</span><span class="p">,</span> <span class="n">_send</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">Wire</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.session</span><span class="w"> </span><span class="kn">import</span> <span class="n">Session</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply</span> <span class="k">as</span> <span class="n">_apply</span><span class="p">,</span> <span class="n">diff</span> <span class="k">as</span> <span class="n">_diff</span>
 
@@ -362,12 +363,12 @@
 
 <span class="sd">    Construct with `key`, a function mapping a connection handle to its tenant key. Register shared</span>
 <span class="sd">    models with `share()` and connect tenants to them with `subscribe()`. Like `Server`, the methods</span>
-<span class="sd">    return the messages to send keyed by connection; `endpoint()` performs the I/O over Starlette.</span>
+<span class="sd">    return the messages to send keyed by connection; an adapter such as `ws_endpoint(hub)` performs I/O.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">key</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="n">Any</span><span class="p">],</span> <span class="o">*</span><span class="p">,</span> <span class="n">default_codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_key</span> <span class="o">=</span> <span class="n">key</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_default_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">default_codec</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">default_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">default_codec</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_tenants</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Session</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">_Shared</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_next_shared</span> <span class="o">=</span> <span class="mi">0</span>
@@ -417,7 +418,7 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_encode_for</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">msg_json</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Wire</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">msg_json</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_codec</span><span class="p">))</span>
+        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">msg_json</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_codec</span><span class="p">))</span>
 
 <div class="viewcode-block" id="Hub.open">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.open">[docs]</a>
@@ -425,7 +426,7 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a connection; returns the snapshots of its tenant&#39;s private + subscribed shared models.&quot;&quot;&quot;</span>
         <span class="n">key</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_key</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_conn_key</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">key</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_codec</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
         <span class="n">sess</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
         <span class="n">out</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="n">sess</span><span class="o">.</span><span class="n">ids</span><span class="p">():</span>
@@ -491,7 +492,7 @@
 <div class="viewcode-block" id="Hub.set_shared">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.set_shared">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">set_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value_or_model</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write to a shared model from the host side; the change is broadcast on the next `flush()`.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Write to a shared model from the host side; the change is broadcast on the next `sync`/`autosync`.&quot;&quot;&quot;</span>
         <span class="n">value</span> <span class="o">=</span> <span class="n">new_value_or_model</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">new_value_or_model</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span> <span class="k">else</span> <span class="n">to_value</span><span class="p">(</span><span class="n">new_value_or_model</span><span class="p">)</span>
         <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span><span class="o">.</span><span class="n">value</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">)))</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;ops&quot;</span><span class="p">]:</span>
@@ -523,40 +524,7 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">_fanout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">fan</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
         <span class="n">sh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span>
         <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">fan</span><span class="p">)</span>
-        <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">msg</span><span class="p">)]</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conn_key</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sh</span><span class="o">.</span><span class="n">subs</span><span class="p">}</span>
-
-<div class="viewcode-block" id="Hub.endpoint">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.endpoint">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build a Starlette WebSocket endpoint that serves this hub (tenant from `key(websocket)`).&quot;&quot;&quot;</span>
-
-        <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">websocket</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.websockets</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketDisconnect</span>
-
-            <span class="n">codec</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;codec&quot;</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_default_codec</span><span class="p">)</span>
-            <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span>
-            <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
-                <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
-            <span class="k">try</span><span class="p">:</span>
-                <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-                    <span class="n">frame</span> <span class="o">=</span> <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">receive</span><span class="p">()</span>
-                    <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;websocket.disconnect&quot;</span><span class="p">:</span>
-                        <span class="k">break</span>
-                    <span class="n">payload</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">bytes</span><span class="p">,</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">payload</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                        <span class="n">payload</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bytes&quot;</span><span class="p">)</span>
-                    <span class="k">if</span> <span class="n">payload</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                        <span class="k">continue</span>
-                    <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">payload</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-                        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-                            <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">msg</span><span class="p">)</span>
-            <span class="k">except</span> <span class="n">WebSocketDisconnect</span><span class="p">:</span>
-                <span class="k">pass</span>
-            <span class="k">finally</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">websocket</span><span class="p">)</span>
-
-        <span class="k">return</span> <span class="n">endpoint</span></div>
-</div>
+        <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">msg</span><span class="p">)]</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">k</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_conn_key</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">sh</span><span class="o">.</span><span class="n">subs</span><span class="p">}</span></div>
 
 </pre></div>
         </article>

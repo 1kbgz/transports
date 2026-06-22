@@ -242,7 +242,6 @@
 <span class="sd">A Jupyter **comm** is a bidirectional message channel between a kernel and a frontend (the transport</span>
 <span class="sd">behind ipywidgets). It carries JSON-able data natively, so transports rides it by sending the wire</span>
 <span class="sd">*string* as the comm&#39;s ``data`` — no extra framing, and the same `Client.recv`/`edit` work unchanged.</span>
-<span class="sd">The comm object itself is the connection handle.</span>
 
 <span class="sd">This adapter never imports `comm`/`ipykernel`: you pass in a comm (created by your widget, or</span>
 <span class="sd">`comm.create_comm(...)`), keeping the Jupyter dependency optional. It is therefore also testable with</span>
@@ -257,7 +256,7 @@
 
 <span class="sd">transports.serve_comm(server, my_comm)   # sends snapshots, wires inbound messages</span>
 <span class="sd"># ... mutate model(s) ...</span>
-<span class="sd">transports.pump_comms(server)            # push host-side changes to every comm</span>
+<span class="sd">transports.sync(server)                  # push host-side changes to every connection</span>
 <span class="sd">```</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
@@ -267,42 +266,44 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">.server</span><span class="w"> </span><span class="kn">import</span> <span class="n">Broadcaster</span>
 
 
+<span class="k">class</span><span class="w"> </span><span class="nc">_CommConn</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A Jupyter comm as a transports connection handle: a wire is sent as the comm&#39;s ``data``.</span>
+
+<span class="sd">    Wrapping the comm gives every connection a uniform ``send(wire)``, so `sync`/`autosync` deliver to</span>
+<span class="sd">    comms, anywidgets, and sockets the same way.&quot;&quot;&quot;</span>
+
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;comm&quot;</span><span class="p">,)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">comm</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm</span> <span class="o">=</span> <span class="n">comm</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">wire</span><span class="p">)</span>
+
+
 <div class="viewcode-block" id="serve_comm">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.serve_comm">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">comm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">comm</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_CommConn</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a comm to a `Server`/`Hub`: send the opening snapshots and relay inbound messages.</span>
 
 <span class="sd">    The comm is registered as a connection; its messages (``msg[&quot;content&quot;][&quot;data&quot;]``) are fed to</span>
-<span class="sd">    ``server.recv`` and any resulting messages are sent back over the relevant comms. Returns the comm</span>
-<span class="sd">    (the connection handle), so the caller can `pump_comms(server)` after host-side mutations.</span>
+<span class="sd">    ``server.recv`` and any resulting messages are sent back over the relevant connections. Returns the</span>
+<span class="sd">    connection handle. Call `sync(server)` after host-side mutations to push changes.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span> <span class="o">!=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;the comm transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported&quot;</span><span class="p">)</span>
-    <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
-        <span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">wire</span><span class="p">)</span>
+    <span class="n">conn</span> <span class="o">=</span> <span class="n">_CommConn</span><span class="p">(</span><span class="n">comm</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
+        <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_on_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">comm</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">][</span><span class="s2">&quot;data&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-                <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">m</span><span class="p">)</span>
+                <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">m</span><span class="p">)</span>
 
     <span class="n">comm</span><span class="o">.</span><span class="n">on_msg</span><span class="p">(</span><span class="n">_on_msg</span><span class="p">)</span>
-    <span class="n">comm</span><span class="o">.</span><span class="n">on_close</span><span class="p">(</span><span class="k">lambda</span> <span class="n">_msg</span><span class="p">:</span> <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">comm</span><span class="p">))</span>
-    <span class="k">return</span> <span class="n">comm</span></div>
-
-
-
-<div class="viewcode-block" id="pump_comms">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.pump_comms">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flush host-side changes and push the resulting patches to every connected comm.</span>
-
-<span class="sd">    Call after mutating hosted models (e.g. at the end of a cell, or from a timer). Each connection</span>
-<span class="sd">    handle is a comm, so the patches are delivered with `comm.send`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">comm</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-            <span class="n">comm</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">m</span><span class="p">)</span></div>
+    <span class="n">comm</span><span class="o">.</span><span class="n">on_close</span><span class="p">(</span><span class="k">lambda</span> <span class="n">_msg</span><span class="p">:</span> <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">conn</span></div>
 
 </pre></div>
         </article>

@@ -359,15 +359,15 @@ server <cite>rev</cite>) is returned to broadcast to every connection. <cite>Non
 <h2>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h2>
 <dl class="py class">
 <dt class="sig sig-object py" id="transports.Server">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Server</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">session</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#Server"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Server</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">session</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#Server"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Serves a <cite>Session</cite> to connected clients: sends a snapshot on connect, broadcasts patches, and
 relays a client’s patches to the other clients (a hub). Transport-agnostic — its methods return
-the messages to send; an adapter such as <cite>starlette_endpoint</cite> performs the I/O.</p>
+the messages to send; an adapter such as <cite>ws_endpoint</cite> performs the I/O.</p>
 <p>Each connection has its own negotiated codec, so outbound messages are encoded per connection.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Server.open">
-<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.open" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.open" title="Link to this definition">¶</a></dt>
 <dd><p>Register a connection with its codec; returns the snapshot messages to send it.</p>
 </dd></dl>
 
@@ -453,20 +453,12 @@ keeps <cite>rev</cite> owned by the server and avoids client/server <cite>rev</c
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="transports.starlette_endpoint">
-<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">starlette_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.Server" title="transports.server.Server"><span class="pre">Server</span></a></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#starlette_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.starlette_endpoint" title="Link to this definition">¶</a></dt>
-<dd><p>Build a Starlette WebSocket endpoint that serves <cite>server</cite>.</p>
-<p>The connection’s codec is read from a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param (default JSON). Wire it into an
-app, e.g. <code class="docutils literal notranslate"><span class="pre">WebSocketRoute(&quot;/ws&quot;,</span> <span class="pre">starlette_endpoint(server))</span></code>, and run <cite>autoflush(server)</cite> as a
-background task to stream server-side model changes to clients.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transports.autoflush">
-<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">autoflush</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#autoflush"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.autoflush" title="Link to this definition">¶</a></dt>
-<dd><p>Background task: periodically flush and broadcast patches to all connections.</p>
-<p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
-client.</p>
+<dt class="sig sig-object py" id="transports.ws_endpoint">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">ws_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/server.html#ws_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.ws_endpoint" title="Link to this definition">¶</a></dt>
+<dd><p>Build a Starlette WebSocket endpoint that serves <cite>server</cite> (a <cite>Server</cite> or <cite>Hub</cite>).</p>
+<p>The connection’s codec is read from a <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> query param, falling back to the broadcaster’s
+<cite>default_codec</cite>. Wire it into an app, e.g. <code class="docutils literal notranslate"><span class="pre">WebSocketRoute(&quot;/ws&quot;,</span> <span class="pre">ws_endpoint(server))</span></code>, and run
+<cite>autosync(server)</cite> as a background task to stream server-side model changes to clients.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -474,40 +466,43 @@ client.</p>
 <span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">sse_endpoint</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/sse.html#sse_endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.sse_endpoint" title="Link to this definition">¶</a></dt>
 <dd><p>Build a Starlette endpoint that streams a <cite>Server</cite>/<cite>Hub</cite> to a client over SSE.</p>
 <p>Wire it into an app as a normal route (<code class="docutils literal notranslate"><span class="pre">Route(&quot;/sse&quot;,</span> <span class="pre">sse_endpoint(server))</span></code>) and run
-<cite>autoflush(server)</cite> as a background task to stream server-side model changes to connected clients.</p>
+<cite>autosync(server)</cite> as a background task to stream server-side model changes to connected clients.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.serve_comm">
-<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">serve_comm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../../_modules/transports/comm.html#serve_comm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.serve_comm" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">serve_comm</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">comm</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_CommConn</span></span></span><a class="reference internal" href="../../_modules/transports/comm.html#serve_comm"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.serve_comm" title="Link to this definition">¶</a></dt>
 <dd><p>Wire a comm to a <cite>Server</cite>/<cite>Hub</cite>: send the opening snapshots and relay inbound messages.</p>
 <p>The comm is registered as a connection; its messages (<code class="docutils literal notranslate"><span class="pre">msg[&quot;content&quot;][&quot;data&quot;]</span></code>) are fed to
-<code class="docutils literal notranslate"><span class="pre">server.recv</span></code> and any resulting messages are sent back over the relevant comms. Returns the comm
-(the connection handle), so the caller can <cite>pump_comms(server)</cite> after host-side mutations.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transports.pump_comms">
-<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">pump_comms</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/comm.html#pump_comms"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.pump_comms" title="Link to this definition">¶</a></dt>
-<dd><p>Flush host-side changes and push the resulting patches to every connected comm.</p>
-<p>Call after mutating hosted models (e.g. at the end of a cell, or from a timer). Each connection
-handle is a comm, so the patches are delivered with <cite>comm.send</cite>.</p>
+<code class="docutils literal notranslate"><span class="pre">server.recv</span></code> and any resulting messages are sent back over the relevant connections. Returns the
+connection handle. Call <cite>sync(server)</cite> after host-side mutations to push changes.</p>
 </dd></dl>
 
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.serve_anywidget">
 <span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">serve_anywidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">widget</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">_WidgetConn</span></span></span><a class="reference internal" href="../../_modules/transports/anywidget.html#serve_anywidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.serve_anywidget" title="Link to this definition">¶</a></dt>
-<dd><p>Wire a widget to a <cite>Server</cite>/<cite>Hub</cite>. Returns the connection handle (pass it to <cite>flush_anywidget</cite>).</p>
+<dd><p>Wire a widget to a <cite>Server</cite>/<cite>Hub</cite>. Returns the connection handle; call <cite>sync(server)</cite> to push.</p>
 <p>The widget’s custom messages drive the protocol: <code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> triggers the opening snapshots,
 and any <code class="docutils literal notranslate"><span class="pre">{&quot;wire&quot;:</span> <span class="pre">&lt;wire&gt;}</span></code> is relayed to <code class="docutils literal notranslate"><span class="pre">server.recv</span></code> (a client’s edits), with results sent back
 over the relevant widgets.</p>
 </dd></dl>
 
 <dl class="py function">
-<dt class="sig sig-object py" id="transports.flush_anywidget">
-<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">flush_anywidget</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/anywidget.html#flush_anywidget"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.flush_anywidget" title="Link to this definition">¶</a></dt>
-<dd><p>Flush host-side changes and push the resulting patches to every connected widget.</p>
-<p>Call after mutating hosted models (e.g. from a kernel-loop timer, or at the end of a cell).</p>
+<dt class="sig sig-object py" id="transports.autosync">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">autosync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">interval</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#autosync"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.autosync" title="Link to this definition">¶</a></dt>
+<dd><p>Background task: periodically flush and broadcast patches to all connections.</p>
+<p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
+client. The async counterpart of <cite>sync</cite> — use this for socket backends (WebSocket/SSE) driven by an
+event loop, and <cite>sync</cite> for the synchronous ones (Jupyter comm/anywidget).</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transports.sync">
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">sync</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">server</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Broadcaster</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/server.html#sync"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.sync" title="Link to this definition">¶</a></dt>
+<dd><p>Drain host-side changes and deliver the patches over every connection, synchronously.</p>
+<p>The manual counterpart of <cite>autosync</cite>, for backends driven by a synchronous loop (a Jupyter comm or
+anywidget): call it after mutating hosted models — e.g. at the end of a cell, or from a kernel
+timer. Each connection handle exposes <cite>send(wire)</cite>.</p>
 </dd></dl>
 
 </section>
@@ -548,7 +543,7 @@ errors defaults to ‘strict’.</p>
 <p>Route connections to per-tenant <cite>Session</cite> objects and fan shared data structures to subscribers.</p>
 <p>Construct with <cite>key</cite>, a function mapping a connection handle to its tenant key. Register shared
 models with <cite>share()</cite> and connect tenants to them with <cite>subscribe()</cite>. Like <cite>Server</cite>, the methods
-return the messages to send keyed by connection; <cite>endpoint()</cite> performs the I/O over Starlette.</p>
+return the messages to send keyed by connection; an adapter such as <cite>ws_endpoint(hub)</cite> performs I/O.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.tenant">
 <span class="sig-name descname"><span class="pre">tenant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.tenant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.tenant" title="Link to this definition">¶</a></dt>
@@ -595,19 +590,13 @@ every subscriber connection. Both paths are server-authoritative (origin include
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.set_shared">
 <span class="sig-name descname"><span class="pre">set_shared</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_value_or_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.set_shared"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.set_shared" title="Link to this definition">¶</a></dt>
-<dd><p>Write to a shared model from the host side; the change is broadcast on the next <cite>flush()</cite>.</p>
+<dd><p>Write to a shared model from the host side; the change is broadcast on the next <cite>sync</cite>/<cite>autosync</cite>.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.close">
 <span class="sig-name descname"><span class="pre">close</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.close"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.close" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="transports.Hub.endpoint">
-<span class="sig-name descname"><span class="pre">endpoint</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.endpoint"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.endpoint" title="Link to this definition">¶</a></dt>
-<dd><p>Build a Starlette WebSocket endpoint that serves this hub (tenant from <cite>key(websocket)</cite>).</p>
-</dd></dl>
 
 </dd></dl>
 
@@ -885,13 +874,12 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.connect_sse"><code class="docutils literal notranslate"><span class="pre">Client.connect_sse()</span></code></a></li>
 </ul>
 </li>
-<li><a class="reference internal" href="#transports.starlette_endpoint"><code class="docutils literal notranslate"><span class="pre">starlette_endpoint()</span></code></a></li>
-<li><a class="reference internal" href="#transports.autoflush"><code class="docutils literal notranslate"><span class="pre">autoflush()</span></code></a></li>
+<li><a class="reference internal" href="#transports.ws_endpoint"><code class="docutils literal notranslate"><span class="pre">ws_endpoint()</span></code></a></li>
 <li><a class="reference internal" href="#transports.sse_endpoint"><code class="docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a></li>
 <li><a class="reference internal" href="#transports.serve_comm"><code class="docutils literal notranslate"><span class="pre">serve_comm()</span></code></a></li>
-<li><a class="reference internal" href="#transports.pump_comms"><code class="docutils literal notranslate"><span class="pre">pump_comms()</span></code></a></li>
 <li><a class="reference internal" href="#transports.serve_anywidget"><code class="docutils literal notranslate"><span class="pre">serve_anywidget()</span></code></a></li>
-<li><a class="reference internal" href="#transports.flush_anywidget"><code class="docutils literal notranslate"><span class="pre">flush_anywidget()</span></code></a></li>
+<li><a class="reference internal" href="#transports.autosync"><code class="docutils literal notranslate"><span class="pre">autosync()</span></code></a></li>
+<li><a class="reference internal" href="#transports.sync"><code class="docutils literal notranslate"><span class="pre">sync()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#multi-tenancy-and-sharing">Multi-tenancy and sharing</a><ul>
@@ -906,7 +894,6 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Hub.set_shared"><code class="docutils literal notranslate"><span class="pre">Hub.set_shared()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Hub.close"><code class="docutils literal notranslate"><span class="pre">Hub.close()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.endpoint"><code class="docutils literal notranslate"><span class="pre">Hub.endpoint()</span></code></a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#transports.MergeStrategy"><code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a></li>

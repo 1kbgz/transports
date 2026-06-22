@@ -255,7 +255,7 @@
 
 <span class="sd">transports.serve_anywidget(server, my_widget)   # wires ready-&gt;snapshots + inbound</span>
 <span class="sd"># ... mutate model(s) ...</span>
-<span class="sd">transports.flush_anywidget(server)              # push host-side changes to the widget(s)</span>
+<span class="sd">transports.sync(server)                         # push host-side changes to every connection</span>
 <span class="sd">```</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
@@ -280,7 +280,7 @@
 <div class="viewcode-block" id="serve_anywidget">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.serve_anywidget">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_WidgetConn</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a widget to a `Server`/`Hub`. Returns the connection handle (pass it to `flush_anywidget`).</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.</span>
 
 <span class="sd">    The widget&#39;s custom messages drive the protocol: ``{&quot;ready&quot;: true}`` triggers the opening snapshots,</span>
 <span class="sd">    and any ``{&quot;wire&quot;: &lt;wire&gt;}`` is relayed to ``server.recv`` (a client&#39;s edits), with results sent back</span>
@@ -305,18 +305,6 @@
 
     <span class="n">widget</span><span class="o">.</span><span class="n">on_msg</span><span class="p">(</span><span class="n">_on_msg</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">conn</span></div>
-
-
-
-<div class="viewcode-block" id="flush_anywidget">
-<a class="viewcode-back" href="../../docs/src/api.html#transports.flush_anywidget">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">flush_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Flush host-side changes and push the resulting patches to every connected widget.</span>
-
-<span class="sd">    Call after mutating hosted models (e.g. from a kernel-loop timer, or at the end of a cell).&quot;&quot;&quot;</span>
-    <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
-            <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
 
 </pre></div>
         </article>

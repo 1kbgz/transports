@@ -285,7 +285,7 @@ other Alice connections.</p>
 </pre></div>
 </div>
 <p>Write to the shared model from the host side with <code class="docutils literal notranslate"><span class="pre">set_shared</span></code>. Subscribers receive the patch on the
-next <code class="docutils literal notranslate"><span class="pre">flush</span></code> or <code class="docutils literal notranslate"><span class="pre">autoflush</span></code> tick.</p>
+next <code class="docutils literal notranslate"><span class="pre">sync</span></code> or <code class="docutils literal notranslate"><span class="pre">autosync</span></code> tick.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span><span class="o">.</span><span class="n">set_shared</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Roadmap&quot;</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="s2">&quot;Updated&quot;</span><span class="p">))</span>
 </pre></div>
 </div>
@@ -326,10 +326,10 @@ subclass and pass the class to <code class="docutils literal notranslate"><span 
 <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketRoute</span>
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">startup</span><span class="p">():</span>
-    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">hub</span><span class="p">))</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autosync</span><span class="p">(</span><span class="n">hub</span><span class="p">))</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
-    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hub</span><span class="o">.</span><span class="n">endpoint</span><span class="p">())],</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))],</span>
     <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>

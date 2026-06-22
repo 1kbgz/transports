@@ -243,7 +243,7 @@
 <span class="sd">like dashboards. A client receives the opening snapshots and then a live stream of patches; it does</span>
 <span class="sd">not send edits back over SSE (use the WebSocket adapter for bidirectional sync).</span>
 
-<span class="sd">The adapter reuses the existing `autoflush` driver: each SSE connection is a queue-backed handle</span>
+<span class="sd">The adapter reuses the existing `autosync` driver: each SSE connection is a queue-backed handle</span>
 <span class="sd">whose `send_text` enqueues a message, and the streaming response drains that queue. SSE is a text</span>
 <span class="sd">channel, so the JSON codec is used.</span>
 
@@ -253,7 +253,7 @@
 
 <span class="sd">app = Starlette(</span>
 <span class="sd">    routes=[Route(&quot;/sse&quot;, transports.sse_endpoint(server))],</span>
-<span class="sd">    on_startup=[lambda: asyncio.create_task(transports.autoflush(server))],</span>
+<span class="sd">    on_startup=[lambda: asyncio.create_task(transports.autosync(server))],</span>
 <span class="sd">)</span>
 <span class="sd">```</span>
 <span class="sd">&quot;&quot;&quot;</span>
@@ -281,7 +281,7 @@
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">_SSEConn</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Async generator of wire messages for one SSE connection: the opening snapshots, then patches.</span>
 
-<span class="sd">    Patches arrive on the connection&#39;s queue via `autoflush` (which calls `send_text`). Closes the</span>
+<span class="sd">    Patches arrive on the connection&#39;s queue via `autosync` (which calls `send_text`). Closes the</span>
 <span class="sd">    connection when the consumer stops iterating.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">):</span>  <span class="c1"># snapshots first</span>
@@ -299,7 +299,7 @@
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a Starlette endpoint that streams a `Server`/`Hub` to a client over SSE.</span>
 
 <span class="sd">    Wire it into an app as a normal route (``Route(&quot;/sse&quot;, sse_endpoint(server))``) and run</span>
-<span class="sd">    `autoflush(server)` as a background task to stream server-side model changes to connected clients.</span>
+<span class="sd">    `autosync(server)` as a background task to stream server-side model changes to connected clients.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">sse_starlette</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSourceResponse</span>
 

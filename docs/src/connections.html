@@ -275,11 +275,11 @@ today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom message
         <span class="n">counter</span><span class="o">.</span><span class="n">tick</span> <span class="o">+=</span> <span class="mi">1</span>
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">startup</span><span class="p">():</span>
-    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autosync</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
     <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">ticker</span><span class="p">())</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
-    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">starlette_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
     <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
@@ -288,7 +288,7 @@ today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom message
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>uvicorn<span class="w"> </span>app:app<span class="w"> </span>--reload
 </pre></div>
 </div>
-<p>Run one <code class="docutils literal notranslate"><span class="pre">autoflush</span></code> task per <code class="docutils literal notranslate"><span class="pre">Server</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code>. It drains host-side mutations and broadcasts the
+<p>Run one <code class="docutils literal notranslate"><span class="pre">autosync</span></code> task per <code class="docutils literal notranslate"><span class="pre">Server</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code>. It drains host-side mutations and broadcasts the
 resulting patches to all open connections.</p>
 </section>
 <section id="mirror-the-server-in-a-browser">
@@ -351,7 +351,7 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.routing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Route</span>
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">startup</span><span class="p">():</span>
-    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autoflush</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
+    <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autosync</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
     <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">Route</span><span class="p">(</span><span class="s2">&quot;/sse&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
@@ -384,7 +384,7 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <span class="n">transports</span><span class="o">.</span><span class="n">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>
 
 <span class="c1"># after mutating hosted models</span>
-<span class="n">transports</span><span class="o">.</span><span class="n">pump_comms</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>The comm carries JSON wire strings in <code class="docutils literal notranslate"><span class="pre">data</span></code>, so <code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> rejects non-JSON codecs.</p>
@@ -396,7 +396,7 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conn</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">widget</span><span class="p">)</span>
 
 <span class="c1"># after mutating hosted models</span>
-<span class="n">transports</span><span class="o">.</span><span class="n">flush_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
+<span class="n">transports</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Frontend messages use the same client protocol:</p>
@@ -413,10 +413,11 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 </section>
 <section id="serve-a-hub">
 <h2>Serve a Hub<a class="headerlink" href="#serve-a-hub" title="Link to this heading">¶</a></h2>
-<p>A <code class="docutils literal notranslate"><span class="pre">Hub</span></code> satisfies the same connection contract as <code class="docutils literal notranslate"><span class="pre">Server</span></code>. Use <code class="docutils literal notranslate"><span class="pre">hub.endpoint()</span></code> for WebSocket,
-<code class="docutils literal notranslate"><span class="pre">transports.sse_endpoint(hub)</span></code> for SSE, and the same comm or anywidget helpers for Jupyter.</p>
+<p>A <code class="docutils literal notranslate"><span class="pre">Hub</span></code> satisfies the same connection contract as <code class="docutils literal notranslate"><span class="pre">Server</span></code>, so the same adapters serve it:
+<code class="docutils literal notranslate"><span class="pre">transports.ws_endpoint(hub)</span></code> for WebSocket, <code class="docutils literal notranslate"><span class="pre">transports.sse_endpoint(hub)</span></code> for SSE, and the same
+<code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> / <code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> helpers for Jupyter (with <code class="docutils literal notranslate"><span class="pre">autosync(hub)</span></code> or <code class="docutils literal notranslate"><span class="pre">sync(hub)</span></code>).</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">&quot;tenant&quot;</span><span class="p">])</span>
-<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">hub</span><span class="o">.</span><span class="n">endpoint</span><span class="p">())])</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))])</span>
 </pre></div>
 </div>
 </section>
