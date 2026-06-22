@@ -35,11 +35,11 @@ async def ticker():
         counter.tick += 1
 
 async def startup():
-    asyncio.create_task(transports.autoflush(server))
+    asyncio.create_task(transports.autosync(server))
     asyncio.create_task(ticker())
 
 app = Starlette(
-    routes=[WebSocketRoute("/ws", transports.starlette_endpoint(server))],
+    routes=[WebSocketRoute("/ws", transports.ws_endpoint(server))],
     on_startup=[startup],
 )
 ```
@@ -50,7 +50,7 @@ Run it:
 uvicorn app:app --reload
 ```
 
-Run one `autoflush` task per `Server` or `Hub`. It drains host-side mutations and broadcasts the
+Run one `autosync` task per `Server` or `Hub`. It drains host-side mutations and broadcasts the
 resulting patches to all open connections.
 
 ## Mirror the server in a browser
@@ -124,7 +124,7 @@ from starlette.applications import Starlette
 from starlette.routing import Route
 
 async def startup():
-    asyncio.create_task(transports.autoflush(server))
+    asyncio.create_task(transports.autosync(server))
 
 app = Starlette(
     routes=[Route("/sse", transports.sse_endpoint(server))],
@@ -165,7 +165,7 @@ comm = create_comm(target_name="transports")
 transports.serve_comm(server, comm)
 
 # after mutating hosted models
-transports.pump_comms(server)
+transports.sync(server)
 ```
 
 The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON codecs.
@@ -179,7 +179,7 @@ The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON c
 conn = transports.serve_anywidget(server, widget)
 
 # after mutating hosted models
-transports.flush_anywidget(server)
+transports.sync(server)
 ```
 
 Frontend messages use the same client protocol:
@@ -198,10 +198,11 @@ Use `model.send({ wire: client.edit(id, value) })` to send an edit from the fron
 
 ## Serve a Hub
 
-A `Hub` satisfies the same connection contract as `Server`. Use `hub.endpoint()` for WebSocket,
-`transports.sse_endpoint(hub)` for SSE, and the same comm or anywidget helpers for Jupyter.
+A `Hub` satisfies the same connection contract as `Server`, so the same adapters serve it:
+`transports.ws_endpoint(hub)` for WebSocket, `transports.sse_endpoint(hub)` for SSE, and the same
+`serve_comm` / `serve_anywidget` helpers for Jupyter (with `autosync(hub)` or `sync(hub)`).
 
 ```python
 hub = transports.Hub(key=lambda ws: ws.path_params["tenant"])
-app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", hub.endpoint())])
+app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", transports.ws_endpoint(hub))])
 ```

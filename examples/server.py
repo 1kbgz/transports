@@ -46,14 +46,14 @@ async def _ticker():
 
 
 async def _startup():
-    asyncio.create_task(transports.autoflush(server, 0.05))  # broadcast patches to all clients
+    asyncio.create_task(transports.autosync(server, 0.05))  # broadcast patches to all clients
     asyncio.create_task(_ticker())
 
 
 app = Starlette(
     routes=[
         Route("/", _index),
-        WebSocketRoute("/ws", transports.starlette_endpoint(server)),
+        WebSocketRoute("/ws", transports.ws_endpoint(server)),
         Mount("/pkg", app=StaticFiles(directory=str(PKG))),
     ],
     on_startup=[_startup],

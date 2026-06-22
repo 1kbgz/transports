@@ -2,7 +2,7 @@ import json
 
 from pydantic import BaseModel
 
-from transports import Client, Server, Session, protocol, starlette_endpoint, to_value
+from transports import Client, Server, Session, protocol, to_value, ws_endpoint
 
 
 class Device(BaseModel):
@@ -188,7 +188,7 @@ def test_starlette_msgpack_connection():
     server = Server(session)
     d = Device(name="lamp")
     mid = session.host(d)
-    app = Starlette(routes=[WebSocketRoute("/ws", starlette_endpoint(server))])
+    app = Starlette(routes=[WebSocketRoute("/ws", ws_endpoint(server))])
 
     with TestClient(app) as tc, tc.websocket_connect("/ws?codec=msgpack") as ws:
         client = Client(codec="msgpack")
@@ -210,7 +210,7 @@ def test_starlette_connect_snapshot_and_relay():
     server = Server(session)
     d = Device(name="lamp")
     mid = session.host(d)
-    app = Starlette(routes=[WebSocketRoute("/ws", starlette_endpoint(server))])
+    app = Starlette(routes=[WebSocketRoute("/ws", ws_endpoint(server))])
 
     with TestClient(app) as tc, tc.websocket_connect("/ws") as ws1, tc.websocket_connect("/ws") as ws2:
         snap1 = json.loads(ws1.receive_text())

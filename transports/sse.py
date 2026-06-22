@@ -4,7 +4,7 @@ SSE is a one-way server→client stream (the browser `EventSource`), well suited
 like dashboards. A client receives the opening snapshots and then a live stream of patches; it does
 not send edits back over SSE (use the WebSocket adapter for bidirectional sync).
 
-The adapter reuses the existing `autoflush` driver: each SSE connection is a queue-backed handle
+The adapter reuses the existing `autosync` driver: each SSE connection is a queue-backed handle
 whose `send_text` enqueues a message, and the streaming response drains that queue. SSE is a text
 channel, so the JSON codec is used.
 
@@ -14,7 +14,7 @@ import transports
 
 app = Starlette(
     routes=[Route("/sse", transports.sse_endpoint(server))],
-    on_startup=[lambda: asyncio.create_task(transports.autoflush(server))],
+    on_startup=[lambda: asyncio.create_task(transports.autosync(server))],
 )
 ```
 """
@@ -42,7 +42,7 @@ class _SSEConn:
 async def sse_stream(server: Broadcaster, conn: _SSEConn):
     """Async generator of wire messages for one SSE connection: the opening snapshots, then patches.
 
-    Patches arrive on the connection's queue via `autoflush` (which calls `send_text`). Closes the
+    Patches arrive on the connection's queue via `autosync` (which calls `send_text`). Closes the
     connection when the consumer stops iterating.
     """
     for wire in server.open(conn, protocol.JSON):  # snapshots first
@@ -58,7 +58,7 @@ def sse_endpoint(server: Broadcaster):
     """Build a Starlette endpoint that streams a `Server`/`Hub` to a client over SSE.
 
     Wire it into an app as a normal route (``Route("/sse", sse_endpoint(server))``) and run
-    `autoflush(server)` as a background task to stream server-side model changes to connected clients.
+    `autosync(server)` as a background task to stream server-side model changes to connected clients.
     """
     from sse_starlette import EventSourceResponse
 

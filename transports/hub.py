@@ -12,18 +12,19 @@ access **mode** (`READ` or `WRITE`). The sharing cardinalities fall out of the s
 Writes to a shared model are reconciled by a pluggable :class:`MergeStrategy` (default
 :class:`LastWriteWins`; :class:`LwwMapCrdt` is a conflict-free reference). Like `Server`, the hub's
 logic is synchronous and transport-agnostic — its methods *return* the messages to send, keyed by
-connection — so it is unit-testable without a network; `Hub.endpoint()` adapts it to Starlette.
+connection — so it is unit-testable without a network. It satisfies the same `Broadcaster` contract as
+`Server`, so the same adapters serve it: `ws_endpoint(hub)`, `sse_endpoint(hub)`, `serve_comm`, etc.
 
 Shared models are **server-authoritative**: a writer sends its edit and receives the authoritative
 patch back.
 """
 
 import json
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional
 
 from . import protocol
 from ._bridge import to_value
-from .server import Wire, _send
+from .server import Wire
 from .session import Session
 from .transports import apply as _apply, diff as _diff
 
@@ -112,12 +113,12 @@ class Hub:
 
     Construct with `key`, a function mapping a connection handle to its tenant key. Register shared
     models with `share()` and connect tenants to them with `subscribe()`. Like `Server`, the methods
-    return the messages to send keyed by connection; `endpoint()` performs the I/O over Starlette.
+    return the messages to send keyed by connection; an adapter such as `ws_endpoint(hub)` performs I/O.
     """
 
     def __init__(self, key: Callable[[Any], Any], *, default_codec: str = protocol.JSON) -> None:
         self._key = key
-        self._default_codec = protocol.normalize_codec(default_codec)
+        self.default_codec = protocol.normalize_codec(default_codec)
         self._tenants: Dict[Any, Session] = {}
         self._shared: Dict[int, _Shared] = {}
         self._next_shared = 0
@@ -158,13 +159,13 @@ class Hub:
         self._shared[sid].subs[tenant_key] = mode
 
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
-        return protocol.encode(msg_json, self._codecs.get(conn, self._default_codec))
+        return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
     def open(self, conn: Any, codec: Optional[str] = None) -> List[Wire]:
         """Register a connection; returns the snapshots of its tenant's private + subscribed shared models."""
         key = self._key(conn)
         self._conn_key[conn] = key
-        self._codecs[conn] = protocol.normalize_codec(codec or self._default_codec)
+        self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         sess = self.tenant(key)
         out: List[Wire] = []
         for mid in sess.ids():
@@ -221,7 +222,7 @@ class Hub:
         return out
 
     def set_shared(self, sid: int, new_value_or_model: Any) -> None:
-        """Write to a shared model from the host side; the change is broadcast on the next `flush()`."""
+        """Write to a shared model from the host side; the change is broadcast on the next `sync`/`autosync`."""
         value = new_value_or_model if isinstance(new_value_or_model, dict) else to_value(new_value_or_model)
         patch = json.loads(_diff(json.dumps(self._shared[sid].value), json.dumps(value)))
         if not patch["ops"]:
@@ -250,33 +251,3 @@ class Hub:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
         return {c: [self._encode_for(c, msg)] for c, k in self._conn_key.items() if k in sh.subs}
-
-    def endpoint(self):
-        """Build a Starlette WebSocket endpoint that serves this hub (tenant from `key(websocket)`)."""
-
-        async def endpoint(websocket: Any) -> None:
-            from starlette.websockets import WebSocketDisconnect
-
-            codec = websocket.query_params.get("codec", self._default_codec)
-            await websocket.accept()
-            for msg in self.open(websocket, codec):
-                await _send(websocket, msg)
-            try:
-                while True:
-                    frame = await websocket.receive()
-                    if frame.get("type") == "websocket.disconnect":
-                        break
-                    payload: Union[str, bytes, None] = frame.get("text")
-                    if payload is None:
-                        payload = frame.get("bytes")
-                    if payload is None:
-                        continue
-                    for conn, msgs in self.recv(websocket, payload).items():
-                        for msg in msgs:
-                            await _send(conn, msg)
-            except WebSocketDisconnect:
-                pass
-            finally:
-                self.close(websocket)
-
-        return endpoint

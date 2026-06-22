@@ -36,19 +36,17 @@ This reference lists the Python surface exposed by `transports`.
    :undoc-members:
    :member-order: bysource
 
-.. autofunction:: transports.starlette_endpoint
-
-.. autofunction:: transports.autoflush
+.. autofunction:: transports.ws_endpoint
 
 .. autofunction:: transports.sse_endpoint
 
 .. autofunction:: transports.serve_comm
 
-.. autofunction:: transports.pump_comms
-
 .. autofunction:: transports.serve_anywidget
 
-.. autofunction:: transports.flush_anywidget
+.. autofunction:: transports.autosync
+
+.. autofunction:: transports.sync
 ```
 
 ## Multi-tenancy and sharing

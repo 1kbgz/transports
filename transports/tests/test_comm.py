@@ -2,7 +2,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from transports import Client, Hub, Server, Session, pump_comms, serve_comm
+from transports import Client, Hub, Server, Session, serve_comm, sync
 
 
 class Device(BaseModel):
@@ -67,7 +67,7 @@ def test_comm_inbound_edit_is_applied_and_echoed():
     assert d.on is True
 
 
-def test_pump_comms_delivers_host_side_changes():
+def test_pump_delivers_host_side_changes():
     session = Session()
     server = Server(session)
     d = Device(name="lamp")
@@ -77,7 +77,7 @@ def test_pump_comms_delivers_host_side_changes():
     comm.sent.clear()
 
     d.name = "desk"
-    pump_comms(server)
+    sync(server)
     assert len(comm.sent) == 1
 
 
