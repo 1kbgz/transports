@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from transports import READ, WRITE, Client, Hub, LastWriteWins, LwwMapCrdt
+from transports import READ, WRITE, Client, Hub, LastWriteWins, LwwMapCrdt, ws_endpoint
 
 
 class Doc(BaseModel):
@@ -159,7 +159,7 @@ def test_starlette_two_tenants_share_over_mixed_codecs():
     sid = h.share(Doc())
     h.subscribe("alice", sid, WRITE)
     h.subscribe("bob", sid, WRITE)
-    app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", h.endpoint())])
+    app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", ws_endpoint(h))])
 
     with TestClient(app) as tc, tc.websocket_connect("/ws/alice?codec=json") as wa, tc.websocket_connect("/ws/bob?codec=msgpack") as wb:
         ca = Client()

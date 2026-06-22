@@ -16,7 +16,7 @@ server = transports.Server(session)
 
 transports.serve_anywidget(server, my_widget)   # wires ready->snapshots + inbound
 # ... mutate model(s) ...
-transports.flush_anywidget(server)              # push host-side changes to the widget(s)
+transports.sync(server)                         # push host-side changes to every connection
 ```
 """
 
@@ -39,7 +39,7 @@ class _WidgetConn:
 
 
 def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json") -> _WidgetConn:
-    """Wire a widget to a `Server`/`Hub`. Returns the connection handle (pass it to `flush_anywidget`).
+    """Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.
 
     The widget's custom messages drive the protocol: ``{"ready": true}`` triggers the opening snapshots,
     and any ``{"wire": <wire>}`` is relayed to ``server.recv`` (a client's edits), with results sent back
@@ -64,12 +64,3 @@ def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json") -> _W
 
     widget.on_msg(_on_msg)
     return conn
-
-
-def flush_anywidget(server: Broadcaster) -> None:
-    """Flush host-side changes and push the resulting patches to every connected widget.
-
-    Call after mutating hosted models (e.g. from a kernel-loop timer, or at the end of a cell)."""
-    for conn, msgs in server.flush().items():
-        for msg in msgs:
-            conn.send(msg)

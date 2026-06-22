@@ -46,7 +46,7 @@ hub.subscribe("bob", sid, READ)
 ```
 
 Write to the shared model from the host side with `set_shared`. Subscribers receive the patch on the
-next `flush` or `autoflush` tick.
+next `sync` or `autosync` tick.
 
 ```python
 hub.set_shared(sid, Document(title="Roadmap", body="Updated"))
@@ -94,10 +94,10 @@ from starlette.applications import Starlette
 from starlette.routing import WebSocketRoute
 
 async def startup():
-    asyncio.create_task(transports.autoflush(hub))
+    asyncio.create_task(transports.autosync(hub))
 
 app = Starlette(
-    routes=[WebSocketRoute("/ws/{tenant}", hub.endpoint())],
+    routes=[WebSocketRoute("/ws/{tenant}", transports.ws_endpoint(hub))],
     on_startup=[startup],
 )
 ```

@@ -14,7 +14,7 @@ class Device(BaseModel):
 def test_sse_stream_yields_snapshot_then_patch():
     """Drive the SSE stream generator directly (the `EventSourceResponse` wrapper is a thin shim).
 
-    Exercises the real `_SSEConn`, `server.open`, and the autoflush delivery path (`_send` ->
+    Exercises the real `_SSEConn`, `server.open`, and the autosync delivery path (`_send` ->
     `send_text` -> queue) without an in-process HTTP server (httpx's ASGITransport can't stream an
     unbounded SSE body).
     """
@@ -32,7 +32,7 @@ def test_sse_stream_yields_snapshot_then_patch():
         client.recv(snap)
         assert client.model(mid, Device) == d
 
-        d.on = True  # host-side mutation -> the autoflush driver delivers via send_text
+        d.on = True  # host-side mutation -> the autosync driver delivers via send_text
         for c, msgs in server.flush().items():
             for m in msgs:
                 await c.send_text(m)

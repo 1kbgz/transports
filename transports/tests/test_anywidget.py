@@ -48,7 +48,7 @@ def test_ready_sends_snapshot_then_flush_sends_patch():
     assert len(wires) == 1 and wires[0]["t"] == "snapshot"
 
     model.x = 5
-    transports.flush_anywidget(server)
+    transports.sync(server)
     wires = _wires(widget)
     assert wires[-1]["t"] == "patch"
 

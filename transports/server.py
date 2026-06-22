@@ -2,8 +2,8 @@
 
 `Server` holds the transport-agnostic logic — register connections, send snapshots on open, relay
 inbound patches, broadcast outbound patches — as plain synchronous methods that *return* the messages
-to send, keyed by connection. The actual async I/O lives in a thin adapter (`starlette_endpoint` /
-`autoflush`), so the protocol is testable without a network.
+to send, keyed by connection. The actual async I/O lives in a thin adapter (`ws_endpoint` /
+`autosync`), so the protocol is testable without a network.
 
 A connection handle is any hashable object (the Starlette `WebSocket`, a test sentinel, ...) that the
 I/O adapter knows how to send on. Each connection negotiates a codec (`"json"` or `"msgpack"`); the
@@ -12,7 +12,7 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 """
 
 import asyncio
-from typing import Any, Dict, List, Protocol, Union
+from typing import Any, Dict, List, Optional, Protocol, Union
 
 from . import protocol
 from .session import Session
@@ -22,6 +22,9 @@ Wire = Union[str, bytes]
 
 class Broadcaster(Protocol):
     """The structural contract the I/O adapters drive — satisfied by both `Server` and `Hub`."""
+
+    #: the codec a connection gets when it doesn't request one (the I/O adapters read this)
+    default_codec: str
 
     def open(self, conn: Any, codec: str = ...) -> List[Wire]: ...
 
@@ -35,20 +38,21 @@ class Broadcaster(Protocol):
 class Server:
     """Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and
     relays a client's patches to the other clients (a hub). Transport-agnostic — its methods return
-    the messages to send; an adapter such as `starlette_endpoint` performs the I/O.
+    the messages to send; an adapter such as `ws_endpoint` performs the I/O.
 
     Each connection has its own negotiated codec, so outbound messages are encoded per connection."""
 
-    def __init__(self, session: Session) -> None:
+    def __init__(self, session: Session, *, default_codec: str = protocol.JSON) -> None:
         self._session = session
         self._codecs: Dict[Any, str] = {}
+        self.default_codec = protocol.normalize_codec(default_codec)
 
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
-        return protocol.encode(msg_json, self._codecs.get(conn, protocol.JSON))
+        return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: str = protocol.JSON) -> List[Wire]:
+    def open(self, conn: Any, codec: Optional[str] = None) -> List[Wire]:
         """Register a connection with its codec; returns the snapshot messages to send it."""
-        self._codecs[conn] = protocol.normalize_codec(codec)
+        self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         out: List[Wire] = []
         for mid in self._session.ids():
             snap = self._session.snapshot(mid)
@@ -91,18 +95,18 @@ async def _send(conn: Any, msg: Wire) -> None:
         await conn.send_text(msg)
 
 
-def starlette_endpoint(server: Server):
-    """Build a Starlette WebSocket endpoint that serves `server`.
+def ws_endpoint(server: Broadcaster):
+    """Build a Starlette WebSocket endpoint that serves `server` (a `Server` or `Hub`).
 
-    The connection's codec is read from a ``?codec=`` query param (default JSON). Wire it into an
-    app, e.g. ``WebSocketRoute("/ws", starlette_endpoint(server))``, and run `autoflush(server)` as a
-    background task to stream server-side model changes to clients.
+    The connection's codec is read from a ``?codec=`` query param, falling back to the broadcaster's
+    `default_codec`. Wire it into an app, e.g. ``WebSocketRoute("/ws", ws_endpoint(server))``, and run
+    `autosync(server)` as a background task to stream server-side model changes to clients.
     """
 
     async def endpoint(websocket: Any) -> None:
         from starlette.websockets import WebSocketDisconnect
 
-        codec = websocket.query_params.get("codec", protocol.JSON)
+        codec = websocket.query_params.get("codec", server.default_codec)
         await websocket.accept()
         for msg in server.open(websocket, codec):
             await _send(websocket, msg)
@@ -127,11 +131,12 @@ def starlette_endpoint(server: Server):
     return endpoint
 
 
-async def autoflush(server: Broadcaster, interval: float = 0.01) -> None:
+async def autosync(server: Broadcaster, interval: float = 0.01) -> None:
     """Background task: periodically flush and broadcast patches to all connections.
 
     Run exactly one of these per `Server`/`Hub` (not per connection), so a single drain feeds every
-    client.
+    client. The async counterpart of `sync` — use this for socket backends (WebSocket/SSE) driven by an
+    event loop, and `sync` for the synchronous ones (Jupyter comm/anywidget).
     """
     while True:
         await asyncio.sleep(interval)
@@ -141,3 +146,15 @@ async def autoflush(server: Broadcaster, interval: float = 0.01) -> None:
                     await _send(conn, msg)
                 except Exception:
                     server.close(conn)
+
+
+def sync(server: Broadcaster) -> None:
+    """Drain host-side changes and deliver the patches over every connection, synchronously.
+
+    The manual counterpart of `autosync`, for backends driven by a synchronous loop (a Jupyter comm or
+    anywidget): call it after mutating hosted models — e.g. at the end of a cell, or from a kernel
+    timer. Each connection handle exposes `send(wire)`.
+    """
+    for conn, msgs in server.flush().items():
+        for msg in msgs:
+            conn.send(msg)
