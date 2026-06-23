@@ -9,7 +9,7 @@
 //! ```
 //!
 //! exercised by a deterministic fuzz below. Maps diff by key; lists diff positionally (keyed-by-id
-//! list reconciliation for `Submodel` lists is a Phase 1 refinement). A type change at a path
+//! list reconciliation for `Submodel` lists is a later refinement). A type change at a path
 //! replaces the value there wholesale.
 
 use serde::{Deserialize, Serialize};

@@ -3,7 +3,7 @@ import json
 from transports import Store, apply, decode, diff, encode
 
 # A model is a `Value`; on the wire that is the externally-tagged enum, e.g. a map of fields is
-# {"Map": {"on": {"Bool": false}}}. The pydantic/msgspec bridge (Phase 1) will hide this; the tests
+# {"Map": {"on": {"Bool": false}}}. The pydantic/msgspec bridge will hide this; the tests
 # speak the raw wire form directly.
 
 

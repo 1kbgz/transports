@@ -6,7 +6,7 @@ dirty; `flush()` (also invoked by `drain()`/`snapshot()`) recomputes each dirty 
 diffs it against the core's held value, and emits the minimal `Patch`. Because emission is deferred
 to a flush, several writes between flushes coalesce into a single patch.
 
-This is the single-owner reactive nucleus; the Phase 4 multi-tenant session (in the Rust core) will
+This is the single-owner reactive nucleus; the multi-tenant session (in the Rust core) will
 back it with fan-out, backpressure, and authorization.
 """
 

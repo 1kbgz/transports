@@ -3,7 +3,7 @@
 //! A [`Schema`] describes a model type's fields; the [`Registry`] maps a registered type name to
 //! its schema. This ports the prototype's `model_map` (class-name → type), which let the receiving
 //! side reconstruct a model from a `model_type` hint on the wire. Validation is intentionally
-//! lenient for Phase 0 — it checks shape, not exhaustive types.
+//! lenient for now — it checks shape, not exhaustive types.
 
 use std::collections::BTreeMap;
 

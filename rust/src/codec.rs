@@ -1,6 +1,6 @@
 //! Wire codecs. [`Codec`] is the seam that makes the format pluggable; [`JsonCodec`] is the
-//! bring-up implementation. Binary codecs (MessagePack, Protobuf, FlatBuffers) are Phase 2 and slot
-//! in behind this same trait without touching the model or diff layers.
+//! bring-up implementation. Binary codecs (MessagePack, Protobuf, FlatBuffers) slot in behind this
+//! same trait without touching the model or diff layers.
 
 use crate::diff::Patch;
 use crate::value::Value;
@@ -80,7 +80,7 @@ impl Codec for MsgpackCodec {
     }
 }
 
-/// Look up a codec by its content-type tag — the seam codec negotiation (Phase 2.1) builds on.
+/// Look up a codec by its content-type tag — the seam codec negotiation builds on.
 pub fn codec_for(content_type: &str) -> Option<Box<dyn Codec>> {
     match content_type {
         "application/json" => Some(Box::new(JsonCodec)),

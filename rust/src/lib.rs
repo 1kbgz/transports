@@ -2,7 +2,7 @@
 //!
 //! This crate is the single source of truth for the model representation, the diff/patch engine,
 //! the codecs, and the wire envelope; it compiles into the PyO3 (`rust/python`) and wasm (`js`)
-//! bindings so Python and JavaScript share one implementation. See `transports/ROADMAP.md`, Phase 0.
+//! bindings so Python and JavaScript share one implementation.
 //!
 //! Layers (bottom-up):
 //! - [`value`] — the typed [`Value`] a model is made of, with [`ModelId`] submodel references.

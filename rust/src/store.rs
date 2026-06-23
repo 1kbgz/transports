@@ -5,7 +5,7 @@
 //! [`Patch`] to send to peers — this is the reactive core: a field change becomes an incremental
 //! update with no whole-model resend. [`Store::apply`] applies a peer's patch to a mirrored model.
 //!
-//! Full sessions — fan-out to many subscribers, backpressure, authorization — are Phase 4; this is
+//! Full sessions — fan-out to many subscribers, backpressure, authorization — are future work; this is
 //! the single-owner nucleus they grow from.
 
 use std::collections::BTreeMap;

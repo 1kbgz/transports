@@ -8,8 +8,7 @@ Supports three model kinds with one contract — **pydantic** models, stdlib **d
   `{"Map": {...}}`). We obtain JSON-native python (pydantic `model_dump(mode="json")`, else via
   `msgspec`) and tag it; the inverse strips tags and lets the model library validate/coerce.
 - `schema_of` derives a core `Schema` (type_name + fields) from the model class.
-- `schema_to_ts` renders that schema as a TypeScript interface — one schema, both languages
-  (Phase 1.4).
+- `schema_to_ts` renders that schema as a TypeScript interface — one schema, both languages.
 
 Nested models are inlined as `Map`s; `Submodel`-by-id references are a later refinement.
 """
