@@ -7,8 +7,8 @@
 //!
 //! [`Frame::encode`] produces a self-delimiting, length-prefixed byte string so frames can be
 //! streamed back-to-back over a byte transport (TCP, a WebSocket binary message, …); [`Frame::decode`]
-//! reads one frame and returns the remaining bytes. The header is itself JSON for now; Phase 3
-//! connections build on this, and Phase 2 binary codecs only change the *payload*, not the framing.
+//! reads one frame and returns the remaining bytes. The header is itself JSON for now; richer
+//! connections build on this, and binary codecs only change the *payload*, not the framing.
 
 use serde::{Deserialize, Serialize};
 
