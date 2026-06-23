@@ -67,6 +67,20 @@ pub fn msgpack_to_json(bytes: &[u8]) -> Result<String, String> {
     serde_json::to_string(&v).map_err(|e| e.to_string())
 }
 
+/// Convert an arbitrary JSON document to CBOR bytes (any JSON, like [`json_to_msgpack`]).
+pub fn json_to_cbor(json: &str) -> Result<Vec<u8>, String> {
+    let v: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    let mut buf = Vec::new();
+    ciborium::into_writer(&v, &mut buf).map_err(|e| e.to_string())?;
+    Ok(buf)
+}
+
+/// Convert CBOR bytes back to a JSON document.
+pub fn cbor_to_json(bytes: &[u8]) -> Result<String, String> {
+    let v: serde_json::Value = ciborium::from_reader(bytes).map_err(|e| e.to_string())?;
+    serde_json::to_string(&v).map_err(|e| e.to_string())
+}
+
 /// A string-in/string-out facade over [`Store`] for the bindings.
 #[derive(Default)]
 pub struct JsonStore {

@@ -19,8 +19,7 @@ class Client:
 
     Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live
     connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`
-    (`"json"` or `"msgpack"`) controls how outbound edits are framed; inbound frames are decoded
-    automatically from their type (text=JSON, binary=msgpack)."""
+    (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound edits and decodes inbound frames."""
 
     def __init__(self, codec: str = protocol.JSON) -> None:
         self._values: Dict[int, Any] = {}

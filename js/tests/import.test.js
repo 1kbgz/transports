@@ -8,6 +8,8 @@ import {
   decodeAs,
   jsonToMsgpack,
   msgpackToJson,
+  jsonToCbor,
+  cborToJson,
   registerCodec,
   unregisterCodec,
   Client,
@@ -68,6 +70,48 @@ test("Client mirrors a binary (msgpack) snapshot then patch", async () => {
   );
   c.recv(
     jsonToMsgpack(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: {
+          rev: 1,
+          ops: [{ Set: { path: [{ Key: "on" }], value: { Bool: true } } }],
+        },
+      }),
+    ),
+  );
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
+});
+
+test("cbor round-trips via encodeAs/decodeAs", async () => {
+  const v = JSON.stringify(toValue({ name: "lamp", on: true, count: 123456 }));
+  const cb = encodeAs(v, "application/cbor");
+  expect(cb instanceof Uint8Array).toBe(true);
+  expect(JSON.parse(decodeAs(cb, "application/cbor"))).toEqual(JSON.parse(v));
+});
+
+test("whole-message json<->cbor round-trips", async () => {
+  const msg = JSON.stringify({ t: "patch", id: 7, patch: { rev: 2, ops: [] } });
+  const cb = jsonToCbor(msg);
+  expect(cb instanceof Uint8Array).toBe(true);
+  expect(JSON.parse(cborToJson(cb))).toEqual(JSON.parse(msg));
+});
+
+test("Client mirrors a binary (cbor) snapshot then patch", async () => {
+  const c = new Client("cbor");
+  c.recv(
+    jsonToCbor(
+      JSON.stringify({
+        t: "snapshot",
+        id: 1,
+        type: "Device",
+        rev: 0,
+        value: { Map: { on: { Bool: false } } },
+      }),
+    ),
+  );
+  c.recv(
+    jsonToCbor(
       JSON.stringify({
         t: "patch",
         id: 1,

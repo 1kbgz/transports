@@ -34,6 +34,13 @@ export const jsonToMsgpack = (json: string): Uint8Array =>
 export const msgpackToJson = (bytes: Uint8Array): string =>
   wasm.msgpack_to_json(bytes);
 
+/** Convert an arbitrary JSON document to CBOR bytes (for whole protocol messages). */
+export const jsonToCbor = (json: string): Uint8Array => wasm.json_to_cbor(json);
+
+/** Convert CBOR bytes back to a JSON document. */
+export const cborToJson = (bytes: Uint8Array): string =>
+  wasm.cbor_to_json(bytes);
+
 /** In-process model store: host / mutate → patch / apply / snapshot. */
 export const Store = wasm.Store;
 

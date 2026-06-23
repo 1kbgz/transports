@@ -7,9 +7,11 @@ from transports import (
     Client,
     Server,
     Session,
+    cbor_to_json,
     decode_as,
     encode,
     encode_as,
+    json_to_cbor,
     json_to_msgpack,
     msgpack_to_json,
     protocol,
@@ -61,8 +63,31 @@ def test_protocol_encode_decode_msgpack():
     assert protocol.decode(wire) == json.loads(MSG)
 
 
+def test_cbor_round_trip():
+    blob = encode_as(MODEL, "application/cbor")
+    assert isinstance(blob, bytes)
+    assert json.loads(decode_as(blob, "application/cbor")) == json.loads(MODEL)
+
+
+def test_cbor_is_smaller_than_json():
+    assert len(encode_as(MODEL, "application/cbor")) < len(encode(MODEL))
+
+
+def test_json_cbor_message_round_trip():
+    blob = json_to_cbor(MSG)
+    assert isinstance(blob, bytes)
+    assert json.loads(cbor_to_json(blob)) == json.loads(MSG)
+
+
+def test_protocol_encode_decode_cbor():
+    wire = protocol.encode(MSG, protocol.CBOR)
+    assert isinstance(wire, bytes)
+    assert protocol.decode(wire, protocol.CBOR) == json.loads(MSG)
+
+
 def test_normalize_codec_aliases():
     assert protocol.normalize_codec("application/msgpack") == protocol.MSGPACK
+    assert protocol.normalize_codec("application/cbor") == protocol.CBOR
     assert protocol.normalize_codec(None) == protocol.JSON
     with pytest.raises(ValueError):
         protocol.normalize_codec("application/protobuf")
