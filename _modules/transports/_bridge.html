@@ -247,8 +247,7 @@
 <span class="sd">  `{&quot;Map&quot;: {...}}`). We obtain JSON-native python (pydantic `model_dump(mode=&quot;json&quot;)`, else via</span>
 <span class="sd">  `msgspec`) and tag it; the inverse strips tags and lets the model library validate/coerce.</span>
 <span class="sd">- `schema_of` derives a core `Schema` (type_name + fields) from the model class.</span>
-<span class="sd">- `schema_to_ts` renders that schema as a TypeScript interface — one schema, both languages</span>
-<span class="sd">  (Phase 1.4).</span>
+<span class="sd">- `schema_to_ts` renders that schema as a TypeScript interface — one schema, both languages.</span>
 
 <span class="sd">Nested models are inlined as `Map`s; `Submodel`-by-id references are a later refinement.</span>
 <span class="sd">&quot;&quot;&quot;</span>
