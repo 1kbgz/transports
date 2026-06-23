@@ -260,8 +260,7 @@
 
 <span class="sd">    Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live</span>
 <span class="sd">    connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`</span>
-<span class="sd">    (`&quot;json&quot;` or `&quot;msgpack&quot;`) controls how outbound edits are framed; inbound frames are decoded</span>
-<span class="sd">    automatically from their type (text=JSON, binary=msgpack).&quot;&quot;&quot;</span>
+<span class="sd">    (`&quot;json&quot;`, `&quot;msgpack&quot;`, or `&quot;cbor&quot;`) frames outbound edits and decodes inbound frames.&quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>

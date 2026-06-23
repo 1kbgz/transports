@@ -253,18 +253,21 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Dict</span><span class="p">,</span> <span class="n">Tuple</span><span class="p">,</span> <span class="n">Union</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">cbor_to_json</span> <span class="k">as</span> <span class="n">_cbor_to_json</span><span class="p">,</span>
     <span class="n">decode_as</span> <span class="k">as</span> <span class="n">_core_decode_as</span><span class="p">,</span>
     <span class="n">encode_as</span> <span class="k">as</span> <span class="n">_core_encode_as</span><span class="p">,</span>
+    <span class="n">json_to_cbor</span> <span class="k">as</span> <span class="n">_json_to_cbor</span><span class="p">,</span>
     <span class="n">json_to_msgpack</span> <span class="k">as</span> <span class="n">_json_to_msgpack</span><span class="p">,</span>
     <span class="n">msgpack_to_json</span> <span class="k">as</span> <span class="n">_msgpack_to_json</span><span class="p">,</span>
 <span class="p">)</span>
 
 <span class="c1">#: Canonical codec names. A connection negotiates one of these (e.g. via a ``?codec=`` query param);</span>
-<span class="c1">#: JSON travels as text frames, MessagePack as binary frames.</span>
+<span class="c1">#: JSON travels as text frames, MessagePack and CBOR as binary frames.</span>
 <span class="n">JSON</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span>
 <span class="n">MSGPACK</span> <span class="o">=</span> <span class="s2">&quot;msgpack&quot;</span>
+<span class="n">CBOR</span> <span class="o">=</span> <span class="s2">&quot;cbor&quot;</span>
 
-<span class="n">_BUILTIN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span> <span class="s2">&quot;msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;x-msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/x-msgpack&quot;</span><span class="p">}</span>
+<span class="n">_BUILTIN</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">,</span> <span class="s2">&quot;msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;x-msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/x-msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;cbor&quot;</span><span class="p">,</span> <span class="s2">&quot;application/cbor&quot;</span><span class="p">}</span>
 
 <span class="c1">#: Registered custom codecs: ``content_type -&gt; (encode, decode)``. ``encode`` maps a JSON-able object</span>
 <span class="c1">#: (a protocol message, or a model ``Value``) to wire bytes/str; ``decode`` is its inverse.</span>
@@ -309,12 +312,14 @@
 <div class="viewcode-block" id="normalize_codec">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.normalize_codec">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">normalize_codec</span><span class="p">(</span><span class="n">name</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`, or a</span>
-<span class="sd">    registered custom content type).&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`,</span>
+<span class="sd">    :data:`CBOR`, or a registered custom content type).&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;json&quot;</span><span class="p">,</span> <span class="s2">&quot;application/json&quot;</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">JSON</span>
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;x-msgpack&quot;</span><span class="p">,</span> <span class="s2">&quot;application/x-msgpack&quot;</span><span class="p">):</span>
         <span class="k">return</span> <span class="n">MSGPACK</span>
+    <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;cbor&quot;</span><span class="p">,</span> <span class="s2">&quot;application/cbor&quot;</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">CBOR</span>
     <span class="k">if</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_CODECS</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">name</span>  <span class="c1"># a registered content type is its own canonical name</span>
     <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown codec: </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
@@ -348,6 +353,8 @@
         <span class="k">return</span> <span class="n">_CODECS</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="mi">0</span><span class="p">](</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">msg_json</span><span class="p">))</span>
     <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">MSGPACK</span><span class="p">:</span>
         <span class="k">return</span> <span class="n">_json_to_msgpack</span><span class="p">(</span><span class="n">msg_json</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">CBOR</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">_json_to_cbor</span><span class="p">(</span><span class="n">msg_json</span><span class="p">)</span>
     <span class="k">return</span> <span class="n">msg_json</span></div>
 
 
@@ -366,6 +373,8 @@
             <span class="k">return</span> <span class="n">_CODECS</span><span class="p">[</span><span class="n">c</span><span class="p">][</span><span class="mi">1</span><span class="p">](</span><span class="n">data</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">JSON</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">c</span> <span class="o">==</span> <span class="n">CBOR</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_cbor_to_json</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
     <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="p">(</span><span class="nb">bytes</span><span class="p">,</span> <span class="nb">bytearray</span><span class="p">)):</span>
         <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_msgpack_to_json</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">)))</span>
     <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">data</span><span class="p">)</span></div>
