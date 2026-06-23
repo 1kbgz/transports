@@ -1,5 +1,12 @@
 import { codecFor } from "./codecs";
-import { apply, diff, jsonToMsgpack, msgpackToJson } from "./index";
+import {
+  apply,
+  cborToJson,
+  diff,
+  jsonToCbor,
+  jsonToMsgpack,
+  msgpackToJson,
+} from "./index";
 
 type SnapshotMsg = {
   t: "snapshot";
@@ -33,11 +40,17 @@ export class Client {
    */
   recv(data: string | Uint8Array): void {
     const custom = codecFor(this.codec);
-    const msg = (
-      custom
-        ? custom.decode(data)
-        : JSON.parse(typeof data === "string" ? data : msgpackToJson(data))
-    ) as SnapshotMsg | PatchMsg;
+    let msg: SnapshotMsg | PatchMsg;
+    if (custom) {
+      msg = custom.decode(data) as SnapshotMsg | PatchMsg;
+    } else if (typeof data === "string") {
+      msg = JSON.parse(data);
+    } else {
+      // binary frame: disambiguate by the connection's codec (msgpack vs cbor)
+      msg = JSON.parse(
+        this.codec === "cbor" ? cborToJson(data) : msgpackToJson(data),
+      );
+    }
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);
@@ -77,7 +90,9 @@ export class Client {
     const custom = codecFor(this.codec);
     if (custom) return custom.encode(msg);
     const s = JSON.stringify(msg);
-    return this.codec === "msgpack" ? jsonToMsgpack(s) : s;
+    if (this.codec === "msgpack") return jsonToMsgpack(s);
+    if (this.codec === "cbor") return jsonToCbor(s);
+    return s;
   }
 
   /** Connect to a transports server and mirror it. Returns the `WebSocket`. */

@@ -134,6 +134,27 @@ def test_msgpack_connection_mirrors_with_binary_frames():
     assert client.model(mid, Device).on is True
 
 
+def test_cbor_connection_mirrors_with_binary_frames():
+    session = Session()
+    server = Server(session)
+    client = Client(codec="cbor")
+    d = Device(name="lamp")
+    mid = session.host(d)
+
+    snaps = server.open("c1", codec="cbor")
+    assert all(isinstance(m, bytes) for m in snaps)  # CBOR frames are binary
+    for m in snaps:
+        client.recv(m)
+    assert client.model(mid, Device) == d
+
+    d.on = True
+    out = server.flush()["c1"]
+    assert all(isinstance(m, bytes) for m in out)
+    for m in out:
+        client.recv(m)
+    assert client.model(mid, Device).on is True
+
+
 def test_mixed_codecs_per_connection():
     session = Session()
     server = Server(session)

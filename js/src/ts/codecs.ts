@@ -16,6 +16,8 @@ const BUILTIN = new Set([
   "application/msgpack",
   "x-msgpack",
   "application/x-msgpack",
+  "cbor",
+  "application/cbor",
 ]);
 
 const registry = new Map<

@@ -56,6 +56,19 @@ pub fn msgpack_to_json(data: &[u8]) -> PyResult<String> {
     transports::msgpack_to_json(data).map_err(PyValueError::new_err)
 }
 
+/// Convert an arbitrary JSON document to CBOR bytes (for encoding whole protocol messages).
+#[pyfunction]
+pub fn json_to_cbor<'py>(py: Python<'py>, json: &str) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = transports::json_to_cbor(json).map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &bytes))
+}
+
+/// Convert CBOR bytes back to a JSON document.
+#[pyfunction]
+pub fn cbor_to_json(data: &[u8]) -> PyResult<String> {
+    transports::cbor_to_json(data).map_err(PyValueError::new_err)
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

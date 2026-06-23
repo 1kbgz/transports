@@ -22,10 +22,10 @@ mod store;
 mod value;
 
 pub use bridge::{
-    apply_json, decode_as, decode_json, diff_json, encode_as, encode_json, json_to_msgpack,
-    msgpack_to_json, JsonStore,
+    apply_json, cbor_to_json, decode_as, decode_json, diff_json, encode_as, encode_json,
+    json_to_cbor, json_to_msgpack, msgpack_to_json, JsonStore,
 };
-pub use codec::{codec_for, Codec, CodecError, JsonCodec, MsgpackCodec};
+pub use codec::{codec_for, CborCodec, Codec, CodecError, JsonCodec, MsgpackCodec};
 pub use diff::{apply, diff, Op, Patch, Path, PathSeg};
 pub use frame::{Frame, FrameError, FrameKind};
 pub use schema::{Field, FieldType, Registry, Schema};

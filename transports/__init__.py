@@ -11,9 +11,11 @@ from .sse import sse_endpoint
 from .transports import (  # compiled Rust extension (rust/python)
     Store,
     apply,
+    cbor_to_json,
     decode,
     diff,
     encode,
+    json_to_cbor,
     json_to_msgpack,
     msgpack_to_json,
 )
@@ -32,6 +34,8 @@ __all__ = [
     "encode_as",
     "json_to_msgpack",
     "msgpack_to_json",
+    "json_to_cbor",
+    "cbor_to_json",
     # custom wire codecs
     "register_codec",
     "unregister_codec",

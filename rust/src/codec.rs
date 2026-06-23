@@ -80,11 +80,43 @@ impl Codec for MsgpackCodec {
     }
 }
 
+/// CBOR via `ciborium`. Compact, self-describing binary — like MessagePack it needs no schema, so it
+/// works with the dynamic [`Value`] as a drop-in for `JsonCodec`.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CborCodec;
+
+impl Codec for CborCodec {
+    fn encode_value(&self, value: &Value) -> Vec<u8> {
+        let mut buf = Vec::new();
+        ciborium::into_writer(value, &mut buf).expect("Value serializes");
+        buf
+    }
+
+    fn decode_value(&self, bytes: &[u8]) -> Result<Value, CodecError> {
+        ciborium::from_reader(bytes).map_err(|e| CodecError(e.to_string()))
+    }
+
+    fn encode_patch(&self, patch: &Patch) -> Vec<u8> {
+        let mut buf = Vec::new();
+        ciborium::into_writer(patch, &mut buf).expect("Patch serializes");
+        buf
+    }
+
+    fn decode_patch(&self, bytes: &[u8]) -> Result<Patch, CodecError> {
+        ciborium::from_reader(bytes).map_err(|e| CodecError(e.to_string()))
+    }
+
+    fn content_type(&self) -> &'static str {
+        "application/cbor"
+    }
+}
+
 /// Look up a codec by its content-type tag — the seam codec negotiation builds on.
 pub fn codec_for(content_type: &str) -> Option<Box<dyn Codec>> {
     match content_type {
         "application/json" => Some(Box::new(JsonCodec)),
         "application/msgpack" | "application/x-msgpack" => Some(Box::new(MsgpackCodec)),
+        "application/cbor" => Some(Box::new(CborCodec)),
         _ => None,
     }
 }
@@ -128,6 +160,20 @@ mod codec_tests {
     }
 
     #[test]
+    fn test_cbor_round_trip_and_smaller() {
+        let c = CborCodec;
+        let v = Value::map([
+            ("name", Value::from("lamp")),
+            ("on", Value::from(true)),
+            ("count", Value::from(123456i64)),
+        ]);
+        assert_eq!(c.decode_value(&c.encode_value(&v)).unwrap(), v);
+        assert_eq!(c.content_type(), "application/cbor");
+        // self-describing binary (no schema), more compact than JSON
+        assert!(c.encode_value(&v).len() < JsonCodec.encode_value(&v).len());
+    }
+
+    #[test]
     fn test_codec_for() {
         assert_eq!(
             codec_for("application/json").unwrap().content_type(),
@@ -138,6 +184,7 @@ mod codec_tests {
             "application/msgpack"
         );
         assert!(codec_for("application/x-msgpack").is_some());
+        assert!(codec_for("application/cbor").unwrap().content_type() == "application/cbor");
         assert!(codec_for("application/protobuf").is_none());
     }
 

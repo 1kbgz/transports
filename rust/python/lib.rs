@@ -13,6 +13,8 @@ fn transports(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(api::decode_as, m)?)?;
     m.add_function(wrap_pyfunction!(api::json_to_msgpack, m)?)?;
     m.add_function(wrap_pyfunction!(api::msgpack_to_json, m)?)?;
+    m.add_function(wrap_pyfunction!(api::json_to_cbor, m)?)?;
+    m.add_function(wrap_pyfunction!(api::cbor_to_json, m)?)?;
     m.add_class::<api::Store>()?;
     Ok(())
 }

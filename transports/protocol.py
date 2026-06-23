@@ -14,18 +14,21 @@ import json
 from typing import Any, Callable, Dict, Tuple, Union
 
 from .transports import (
+    cbor_to_json as _cbor_to_json,
     decode_as as _core_decode_as,
     encode_as as _core_encode_as,
+    json_to_cbor as _json_to_cbor,
     json_to_msgpack as _json_to_msgpack,
     msgpack_to_json as _msgpack_to_json,
 )
 
 #: Canonical codec names. A connection negotiates one of these (e.g. via a ``?codec=`` query param);
-#: JSON travels as text frames, MessagePack as binary frames.
+#: JSON travels as text frames, MessagePack and CBOR as binary frames.
 JSON = "json"
 MSGPACK = "msgpack"
+CBOR = "cbor"
 
-_BUILTIN = {"", "json", "application/json", "msgpack", "application/msgpack", "x-msgpack", "application/x-msgpack"}
+_BUILTIN = {"", "json", "application/json", "msgpack", "application/msgpack", "x-msgpack", "application/x-msgpack", "cbor", "application/cbor"}
 
 #: Registered custom codecs: ``content_type -> (encode, decode)``. ``encode`` maps a JSON-able object
 #: (a protocol message, or a model ``Value``) to wire bytes/str; ``decode`` is its inverse.
@@ -59,12 +62,14 @@ def registered_codecs() -> Tuple[str, ...]:
 
 
 def normalize_codec(name: Union[str, None]) -> str:
-    """Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`, or a
-    registered custom content type)."""
+    """Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`,
+    :data:`CBOR`, or a registered custom content type)."""
     if name in (None, "", "json", "application/json"):
         return JSON
     if name in ("msgpack", "application/msgpack", "x-msgpack", "application/x-msgpack"):
         return MSGPACK
+    if name in ("cbor", "application/cbor"):
+        return CBOR
     if name in _CODECS:
         return name  # a registered content type is its own canonical name
     raise ValueError(f"unknown codec: {name}")
@@ -89,6 +94,8 @@ def encode(msg_json: str, codec: str = JSON) -> Union[str, bytes]:
         return _CODECS[c][0](json.loads(msg_json))
     if c == MSGPACK:
         return _json_to_msgpack(msg_json)
+    if c == CBOR:
+        return _json_to_cbor(msg_json)
     return msg_json
 
 
@@ -104,6 +111,8 @@ def decode(data: Union[str, bytes], codec: Union[str, None] = None) -> dict:
             return _CODECS[c][1](data)
         if c == JSON:
             return json.loads(data)
+        if c == CBOR:
+            return json.loads(_cbor_to_json(bytes(data)))
     if isinstance(data, (bytes, bytearray)):
         return json.loads(_msgpack_to_json(bytes(data)))
     return json.loads(data)
