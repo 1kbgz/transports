@@ -6,12 +6,15 @@ import asyncio
 import multiprocessing as mp
 import os
 import random
+import sys
 import tempfile
 from functools import partial
 
 import pytest
 
 from transports.backplane import QueueBackplane, UnixSocketBackplane, ZmqBackplane
+
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="Unix domain sockets are POSIX-only")
 
 
 def _peer(make, my_id, result_q, secs=1.5):
@@ -71,6 +74,7 @@ def test_queue_backplane_relays_across_processes():
     _assert_full_mesh(results, ["0", "1", "2"])
 
 
+@posix_only
 def test_unix_socket_backplane_relays_across_processes():
     path = os.path.join(tempfile.gettempdir(), f"tbp-{os.getpid()}-{random.randint(0, 9999)}.sock")
     try:

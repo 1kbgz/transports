@@ -28,6 +28,7 @@ from __future__ import annotations
 import asyncio
 import os
 import struct
+import sys
 import threading
 from typing import AsyncIterator
 
@@ -176,6 +177,8 @@ class UnixSocketBackplane(Backplane):
             writer.close()
 
     async def _start(self) -> None:
+        if sys.platform == "win32":  # Unix domain sockets + flock are POSIX-only
+            raise RuntimeError("UnixSocketBackplane requires POSIX; use ZmqBackplane on Windows")
         self.runs_broker = await self._elect()
         reader, self._writer = await self._connect()  # everyone, the binder included, connects a client
         self._task = asyncio.create_task(self._read(reader))

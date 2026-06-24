@@ -8,7 +8,12 @@ import json
 import multiprocessing as mp
 import os
 import random
+import sys
 import tempfile
+
+import pytest
+
+posix_only = pytest.mark.skipif(sys.platform == "win32", reason="Unix domain sockets are POSIX-only")
 
 
 def _patch(rev, *kv):
@@ -49,6 +54,7 @@ def _worker(path, idx, patch, result_q):
     asyncio.run(go())
 
 
+@posix_only
 def test_concurrent_cross_worker_edits_converge():
     path = os.path.join(tempfile.gettempdir(), f"tbp-relay-{os.getpid()}-{random.randint(0, 9999)}.sock")
     patches = {
@@ -206,6 +212,7 @@ def _joiner_worker(path, result_q):
     asyncio.run(go())
 
 
+@posix_only
 def test_cross_process_late_joiner_catches_up_over_a_real_backplane():
     path = os.path.join(tempfile.gettempdir(), f"tbp-join-{os.getpid()}-{random.randint(0, 9999)}.sock")
     result_q = mp.Queue()
