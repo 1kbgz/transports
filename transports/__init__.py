@@ -1,6 +1,7 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .anywidget import serve_anywidget
+from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane
 from .client import Client
 from .comm import serve_comm
 from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
@@ -53,6 +54,11 @@ __all__ = [
     "ws_endpoint",
     "sse_endpoint",
     "serve_comm",
+    # cross-process backplane (multi-worker fan-out)
+    "Backplane",
+    "QueueBackplane",
+    "UnixSocketBackplane",
+    "ZmqBackplane",
     "serve_anywidget",
     "autosync",
     "sync",
