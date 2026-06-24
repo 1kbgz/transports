@@ -120,6 +120,63 @@ export class Client {
     return ws;
   }
 
+  /** Connect and mirror, **reconnecting** whenever the socket drops — so the client survives a server
+   * restart or a refresh. `authority` decides reconciliation on each (re)connect:
+   *
+   * - `"server"` (default): the server is canonical; the client adopts its state (resuming via `?since=`
+   *   when it can, else a fresh snapshot) — the "refetch on refresh" behavior.
+   * - `"client"`: the client is canonical; after the server's snapshot it pushes its last-known state
+   *   back as an edit, rectifying a server that came back stale/empty (merges under a CRDT, else
+   *   overwrites).
+   *
+   * `onMessage` fires after each applied frame (e.g. to re-render). Returns `{ stop() }`.
+   */
+  run(
+    url: string,
+    opts: {
+      authority?: "server" | "client";
+      retry?: number;
+      onMessage?: () => void;
+    } = {},
+  ): { stop: () => void } {
+    const { authority = "server", retry = 1000, onMessage } = opts;
+    let stopped = false;
+    const loop = () => {
+      if (stopped) return;
+      const pre = authority === "client" ? new Map(this.values) : null;
+      const pushed = new Set<number>();
+      const ws = this.connect(url); // reuses connect(): adds the recv listener + ?since= resume
+      ws.addEventListener("message", () => {
+        onMessage?.();
+        if (pre) {
+          // rectify: once the server has (re)snapshotted a model, push our copy back to it
+          for (const id of this.values.keys()) {
+            if (!pushed.has(id) && pre.has(id)) {
+              ws.send(this.edit(id, pre.get(id)));
+              pushed.add(id);
+            }
+          }
+        }
+      });
+      ws.addEventListener("close", () => {
+        if (!stopped) setTimeout(loop, retry);
+      });
+      ws.addEventListener("error", () => {
+        try {
+          ws.close();
+        } catch {
+          /* already closing */
+        }
+      });
+    };
+    loop();
+    return {
+      stop() {
+        stopped = true;
+      },
+    };
+  }
+
   /** Mirror a server over Server-Sent Events (receive-only, JSON). Returns the `EventSource`. */
   connectSSE(url: string): EventSource {
     const es = new EventSource(url);
