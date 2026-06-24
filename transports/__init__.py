@@ -3,7 +3,7 @@ from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .anywidget import serve_anywidget
 from .client import Client
 from .comm import serve_comm
-from .hub import READ, WRITE, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
+from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
 from .server import Server, autosync, sync, ws_endpoint
 from .session import Session
@@ -63,4 +63,5 @@ __all__ = [
     "MergeStrategy",
     "LastWriteWins",
     "LwwMapCrdt",
+    "DeepLwwCrdt",
 ]

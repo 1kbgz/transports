@@ -97,6 +97,42 @@ class LwwMapCrdt(MergeStrategy):
         return new
 
 
+class DeepLwwCrdt(MergeStrategy):
+    """Field-granular conflict-free LWW — an independent last-writer-wins register at **every** map path,
+    not just the top level (cf. :class:`LwwMapCrdt`). Each map-key write carries a logical stamp
+    `(patch rev, origin)` kept per *full path*; a write is accepted only if its stamp is at least the one
+    stored for that exact path. So concurrent edits to **different** fields — however deeply nested — all
+    survive, and conflicting edits to the **same** field converge to the same value regardless of the
+    order the hub receives them.
+
+    Scope: field-granular for scalar/map writes (the leaf ops a `diff` produces for edited fields).
+    List-index ops and whole-subtree replaces fall back to a direct stamped apply — they are not
+    element-granular (an order-free list/text CRDT needs per-element identity; see ROADMAP 6.2).
+    """
+
+    def __init__(self) -> None:
+        self._clock: Dict[tuple, tuple] = {}
+
+    def merge(self, current: Any, patch: dict, origin: Any) -> Any:
+        new = json.loads(json.dumps(current))
+        rev = patch.get("rev", 0)
+        stamp = (rev, str(origin))
+        for op in patch.get("ops", []):
+            kind = next(iter(op))
+            body = op[kind]
+            segs = body.get("path", [])
+            keys = tuple(s["Key"] for s in segs if "Key" in s)
+            if len(keys) != len(segs) or kind not in ("Set", "Remove"):
+                # a list-index op or whole-subtree op — apply directly (not field-granular)
+                new = json.loads(_apply(json.dumps(new), json.dumps({"rev": rev, "ops": [op]})))
+                continue
+            if keys in self._clock and stamp < self._clock[keys]:
+                continue  # stale write to this exact field — drop
+            self._clock[keys] = stamp
+            new = json.loads(_apply(json.dumps(new), json.dumps({"rev": rev, "ops": [op]})))
+        return new
+
+
 class _Shared:
     """Authoritative state for a shared data structure."""
 

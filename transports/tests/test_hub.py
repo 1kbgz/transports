@@ -1,6 +1,8 @@
+import itertools
+
 from pydantic import BaseModel
 
-from transports import READ, WRITE, Client, Hub, LastWriteWins, LwwMapCrdt, ws_endpoint
+from transports import READ, WRITE, Client, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, ws_endpoint
 
 
 class Doc(BaseModel):
@@ -148,6 +150,77 @@ def test_crdt_preserves_concurrent_edits_to_different_keys():
     merged = crdt.merge(crdt.merge(base, px, "A"), py, "B")
     assert merged["Map"]["x"] == {"Int": 1}
     assert merged["Map"]["y"] == {"Int": 1}  # neither write clobbered the other
+
+
+_NESTED = {"Map": {"a": {"Map": {"b": {"Int": 0}, "c": {"Int": 0}}}, "z": {"Int": 0}}}
+
+
+def _set(path_keys, value, rev):
+    return {"rev": rev, "ops": [{"Set": {"path": [{"Key": k} for k in path_keys], "value": value}}]}
+
+
+def test_deep_lww_preserves_concurrent_nested_edits():
+    # concurrent writes to a.b and a.c (different nested fields) must both survive
+    crdt = DeepLwwCrdt()
+    merged = crdt.merge(crdt.merge(_NESTED, _set(["a", "b"], {"Int": 1}, 1), "A"), _set(["a", "c"], {"Int": 2}, 1), "B")
+    assert merged["Map"]["a"]["Map"]["b"] == {"Int": 1}
+    assert merged["Map"]["a"]["Map"]["c"] == {"Int": 2}  # neither clobbered the other
+
+
+def test_deep_lww_is_finer_grained_than_lww_map():
+    # contrast: LwwMapCrdt stamps both nested writes under the top key "a", so the lower-stamped one is
+    # dropped; DeepLwwCrdt keeps each field's own register.
+    hi = _set(["a", "b"], {"Int": 1}, 2)  # higher stamp, field a.b
+    lo = _set(["a", "c"], {"Int": 2}, 1)  # lower stamp, different field a.c
+    coarse = LwwMapCrdt()
+    assert coarse.merge(coarse.merge(_NESTED, hi, "A"), lo, "B")["Map"]["a"]["Map"]["c"] == {"Int": 0}  # dropped
+    deep = DeepLwwCrdt()
+    assert deep.merge(deep.merge(_NESTED, hi, "A"), lo, "B")["Map"]["a"]["Map"]["c"] == {"Int": 2}  # kept
+
+
+def test_deep_lww_converges_over_every_order():
+    # writes to distinct field paths, each with its own stamp; every permutation converges (conflict-free)
+    writes = [
+        (_set(["a", "b"], {"Int": 1}, 3), "A"),
+        (_set(["a", "c"], {"Int": 2}, 1), "B"),
+        (_set(["z"], {"Int": 9}, 2), "C"),
+    ]
+    results = []
+    for perm in itertools.permutations(writes):
+        crdt = DeepLwwCrdt()
+        v = _NESTED
+        for patch, origin in perm:
+            v = crdt.merge(v, patch, origin)
+        results.append(v)
+    assert all(r == results[0] for r in results)  # order-independent
+    assert results[0]["Map"]["a"]["Map"]["b"] == {"Int": 1}
+    assert results[0]["Map"]["a"]["Map"]["c"] == {"Int": 2}
+    assert results[0]["Map"]["z"] == {"Int": 9}
+
+
+def test_deep_lww_same_field_converges_by_stamp():
+    # two writes to the SAME nested field; the higher stamp wins, in either arrival order
+    hi = _set(["a", "b"], {"Int": 5}, 2)
+    lo = _set(["a", "b"], {"Int": 4}, 1)
+    a, b = DeepLwwCrdt(), DeepLwwCrdt()
+    v_a = a.merge(a.merge(_NESTED, hi, "A"), lo, "B")
+    v_b = b.merge(b.merge(_NESTED, lo, "B"), hi, "A")
+    assert v_a == v_b
+    assert v_a["Map"]["a"]["Map"]["b"] == {"Int": 5}  # higher (rev 2) wins
+
+
+def test_hub_shares_with_deep_lww_merge():
+    # two WRITE subscribers edit different nested fields of one shared model; both land authoritatively
+    h = hub()
+    sid = h.share({"Map": {"a": {"Map": {"b": {"Int": 0}, "c": {"Int": 0}}}}}, type_name="Nested", merge=DeepLwwCrdt)
+    h.subscribe("t1", sid, WRITE)
+    h.subscribe("t2", sid, WRITE)
+    h.open(("t1", "a"))
+    h.open(("t2", "b"))
+    h.recv(("t1", "a"), '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"a"},{"Key":"b"}],"value":{"Int":1}}}]}}' % sid)
+    h.recv(("t2", "b"), '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"a"},{"Key":"c"}],"value":{"Int":2}}}]}}' % sid)
+    shared = h._shared[sid].value["Map"]["a"]["Map"]
+    assert shared["b"] == {"Int": 1} and shared["c"] == {"Int": 2}
 
 
 def test_starlette_two_tenants_share_over_mixed_codecs():
