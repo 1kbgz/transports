@@ -345,6 +345,42 @@
 
 
 
+<span class="k">class</span><span class="w"> </span><span class="nc">DeepLwwCrdt</span><span class="p">(</span><span class="n">MergeStrategy</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Field-granular conflict-free LWW — an independent last-writer-wins register at **every** map path,</span>
+<span class="sd">    not just the top level (cf. :class:`LwwMapCrdt`). Each map-key write carries a logical stamp</span>
+<span class="sd">    `(patch rev, origin)` kept per *full path*; a write is accepted only if its stamp is at least the one</span>
+<span class="sd">    stored for that exact path. So concurrent edits to **different** fields — however deeply nested — all</span>
+<span class="sd">    survive, and conflicting edits to the **same** field converge to the same value regardless of the</span>
+<span class="sd">    order the hub receives them.</span>
+
+<span class="sd">    Scope: field-granular for scalar/map writes (the leaf ops a `diff` produces for edited fields).</span>
+<span class="sd">    List-index ops and whole-subtree replaces fall back to a direct stamped apply — they are not</span>
+<span class="sd">    element-granular (an order-free list/text CRDT needs per-element identity; see ROADMAP 6.2).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">tuple</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+        <span class="n">new</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">current</span><span class="p">))</span>
+        <span class="n">rev</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;rev&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">stamp</span> <span class="o">=</span> <span class="p">(</span><span class="n">rev</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">origin</span><span class="p">))</span>
+        <span class="k">for</span> <span class="n">op</span> <span class="ow">in</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[]):</span>
+            <span class="n">kind</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">op</span><span class="p">))</span>
+            <span class="n">body</span> <span class="o">=</span> <span class="n">op</span><span class="p">[</span><span class="n">kind</span><span class="p">]</span>
+            <span class="n">segs</span> <span class="o">=</span> <span class="n">body</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;path&quot;</span><span class="p">,</span> <span class="p">[])</span>
+            <span class="n">keys</span> <span class="o">=</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">s</span><span class="p">[</span><span class="s2">&quot;Key&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">s</span> <span class="ow">in</span> <span class="n">segs</span> <span class="k">if</span> <span class="s2">&quot;Key&quot;</span> <span class="ow">in</span> <span class="n">s</span><span class="p">)</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">keys</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">segs</span><span class="p">)</span> <span class="ow">or</span> <span class="n">kind</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;Set&quot;</span><span class="p">,</span> <span class="s2">&quot;Remove&quot;</span><span class="p">):</span>
+                <span class="c1"># a list-index op or whole-subtree op — apply directly (not field-granular)</span>
+                <span class="n">new</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">]})))</span>
+                <span class="k">continue</span>
+            <span class="k">if</span> <span class="n">keys</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span> <span class="ow">and</span> <span class="n">stamp</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span><span class="p">[</span><span class="n">keys</span><span class="p">]:</span>
+                <span class="k">continue</span>  <span class="c1"># stale write to this exact field — drop</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span><span class="p">[</span><span class="n">keys</span><span class="p">]</span> <span class="o">=</span> <span class="n">stamp</span>
+            <span class="n">new</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">]})))</span>
+        <span class="k">return</span> <span class="n">new</span>
+
+
 <span class="k">class</span><span class="w"> </span><span class="nc">_Shared</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Authoritative state for a shared data structure.&quot;&quot;&quot;</span>
 
