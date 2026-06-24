@@ -1,10 +1,12 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .anywidget import serve_anywidget
+from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane
 from .client import Client
 from .comm import serve_comm
 from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
+from .relay import RelayBroadcaster
 from .seq import SeqCrdt, seq_delete, seq_insert, seq_key_between, seq_materialize, seq_new
 from .server import Server, autosync, sync, ws_endpoint
 from .session import Session
@@ -53,6 +55,12 @@ __all__ = [
     "ws_endpoint",
     "sse_endpoint",
     "serve_comm",
+    # cross-process backplane (multi-worker fan-out)
+    "Backplane",
+    "QueueBackplane",
+    "UnixSocketBackplane",
+    "ZmqBackplane",
+    "RelayBroadcaster",
     "serve_anywidget",
     "autosync",
     "sync",

@@ -47,6 +47,14 @@ class MergeStrategy:
     def merge(self, current: Any, patch: dict, origin: Any) -> Any:  # pragma: no cover - interface
         raise NotImplementedError
 
+    def state(self) -> dict:
+        """The strategy's own metadata (e.g. a CRDT clock), JSON-serializable, so a model's full state can
+        be transferred to a joining worker or persisted by the user. Stateless strategies return ``{}``."""
+        return {}
+
+    def restore(self, state: dict) -> None:
+        """Adopt metadata produced by :meth:`state` (catch-up or durable restore). Default: ignore."""
+
 
 class LastWriteWins(MergeStrategy):
     """Apply each write in arrival order (today's `Store` semantics). Order-dependent."""
@@ -96,6 +104,12 @@ class LwwMapCrdt(MergeStrategy):
                 mp = new.get("Map")
         return new
 
+    def state(self) -> dict:
+        return {"clock": {k: list(v) for k, v in self._clock.items()}}
+
+    def restore(self, state: dict) -> None:
+        self._clock = {k: tuple(v) for k, v in state.get("clock", {}).items()}
+
 
 class DeepLwwCrdt(MergeStrategy):
     """Field-granular conflict-free LWW — an independent last-writer-wins register at **every** map path,
@@ -132,16 +146,25 @@ class DeepLwwCrdt(MergeStrategy):
             new = json.loads(_apply(json.dumps(new), json.dumps({"rev": rev, "ops": [op]})))
         return new
 
+    def state(self) -> dict:
+        return {"clock": [[list(k), list(v)] for k, v in self._clock.items()]}
+
+    def restore(self, state: dict) -> None:
+        self._clock = {tuple(k): tuple(v) for k, v in state.get("clock", [])}
+
 
 class _Shared:
     """Authoritative state for a shared data structure."""
 
-    def __init__(self, type_name: str, value: dict, merge: MergeStrategy) -> None:
+    def __init__(self, type_name: str, value: dict, merge: MergeStrategy, *, replay: bool = False, rev: int = 0, log_cap: int = 512) -> None:
         self.type_name = type_name
         self.value = value
-        self.rev = 0
+        self.rev = rev
         self.merge = merge
         self.subs: Dict[Any, str] = {}  # tenant key -> mode
+        self.replay = replay
+        self.log: List[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
+        self.log_cap = log_cap
 
 
 class Hub:
@@ -161,6 +184,7 @@ class Hub:
         self._conn_key: Dict[Any, Any] = {}
         self._codecs: Dict[Any, str] = {}
         self._shared_outbox: List[tuple] = []  # (sid, fan_patch) from host-side writes
+        self._on_shared_write: Optional[Callable] = None
 
     def tenant(self, key: Any) -> Session:
         """Get (or create) the `Session` holding a tenant's private models."""
@@ -169,12 +193,24 @@ class Hub:
             sess = self._tenants[key] = Session()
         return sess
 
-    def share(self, model_or_value: Any, type_name: Optional[str] = None, *, merge: Any = LastWriteWins) -> int:
+    def share(
+        self,
+        model_or_value: Any,
+        type_name: Optional[str] = None,
+        *,
+        merge: Any = LastWriteWins,
+        replay: bool = False,
+        rev: int = 0,
+        merge_state: Optional[dict] = None,
+    ) -> int:
         """Register a shared data structure; returns its shared id.
 
         Pass a model instance (pydantic/dataclass/msgspec) to capture its value and type name, or a
-        core `Value` dict together with `type_name`. `merge` is a `MergeStrategy` subclass (each
-        shared model gets its own instance) or an instance to reuse.
+        core `Value` dict together with `type_name`. `merge` is a `MergeStrategy` subclass (each shared
+        model gets its own instance) or an instance to reuse. ``replay=True`` keeps a bounded patch log
+        so a joining worker can catch up by delta (see :meth:`since_shared`) instead of a full snapshot.
+        To **restore** a model from a durable checkpoint on startup, pass ``rev`` and ``merge_state``
+        (from a prior :meth:`snapshot_shared`) alongside the saved value.
         """
         if type_name is None:
             type_name = type(model_or_value).__name__
@@ -182,9 +218,11 @@ class Hub:
         else:
             value = model_or_value
         strategy = merge() if isinstance(merge, type) else merge
+        if merge_state is not None:
+            strategy.restore(merge_state)
         sid = SHARED_ID_BASE + self._next_shared
         self._next_shared += 1
-        self._shared[sid] = _Shared(type_name, value, strategy)
+        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev)
         return sid
 
     def subscribe(self, tenant_key: Any, sid: int, mode: str = READ) -> None:
@@ -275,6 +313,68 @@ class Hub:
         if fan:
             self._shared_outbox.append((sid, fan))
 
+    def apply_shared(self, sid: int, patch: dict, origin: Any) -> None:
+        """Merge a shared-model write that happened on another worker (delivered over a backplane), and
+        queue the resulting authoritative fan for this worker's subscribers on the next `flush`. Do not
+        re-publish — the originating worker already broadcast it. When the model's `MergeStrategy` is a
+        CRDT this is convergent: applying the same set of writes in any order yields the same value, so
+        concurrent edits from clients on different workers reconcile identically everywhere."""
+        if self._shared.get(sid) is None:
+            return
+        fan = self._write_shared(sid, patch, origin)
+        if fan:
+            self._shared_outbox.append((sid, fan))
+
+    def on_shared_write(self, callback: Optional[Callable]) -> None:
+        """Register a callback fired after each authoritative shared write, with
+        ``(sid, type_name, value, rev, patch, merge_state)``. transports stores nothing durably; persist
+        these (the value+rev+merge_state, or append the patch) to make a model survive a full-cluster
+        restart, and restore with ``share(value=…, rev=…, merge_state=…)``. Gate on a single writer (e.g.
+        the relay's leader) if you don't want every worker persisting the same change."""
+        self._on_shared_write = callback
+
+    def snapshot_shared(self, sid: int) -> dict:
+        """The full transferable/persistable state of a shared model: ``value``, ``rev`` and the merge
+        clock (``merge_state``). Used by the relay to catch up a joining worker, and by users to
+        checkpoint for durability."""
+        sh = self._shared[sid]
+        return {"type_name": sh.type_name, "value": sh.value, "rev": sh.rev, "merge_state": sh.merge.state()}
+
+    def since_shared(self, sid: int, since_rev: int) -> Optional[List[dict]]:
+        """Patches after `since_rev` for a delta catch-up, or ``None`` if it is outside the kept log (the
+        caller should fall back to a snapshot). Requires ``share(replay=True)``. Mirrors `Session.since`."""
+        sh = self._shared.get(sid)
+        if sh is None or not sh.replay:
+            return None
+        if since_rev >= sh.rev:
+            return []
+        if not sh.log or sh.log[0][0] > since_rev + 1:
+            return None  # the needed delta has scrolled out of the bounded log
+        return [p for r, p in sh.log if r > since_rev]
+
+    def apply_snapshot_shared(self, sid: int, value: dict, rev: int, merge_state: Optional[dict]) -> None:
+        """Adopt a peer's snapshot of a shared model: set value/rev and restore the merge clock, so later
+        merges respect the transferred causal stamps."""
+        sh = self._shared.get(sid)
+        if sh is None:
+            return
+        sh.value = value
+        sh.rev = max(sh.rev, rev)
+        sh.merge.restore(merge_state or {})
+
+    def apply_delta_shared(self, sid: int, patches: List[dict], rev: int, merge_state: Optional[dict]) -> None:
+        """Catch up by applying replay patches onto the current (restored) value, then restoring the merge
+        clock — cheaper than a snapshot when a recent checkpoint is held."""
+        sh = self._shared.get(sid)
+        if sh is None:
+            return
+        v = sh.value
+        for patch in patches:
+            v = json.loads(_apply(json.dumps(v), json.dumps(patch)))
+        sh.value = v
+        sh.rev = max(sh.rev, rev)
+        sh.merge.restore(merge_state or {})
+
     def close(self, conn: Any) -> None:
         self._conn_key.pop(conn, None)
         self._codecs.pop(conn, None)
@@ -289,6 +389,13 @@ class Hub:
         sh.value = new
         sh.rev += 1
         fan["rev"] = sh.rev
+        if sh.replay:
+            sh.log.append((sh.rev, fan))
+            if len(sh.log) > sh.log_cap:
+                del sh.log[: len(sh.log) - sh.log_cap]
+        if self._on_shared_write is not None:
+            # durability seam: the user persists this so the model survives a full-cluster restart.
+            self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, fan, sh.merge.state())
         return fan
 
     def _fanout(self, sid: int, fan: dict) -> Dict[Any, List[Wire]]:
