@@ -197,16 +197,24 @@ class Hub:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: Optional[str] = None) -> List[Wire]:
-        """Register a connection; returns the snapshots of its tenant's private + subscribed shared models."""
+    def open(self, conn: Any, codec: Optional[str] = None, since: Optional[Dict[int, int]] = None) -> List[Wire]:
+        """Register a connection; return the messages to bring it up to date — its tenant's private models
+        and its subscribed shared models. With ``since={mid: last_rev}`` a reconnecting client resumes its
+        **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on)."""
         key = self._key(conn)
         self._conn_key[conn] = key
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         sess = self.tenant(key)
         out: List[Wire] = []
         for mid in sess.ids():
-            snap = sess.snapshot(mid)
-            out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
+            client_rev = since.get(mid) if since else None
+            delta = sess.since(mid, client_rev) if client_rev is not None else None
+            if delta is not None:
+                for patch in delta:
+                    out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
+            else:
+                snap = sess.snapshot(mid)
+                out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
         for sid, sh in self._shared.items():
             if key in sh.subs:
                 out.append(self._encode_for(conn, protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)))

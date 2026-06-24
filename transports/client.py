@@ -7,6 +7,7 @@ network).
 """
 
 import json
+import urllib.parse
 from typing import Any, Dict, List, Type, Union
 
 from . import protocol
@@ -68,12 +69,16 @@ class Client:
     async def connect(self, url: str) -> None:
         """Connect to a transports server and mirror it until the connection closes.
 
-        Appends ``?codec=`` for the client's codec so the server frames messages to match.
+        Appends ``?codec=`` for the client's codec, and — if this client already mirrors models (a
+        reconnect) — ``?since=`` with its last-seen rev per model, so the server replays only the delta.
         """
         import websockets
 
         sep = "&" if "?" in url else "?"
-        async with websockets.connect(f"{url}{sep}codec={self._codec}") as ws:
+        params = f"codec={self._codec}"
+        if self._rev:  # resume: bring this mirror up to date from where it left off
+            params += "&since=" + urllib.parse.quote(json.dumps(self._rev))
+        async with websockets.connect(f"{url}{sep}{params}") as ws:
             async for frame in ws:
                 self.recv(frame)
 
