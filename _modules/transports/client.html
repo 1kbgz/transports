@@ -322,23 +322,62 @@
         <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_connect_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already</span>
+<span class="sd">        mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model.&quot;&quot;&quot;</span>
+        <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;&amp;&quot;</span> <span class="k">if</span> <span class="s2">&quot;?&quot;</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">+=</span> <span class="s2">&quot;&amp;since=&quot;</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">))</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="n">params</span><span class="si">}</span><span class="s2">&quot;</span>
+
 <div class="viewcode-block" id="Client.connect">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes.</span>
-
-<span class="sd">        Appends ``?codec=`` for the client&#39;s codec, and — if this client already mirrors models (a</span>
-<span class="sd">        reconnect) — ``?since=`` with its last-seen rev per model, so the server replays only the delta.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes (one connection).&quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
 
-        <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;&amp;&quot;</span> <span class="k">if</span> <span class="s2">&quot;?&quot;</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
-        <span class="n">params</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">&quot;</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span>  <span class="c1"># resume: bring this mirror up to date from where it left off</span>
-            <span class="n">params</span> <span class="o">+=</span> <span class="s2">&quot;&amp;since=&quot;</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">))</span>
-        <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="n">params</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
+        <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
             <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Client.run">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.run">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect and mirror, **reconnecting** whenever the connection drops — so the client survives a</span>
+<span class="sd">        server restart or a network blip. ``authority`` decides reconciliation on each (re)connect:</span>
+
+<span class="sd">        - ``&quot;server&quot;`` (default): the server is canonical; the client adopts its state (resuming from</span>
+<span class="sd">          ``?since=`` when it can, else a fresh snapshot). This is the &quot;refetch on refresh&quot; behavior.</span>
+<span class="sd">        - ``&quot;client&quot;``: the client is canonical; after the server&#39;s snapshot it **pushes its last-known</span>
+<span class="sd">          state back** as an edit, so a server that came back stale or empty is rectified from the client.</span>
+<span class="sd">          With a CRDT model the push merges (newer stamps win); otherwise it overwrites.</span>
+
+<span class="sd">        Runs until cancelled. The choice of *where the authoritative state lives* is yours — pair this</span>
+<span class="sd">        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+        <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
+
+        <span class="k">if</span> <span class="n">authority</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="s2">&quot;client&quot;</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;authority must be &#39;server&#39; or &#39;client&#39;, not </span><span class="si">{</span><span class="n">authority</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;client&quot;</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
+                    <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">pre</span><span class="p">:</span>  <span class="c1"># rectify: once the server has (re)snapshotted a model, push our copy back</span>
+                            <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">):</span>
+                                <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pushed</span> <span class="ow">and</span> <span class="n">mid</span> <span class="ow">in</span> <span class="n">pre</span><span class="p">:</span>
+                                    <span class="k">await</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">pre</span><span class="p">[</span><span class="n">mid</span><span class="p">]))</span>
+                                    <span class="n">pushed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+            <span class="k">except</span> <span class="p">(</span><span class="n">websockets</span><span class="o">.</span><span class="n">ConnectionClosed</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
+                <span class="k">pass</span>  <span class="c1"># dropped — fall through to retry</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Client.connect_sse">

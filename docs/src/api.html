@@ -447,9 +447,23 @@ keeps <cite>rev</cite> owned by the server and avoids client/server <cite>rev</c
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.connect">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect" title="Link to this definition">¶</a></dt>
-<dd><p>Connect to a transports server and mirror it until the connection closes.</p>
-<p>Appends <code class="docutils literal notranslate"><span class="pre">?codec=</span></code> for the client’s codec, and — if this client already mirrors models (a
-reconnect) — <code class="docutils literal notranslate"><span class="pre">?since=</span></code> with its last-seen rev per model, so the server replays only the delta.</p>
+<dd><p>Connect to a transports server and mirror it until the connection closes (one connection).</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.run">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">run</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">authority</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'server'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">retry</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.run"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.run" title="Link to this definition">¶</a></dt>
+<dd><p>Connect and mirror, <strong>reconnecting</strong> whenever the connection drops — so the client survives a
+server restart or a network blip. <code class="docutils literal notranslate"><span class="pre">authority</span></code> decides reconciliation on each (re)connect:</p>
+<ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;server&quot;</span></code> (default): the server is canonical; the client adopts its state (resuming from
+<code class="docutils literal notranslate"><span class="pre">?since=</span></code> when it can, else a fresh snapshot). This is the “refetch on refresh” behavior.</p></li>
+<li><p><code class="docutils literal notranslate"><span class="pre">&quot;client&quot;</span></code>: the client is canonical; after the server’s snapshot it <strong>pushes its last-known
+state back</strong> as an edit, so a server that came back stale or empty is rectified from the client.
+With a CRDT model the push merges (newer stamps win); otherwise it overwrites.</p></li>
+</ul>
+<p>Runs until cancelled. The choice of <em>where the authoritative state lives</em> is yours — pair this
+with the server-side durability hooks (<cite>Hub.on_shared_write</cite>) as your use case needs.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -962,6 +976,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.edit"><code class="docutils literal notranslate"><span class="pre">Client.edit()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.run"><code class="docutils literal notranslate"><span class="pre">Client.run()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect_sse"><code class="docutils literal notranslate"><span class="pre">Client.connect_sse()</span></code></a></li>
 </ul>
 </li>
