@@ -286,7 +286,21 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>  <span class="c1"># pragma: no cover - interface</span>
-        <span class="k">raise</span> <span class="ne">NotImplementedError</span></div>
+        <span class="k">raise</span> <span class="ne">NotImplementedError</span>
+
+<div class="viewcode-block" id="MergeStrategy.state">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.MergeStrategy.state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The strategy&#39;s own metadata (e.g. a CRDT clock), JSON-serializable, so a model&#39;s full state can</span>
+<span class="sd">        be transferred to a joining worker or persisted by the user. Stateless strategies return ``{}``.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">{}</span></div>
+
+
+<div class="viewcode-block" id="MergeStrategy.restore">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.MergeStrategy.restore">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">restore</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adopt metadata produced by :meth:`state` (catch-up or durable restore). Default: ignore.&quot;&quot;&quot;</span></div>
+</div>
 
 
 
@@ -341,7 +355,19 @@
             <span class="k">else</span><span class="p">:</span>  <span class="c1"># nested op under `top` — apply to the whole value, then refresh the map handle</span>
                 <span class="n">new</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">]})))</span>
                 <span class="n">mp</span> <span class="o">=</span> <span class="n">new</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;Map&quot;</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">new</span></div>
+        <span class="k">return</span> <span class="n">new</span>
+
+<div class="viewcode-block" id="LwwMapCrdt.state">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.LwwMapCrdt.state">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;clock&quot;</span><span class="p">:</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">list</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span><span class="o">.</span><span class="n">items</span><span class="p">()}}</span></div>
+
+
+<div class="viewcode-block" id="LwwMapCrdt.restore">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.LwwMapCrdt.restore">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">restore</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;clock&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span></div>
+</div>
 
 
 
@@ -380,16 +406,25 @@
             <span class="n">new</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="p">[</span><span class="n">op</span><span class="p">]})))</span>
         <span class="k">return</span> <span class="n">new</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">state</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;clock&quot;</span><span class="p">:</span> <span class="p">[[</span><span class="nb">list</span><span class="p">(</span><span class="n">k</span><span class="p">),</span> <span class="nb">list</span><span class="p">(</span><span class="n">v</span><span class="p">)]</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span><span class="o">.</span><span class="n">items</span><span class="p">()]}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">restore</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_clock</span> <span class="o">=</span> <span class="p">{</span><span class="nb">tuple</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">state</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;clock&quot;</span><span class="p">,</span> <span class="p">[])}</span>
+
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_Shared</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Authoritative state for a shared data structure.&quot;&quot;&quot;</span>
 
-    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">merge</span><span class="p">:</span> <span class="n">MergeStrategy</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">merge</span><span class="p">:</span> <span class="n">MergeStrategy</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">replay</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">log_cap</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">512</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">type_name</span> <span class="o">=</span> <span class="n">type_name</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">value</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">rev</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">rev</span> <span class="o">=</span> <span class="n">rev</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">merge</span> <span class="o">=</span> <span class="n">merge</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">subs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># tenant key -&gt; mode</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">replay</span> <span class="o">=</span> <span class="n">replay</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># bounded [(rev, patch)] for delta catch-up when replay=True</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">log_cap</span> <span class="o">=</span> <span class="n">log_cap</span>
 
 
 <div class="viewcode-block" id="Hub">
@@ -411,6 +446,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_conn_key</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_shared_outbox</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>  <span class="c1"># (sid, fan_patch) from host-side writes</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_shared_write</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Hub.tenant">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.tenant">[docs]</a>
@@ -424,12 +460,24 @@
 
 <div class="viewcode-block" id="Hub.share">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.share">[docs]</a>
-    <span class="k">def</span><span class="w"> </span><span class="nf">share</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model_or_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">merge</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">LastWriteWins</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">share</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">model_or_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+        <span class="n">type_name</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">merge</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="n">LastWriteWins</span><span class="p">,</span>
+        <span class="n">replay</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+        <span class="n">merge_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a shared data structure; returns its shared id.</span>
 
 <span class="sd">        Pass a model instance (pydantic/dataclass/msgspec) to capture its value and type name, or a</span>
-<span class="sd">        core `Value` dict together with `type_name`. `merge` is a `MergeStrategy` subclass (each</span>
-<span class="sd">        shared model gets its own instance) or an instance to reuse.</span>
+<span class="sd">        core `Value` dict together with `type_name`. `merge` is a `MergeStrategy` subclass (each shared</span>
+<span class="sd">        model gets its own instance) or an instance to reuse. ``replay=True`` keeps a bounded patch log</span>
+<span class="sd">        so a joining worker can catch up by delta (see :meth:`since_shared`) instead of a full snapshot.</span>
+<span class="sd">        To **restore** a model from a durable checkpoint on startup, pass ``rev`` and ``merge_state``</span>
+<span class="sd">        (from a prior :meth:`snapshot_shared`) alongside the saved value.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="n">type_name</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">type_name</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">model_or_value</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
@@ -437,9 +485,11 @@
         <span class="k">else</span><span class="p">:</span>
             <span class="n">value</span> <span class="o">=</span> <span class="n">model_or_value</span>
         <span class="n">strategy</span> <span class="o">=</span> <span class="n">merge</span><span class="p">()</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">merge</span><span class="p">,</span> <span class="nb">type</span><span class="p">)</span> <span class="k">else</span> <span class="n">merge</span>
+        <span class="k">if</span> <span class="n">merge_state</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">strategy</span><span class="o">.</span><span class="n">restore</span><span class="p">(</span><span class="n">merge_state</span><span class="p">)</span>
         <span class="n">sid</span> <span class="o">=</span> <span class="n">SHARED_ID_BASE</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">_next_shared</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_next_shared</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span> <span class="o">=</span> <span class="n">_Shared</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">strategy</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span> <span class="o">=</span> <span class="n">_Shared</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">value</span><span class="p">,</span> <span class="n">strategy</span><span class="p">,</span> <span class="n">replay</span><span class="o">=</span><span class="n">replay</span><span class="p">,</span> <span class="n">rev</span><span class="o">=</span><span class="n">rev</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">sid</span></div>
 
 
@@ -546,6 +596,86 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_shared_outbox</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sid</span><span class="p">,</span> <span class="n">fan</span><span class="p">))</span></div>
 
 
+<div class="viewcode-block" id="Hub.apply_shared">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.apply_shared">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">origin</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Merge a shared-model write that happened on another worker (delivered over a backplane), and</span>
+<span class="sd">        queue the resulting authoritative fan for this worker&#39;s subscribers on the next `flush`. Do not</span>
+<span class="sd">        re-publish — the originating worker already broadcast it. When the model&#39;s `MergeStrategy` is a</span>
+<span class="sd">        CRDT this is convergent: applying the same set of writes in any order yields the same value, so</span>
+<span class="sd">        concurrent edits from clients on different workers reconcile identically everywhere.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">fan</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_write_shared</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">patch</span><span class="p">,</span> <span class="n">origin</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">fan</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_shared_outbox</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sid</span><span class="p">,</span> <span class="n">fan</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="Hub.on_shared_write">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.on_shared_write">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_shared_write</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback fired after each authoritative shared write, with</span>
+<span class="sd">        ``(sid, type_name, value, rev, patch, merge_state)``. transports stores nothing durably; persist</span>
+<span class="sd">        these (the value+rev+merge_state, or append the patch) to make a model survive a full-cluster</span>
+<span class="sd">        restart, and restore with ``share(value=…, rev=…, merge_state=…)``. Gate on a single writer (e.g.</span>
+<span class="sd">        the relay&#39;s leader) if you don&#39;t want every worker persisting the same change.&quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_on_shared_write</span> <span class="o">=</span> <span class="n">callback</span></div>
+
+
+<div class="viewcode-block" id="Hub.snapshot_shared">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.snapshot_shared">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">snapshot_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;The full transferable/persistable state of a shared model: ``value``, ``rev`` and the merge</span>
+<span class="sd">        clock (``merge_state``). Used by the relay to catch up a joining worker, and by users to</span>
+<span class="sd">        checkpoint for durability.&quot;&quot;&quot;</span>
+        <span class="n">sh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="p">[</span><span class="n">sid</span><span class="p">]</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;type_name&quot;</span><span class="p">:</span> <span class="n">sh</span><span class="o">.</span><span class="n">type_name</span><span class="p">,</span> <span class="s2">&quot;value&quot;</span><span class="p">:</span> <span class="n">sh</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;merge_state&quot;</span><span class="p">:</span> <span class="n">sh</span><span class="o">.</span><span class="n">merge</span><span class="o">.</span><span class="n">state</span><span class="p">()}</span></div>
+
+
+<div class="viewcode-block" id="Hub.since_shared">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.since_shared">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">since_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">since_rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Patches after `since_rev` for a delta catch-up, or ``None`` if it is outside the kept log (the</span>
+<span class="sd">        caller should fall back to a snapshot). Requires ``share(replay=True)``. Mirrors `Session.since`.&quot;&quot;&quot;</span>
+        <span class="n">sh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sh</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="ow">not</span> <span class="n">sh</span><span class="o">.</span><span class="n">replay</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">since_rev</span> <span class="o">&gt;=</span> <span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sh</span><span class="o">.</span><span class="n">log</span> <span class="ow">or</span> <span class="n">sh</span><span class="o">.</span><span class="n">log</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">since_rev</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># the needed delta has scrolled out of the bounded log</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">p</span> <span class="k">for</span> <span class="n">r</span><span class="p">,</span> <span class="n">p</span> <span class="ow">in</span> <span class="n">sh</span><span class="o">.</span><span class="n">log</span> <span class="k">if</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="n">since_rev</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="Hub.apply_snapshot_shared">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.apply_snapshot_shared">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_snapshot_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">merge_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Adopt a peer&#39;s snapshot of a shared model: set value/rev and restore the merge clock, so later</span>
+<span class="sd">        merges respect the transferred causal stamps.&quot;&quot;&quot;</span>
+        <span class="n">sh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sh</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">value</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">rev</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">,</span> <span class="n">rev</span><span class="p">)</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">merge</span><span class="o">.</span><span class="n">restore</span><span class="p">(</span><span class="n">merge_state</span> <span class="ow">or</span> <span class="p">{})</span></div>
+
+
+<div class="viewcode-block" id="Hub.apply_delta_shared">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.apply_delta_shared">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">apply_delta_shared</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patches</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">merge_state</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Catch up by applying replay patches onto the current (restored) value, then restoring the merge</span>
+<span class="sd">        clock — cheaper than a snapshot when a recent checkpoint is held.&quot;&quot;&quot;</span>
+        <span class="n">sh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_shared</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">sid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sh</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span>
+        <span class="n">v</span> <span class="o">=</span> <span class="n">sh</span><span class="o">.</span><span class="n">value</span>
+        <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">patches</span><span class="p">:</span>
+            <span class="n">v</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">v</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)))</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">v</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">rev</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">,</span> <span class="n">rev</span><span class="p">)</span>
+        <span class="n">sh</span><span class="o">.</span><span class="n">merge</span><span class="o">.</span><span class="n">restore</span><span class="p">(</span><span class="n">merge_state</span> <span class="ow">or</span> <span class="p">{})</span></div>
+
+
 <div class="viewcode-block" id="Hub.close">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Hub.close">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">close</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -563,6 +693,13 @@
         <span class="n">sh</span><span class="o">.</span><span class="n">value</span> <span class="o">=</span> <span class="n">new</span>
         <span class="n">sh</span><span class="o">.</span><span class="n">rev</span> <span class="o">+=</span> <span class="mi">1</span>
         <span class="n">fan</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">sh</span><span class="o">.</span><span class="n">rev</span>
+        <span class="k">if</span> <span class="n">sh</span><span class="o">.</span><span class="n">replay</span><span class="p">:</span>
+            <span class="n">sh</span><span class="o">.</span><span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">,</span> <span class="n">fan</span><span class="p">))</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">sh</span><span class="o">.</span><span class="n">log</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">sh</span><span class="o">.</span><span class="n">log_cap</span><span class="p">:</span>
+                <span class="k">del</span> <span class="n">sh</span><span class="o">.</span><span class="n">log</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">sh</span><span class="o">.</span><span class="n">log</span><span class="p">)</span> <span class="o">-</span> <span class="n">sh</span><span class="o">.</span><span class="n">log_cap</span><span class="p">]</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_on_shared_write</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># durability seam: the user persists this so the model survives a full-cluster restart.</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_on_shared_write</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">sh</span><span class="o">.</span><span class="n">type_name</span><span class="p">,</span> <span class="n">sh</span><span class="o">.</span><span class="n">value</span><span class="p">,</span> <span class="n">sh</span><span class="o">.</span><span class="n">rev</span><span class="p">,</span> <span class="n">fan</span><span class="p">,</span> <span class="n">sh</span><span class="o">.</span><span class="n">merge</span><span class="o">.</span><span class="n">state</span><span class="p">())</span>
         <span class="k">return</span> <span class="n">fan</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_fanout</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">fan</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
