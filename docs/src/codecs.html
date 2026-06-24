@@ -318,7 +318,7 @@ MessagePack names cannot be overridden.</p>
 </section>
 <section id="register-a-custom-javascript-codec">
 <h2>Register a custom JavaScript codec<a class="headerlink" href="#register-a-custom-javascript-codec" title="Link to this heading">¶</a></h2>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">registerCodec</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">registerCodec</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
 
 <span class="nx">registerCodec</span><span class="p">(</span><span class="s2">&quot;application/x-json-zlib&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">encodeZlib</span><span class="p">,</span><span class="w"> </span><span class="nx">decodeZlib</span><span class="p">);</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">&quot;application/x-json-zlib&quot;</span><span class="p">);</span>

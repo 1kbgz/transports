@@ -85,7 +85,7 @@ MessagePack names cannot be overridden.
 ## Register a custom JavaScript codec
 
 ```ts
-import { registerCodec } from "transports";
+import { registerCodec } from "1kbgz/transports";
 
 registerCodec("application/x-json-zlib", encodeZlib, decodeZlib);
 const client = new Client("application/x-json-zlib");

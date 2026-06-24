@@ -294,7 +294,7 @@ resulting patches to all open connections.</p>
 <section id="mirror-the-server-in-a-browser">
 <h2>Mirror the server in a browser<a class="headerlink" href="#mirror-the-server-in-a-browser" title="Link to this heading">¶</a></h2>
 <p>Initialize the wasm package, connect, and render whenever a message arrives.</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
 
 <span class="k">await</span><span class="w"> </span><span class="nx">init</span><span class="p">();</span>
 
@@ -309,7 +309,7 @@ resulting patches to all open connections.</p>
 </pre></div>
 </div>
 <p>To send an edit, create the next core <code class="docutils literal notranslate"><span class="pre">Value</span></code> and send the encoded proposal frame:</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
 <span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">})));</span>
