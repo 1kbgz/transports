@@ -6,6 +6,7 @@ from .client import Client
 from .comm import serve_comm
 from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
+from .relay import RelayBroadcaster
 from .seq import SeqCrdt, seq_delete, seq_insert, seq_key_between, seq_materialize, seq_new
 from .server import Server, autosync, sync, ws_endpoint
 from .session import Session
@@ -59,6 +60,7 @@ __all__ = [
     "QueueBackplane",
     "UnixSocketBackplane",
     "ZmqBackplane",
+    "RelayBroadcaster",
     "serve_anywidget",
     "autosync",
     "sync",

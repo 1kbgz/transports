@@ -275,6 +275,18 @@ class Hub:
         if fan:
             self._shared_outbox.append((sid, fan))
 
+    def apply_shared(self, sid: int, patch: dict, origin: Any) -> None:
+        """Merge a shared-model write that happened on another worker (delivered over a backplane), and
+        queue the resulting authoritative fan for this worker's subscribers on the next `flush`. Do not
+        re-publish — the originating worker already broadcast it. When the model's `MergeStrategy` is a
+        CRDT this is convergent: applying the same set of writes in any order yields the same value, so
+        concurrent edits from clients on different workers reconcile identically everywhere."""
+        if self._shared.get(sid) is None:
+            return
+        fan = self._write_shared(sid, patch, origin)
+        if fan:
+            self._shared_outbox.append((sid, fan))
+
     def close(self, conn: Any) -> None:
         self._conn_key.pop(conn, None)
         self._codecs.pop(conn, None)
