@@ -28,6 +28,8 @@ class Session:
         self._suppress: Set[int] = set()  # ids whose observation is suspended (during inbound apply)
         self.outbox: List[Tuple[int, dict]] = []
         self._on_patch: Optional[Callable[[int, dict], None]] = None
+        self._log: Dict[int, List[Tuple[int, dict]]] = {}  # per-model replay log of (rev, patch), bounded
+        self._log_cap = 512  # patches retained per model for resume; older are evicted (resume → snapshot)
 
     def host(self, model: Any) -> int:
         """Host a model: register its schema, store its value in the core, and watch it. Returns id."""
@@ -61,6 +63,7 @@ class Session:
             if patch["ops"]:
                 self.outbox.append((mid, patch))
                 emitted.append((mid, patch))
+                self._record(mid, patch)
                 if self._on_patch is not None:
                     self._on_patch(mid, patch)
         self._dirty.clear()
@@ -116,7 +119,26 @@ class Session:
         authoritative = {"rev": cur_rev + 1, "ops": patch.get("ops", [])}
         if not self._apply_authoritative(mid, authoritative):
             return None  # reject a malformed proposal (bad path/type/index) without crashing the host
+        self._record(mid, authoritative)
         return authoritative
+
+    def _record(self, mid: int, patch: dict) -> None:
+        """Append a patch to the model's bounded replay log (for resume)."""
+        log = self._log.setdefault(mid, [])
+        log.append((patch["rev"], patch))
+        if len(log) > self._log_cap:
+            del log[: len(log) - self._log_cap]
+
+    def since(self, mid: int, since_rev: int) -> Optional[List[dict]]:
+        """Patches to advance a mirror from `since_rev` to current, or `None` if the log can't bridge the
+        gap (the next needed patch was evicted) — then the caller should send a fresh snapshot instead."""
+        cur = self.snapshot(mid)["rev"]  # flush pending changes (recording them) before reading the log
+        if since_rev >= cur:
+            return []  # already current
+        log = self._log.get(mid, [])
+        if not any(rev == since_rev + 1 for rev, _ in log):
+            return None  # the next needed patch was evicted — gap, can't replay
+        return [patch for rev, patch in log if rev > since_rev]
 
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
         try:

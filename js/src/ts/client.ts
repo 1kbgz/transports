@@ -95,10 +95,21 @@ export class Client {
     return s;
   }
 
-  /** Connect to a transports server and mirror it. Returns the `WebSocket`. */
+  /** Connect to a transports server and mirror it. Returns the `WebSocket`.
+   *
+   * On a reconnect (this client already mirrors models) it appends `?since=` with its last-seen rev per
+   * model, so the server replays only the delta instead of re-sending each whole model.
+   */
   connect(url: string): WebSocket {
     const sep = url.includes("?") ? "&" : "?";
-    const ws = new WebSocket(`${url}${sep}codec=${this.codec}`);
+    let params = `codec=${this.codec}`;
+    if (this.revs.size) {
+      const since = encodeURIComponent(
+        JSON.stringify(Object.fromEntries(this.revs)),
+      );
+      params += `&since=${since}`;
+    }
+    const ws = new WebSocket(`${url}${sep}${params}`);
     ws.binaryType = "arraybuffer";
     ws.addEventListener("message", (e) => {
       const data = (e as MessageEvent).data;

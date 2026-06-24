@@ -12,6 +12,7 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 """
 
 import asyncio
+import json
 from typing import Any, Dict, List, Optional, Protocol, Union
 
 from . import protocol
@@ -26,7 +27,7 @@ class Broadcaster(Protocol):
     #: the codec a connection gets when it doesn't request one (the I/O adapters read this)
     default_codec: str
 
-    def open(self, conn: Any, codec: str = ...) -> List[Wire]: ...
+    def open(self, conn: Any, codec: str = ..., since: Optional[Dict[int, int]] = ...) -> List[Wire]: ...
 
     def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]: ...
 
@@ -50,14 +51,24 @@ class Server:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: Optional[str] = None) -> List[Wire]:
-        """Register a connection with its codec; returns the snapshot messages to send it."""
+    def open(self, conn: Any, codec: Optional[str] = None, since: Optional[Dict[int, int]] = None) -> List[Wire]:
+        """Register a connection; return the messages that bring it up to date.
+
+        Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only
+        the patches each model emitted after ``last_rev``, falling back to a snapshot for any model whose
+        replay log can't bridge the gap. So a reconnecting client replays the delta, not the whole model.
+        """
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         out: List[Wire] = []
         for mid in self._session.ids():
-            snap = self._session.snapshot(mid)
-            msg = protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])
-            out.append(self._encode_for(conn, msg))
+            client_rev = since.get(mid) if since else None
+            delta = self._session.since(mid, client_rev) if client_rev is not None else None
+            if delta is not None:
+                for patch in delta:
+                    out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
+            else:
+                snap = self._session.snapshot(mid)
+                out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
         return out
 
     def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
@@ -107,8 +118,10 @@ def ws_endpoint(server: Broadcaster):
         from starlette.websockets import WebSocketDisconnect
 
         codec = websocket.query_params.get("codec", server.default_codec)
+        since_param = websocket.query_params.get("since")  # resume token: {mid: last_rev} JSON
+        since = {int(k): int(v) for k, v in json.loads(since_param).items()} if since_param else None
         await websocket.accept()
-        for msg in server.open(websocket, codec):
+        for msg in server.open(websocket, codec, since):
             await _send(websocket, msg)
         try:
             while True:
