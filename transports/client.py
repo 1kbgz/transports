@@ -66,21 +66,57 @@ class Client:
         patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
         return protocol.encode(protocol.patch_msg(mid, patch), self._codec)
 
-    async def connect(self, url: str) -> None:
-        """Connect to a transports server and mirror it until the connection closes.
-
-        Appends ``?codec=`` for the client's codec, and — if this client already mirrors models (a
-        reconnect) — ``?since=`` with its last-seen rev per model, so the server replays only the delta.
-        """
-        import websockets
-
+    def _connect_url(self, url: str) -> str:
+        """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
+        mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""
         sep = "&" if "?" in url else "?"
         params = f"codec={self._codec}"
-        if self._rev:  # resume: bring this mirror up to date from where it left off
+        if self._rev:
             params += "&since=" + urllib.parse.quote(json.dumps(self._rev))
-        async with websockets.connect(f"{url}{sep}{params}") as ws:
+        return f"{url}{sep}{params}"
+
+    async def connect(self, url: str) -> None:
+        """Connect to a transports server and mirror it until the connection closes (one connection)."""
+        import websockets
+
+        async with websockets.connect(self._connect_url(url)) as ws:
             async for frame in ws:
                 self.recv(frame)
+
+    async def run(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
+        """Connect and mirror, **reconnecting** whenever the connection drops — so the client survives a
+        server restart or a network blip. ``authority`` decides reconciliation on each (re)connect:
+
+        - ``"server"`` (default): the server is canonical; the client adopts its state (resuming from
+          ``?since=`` when it can, else a fresh snapshot). This is the "refetch on refresh" behavior.
+        - ``"client"``: the client is canonical; after the server's snapshot it **pushes its last-known
+          state back** as an edit, so a server that came back stale or empty is rectified from the client.
+          With a CRDT model the push merges (newer stamps win); otherwise it overwrites.
+
+        Runs until cancelled. The choice of *where the authoritative state lives* is yours — pair this
+        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs.
+        """
+        import asyncio
+
+        import websockets
+
+        if authority not in ("server", "client"):
+            raise ValueError(f"authority must be 'server' or 'client', not {authority!r}")
+        while True:
+            pre = dict(self._values) if authority == "client" else None
+            pushed: set = set()
+            try:
+                async with websockets.connect(self._connect_url(url)) as ws:
+                    async for frame in ws:
+                        self.recv(frame)
+                        if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
+                            for mid in list(self._values):
+                                if mid not in pushed and mid in pre:
+                                    await ws.send(self.edit(mid, pre[mid]))
+                                    pushed.add(mid)
+            except (websockets.ConnectionClosed, OSError):
+                pass  # dropped — fall through to retry
+            await asyncio.sleep(retry)
 
     async def connect_sse(self, url: str) -> None:
         """Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.
