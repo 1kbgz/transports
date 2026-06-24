@@ -33,7 +33,7 @@ import threading
 from typing import AsyncIterator
 
 _ID_LEN = 16  # per-instance sender id, prefixed to every frame so a backplane can skip its own messages
-_CLOSE = object()  # sentinel pushed on close() to unblock messages()
+_CLOSE = object()  # sentinel pushed on stop() to unblock messages()
 
 
 class Backplane:
@@ -59,7 +59,7 @@ class Backplane:
         raise NotImplementedError
 
     async def messages(self) -> AsyncIterator[bytes]:
-        """Yield frames published by other processes (never this one), until :meth:`close`."""
+        """Yield frames published by other processes (never this one), until :meth:`stop`."""
         assert self._inbox is not None, "start() the backplane first"
         while not self._closed:
             item = await self._inbox.get()
@@ -67,7 +67,7 @@ class Backplane:
                 break
             yield item
 
-    async def close(self) -> None:
+    async def stop(self) -> None:
         self._closed = True
         if self._inbox is not None:
             self._inbox.put_nowait(_CLOSE)
@@ -135,8 +135,8 @@ class ZmqBackplane(Backplane):
     async def publish(self, data: bytes) -> None:
         await self._pub.send(self._frame(data))
 
-    async def close(self) -> None:
-        await super().close()
+    async def stop(self) -> None:
+        await super().stop()
         if self._task:
             self._task.cancel()
         if self._pub:
@@ -219,8 +219,8 @@ class UnixSocketBackplane(Backplane):
         self._writer.write(struct.pack(">I", len(frame)) + frame)
         await self._writer.drain()
 
-    async def close(self) -> None:
-        await super().close()
+    async def stop(self) -> None:
+        await super().stop()
         if self._task:
             self._task.cancel()
         if self._writer:
@@ -283,8 +283,8 @@ class QueueBackplane(Backplane):
     async def publish(self, data: bytes) -> None:
         self._in.put(self._frame(data))
 
-    async def close(self) -> None:
-        await super().close()
+    async def stop(self) -> None:
+        await super().stop()
         self._out.put(None)  # unblock the executor get
         if self._task:
             self._task.cancel()

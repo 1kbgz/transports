@@ -48,7 +48,7 @@ def _worker(path, idx, patch, result_q):
             await bp.publish(payload)
             await asyncio.sleep(0.3)
         ct.cancel()
-        await bp.close()
+        await bp.stop()
         result_q.put((idx, hub._shared[sid].value))
 
     asyncio.run(go())

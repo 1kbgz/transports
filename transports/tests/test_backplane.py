@@ -38,7 +38,7 @@ def _peer(make, my_id, result_q, secs=1.5):
             await asyncio.sleep(0.1)
         await asyncio.sleep(0.25)
         ct.cancel()
-        await bp.close()
+        await bp.stop()
         result_q.put((my_id, sorted(seen)))
 
     asyncio.run(go())

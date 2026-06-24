@@ -340,17 +340,17 @@ class Hub:
         sh = self._shared[sid]
         return {"type_name": sh.type_name, "value": sh.value, "rev": sh.rev, "merge_state": sh.merge.state()}
 
-    def since_shared(self, sid: int, rev: int) -> Optional[List[dict]]:
-        """Patches after `rev` for a delta catch-up, or ``None`` if `rev` is outside the kept log (the
-        caller should fall back to a snapshot). Requires ``share(replay=True)``."""
+    def since_shared(self, sid: int, since_rev: int) -> Optional[List[dict]]:
+        """Patches after `since_rev` for a delta catch-up, or ``None`` if it is outside the kept log (the
+        caller should fall back to a snapshot). Requires ``share(replay=True)``. Mirrors `Session.since`."""
         sh = self._shared.get(sid)
         if sh is None or not sh.replay:
             return None
-        if rev >= sh.rev:
+        if since_rev >= sh.rev:
             return []
-        if not sh.log or sh.log[0][0] > rev + 1:
+        if not sh.log or sh.log[0][0] > since_rev + 1:
             return None  # the needed delta has scrolled out of the bounded log
-        return [p for r, p in sh.log if r > rev]
+        return [p for r, p in sh.log if r > since_rev]
 
     def apply_snapshot_shared(self, sid: int, value: dict, rev: int, merge_state: Optional[dict]) -> None:
         """Adopt a peer's snapshot of a shared model: set value/rev and restore the merge clock, so later

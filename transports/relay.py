@@ -66,7 +66,7 @@ class RelayBroadcaster:
     async def stop(self) -> None:
         if self._task:
             self._task.cancel()
-        await self.backplane.close()
+        await self.backplane.stop()
 
     async def _catch_up(self, timeout: float) -> None:
         """Ask peers for the current state of our shared models; adopt the first answer per model. Buffer
@@ -158,9 +158,10 @@ class RelayBroadcaster:
             asyncio.create_task(self.backplane.publish(payload))  # broadcast the raw write to the others
         return out
 
-    async def write_shared(self, sid: int, value: Any) -> None:
+    async def set_shared(self, sid: int, value: Any) -> None:
         """Write to a shared model from the host side (e.g. a ticker) and propagate it to the cluster:
-        apply locally (fanned on the next flush) and publish so every other worker applies it too."""
+        apply locally (fanned on the next flush) and publish so every other worker applies it too. The
+        cluster-aware counterpart of `Hub.set_shared`."""
         sh = self.hub._shared.get(sid)
         if sh is None:
             return
