@@ -58,7 +58,7 @@ resulting patches to all open connections.
 Initialize the wasm package, connect, and render whenever a message arrives.
 
 ```ts
-import init, { Client, fromValue } from "transports";
+import init, { Client, fromValue } from "1kbgz/transports";
 
 await init();
 
@@ -75,7 +75,7 @@ ws.addEventListener("message", () => {
 To send an edit, create the next core `Value` and send the encoded proposal frame:
 
 ```ts
-import { toValue } from "transports";
+import { toValue } from "1kbgz/transports";
 
 const [id] = client.ids();
 ws.send(client.edit(id, toValue({ tick: 10 })));

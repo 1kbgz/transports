@@ -106,7 +106,7 @@ export interface Device {
 ## Bridge plain JavaScript objects
 
 ```ts
-import { fromValue, toValue } from "transports";
+import { fromValue, toValue } from "1kbgz/transports";
 
 const value = toValue({ name: "lamp", on: true });
 // { Map: { name: { Str: "lamp" }, on: { Bool: true } } }
