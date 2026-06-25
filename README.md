@@ -7,8 +7,11 @@ Define a model once as a [pydantic](https://docs.pydantic.dev) model, stdlib `da
 only the patch needed to update a remote mirror. The same Rust core drives Python (PyO3) and
 JavaScript (wasm), so both sides use the same `Value`, diff, patch, and codec machinery.
 
+[![Build Status](https://github.com/1kbgz/transports/actions/workflows/build.yaml/badge.svg?branch=main&event=push)](https://github.com/1kbgz/transports/actions/workflows/build.yaml)
+[![codecov](https://codecov.io/gh/1kbgz/transports/branch/main/graph/badge.svg)](https://codecov.io/gh/1kbgz/transports)
 [![License](https://img.shields.io/github/license/1kbgz/transports)](https://github.com/1kbgz/transports)
 [![PyPI](https://img.shields.io/pypi/v/transports.svg)](https://pypi.python.org/pypi/transports)
+
 
 ```python
 import transports
