@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from bigbrother import watch
 
 from ._bridge import _annotations, from_value, schema_of, to_value
-from .transports import Store as _CoreStore, apply as _apply
+from .transports import Store as _CoreStore, apply as _apply, diff as _diff
 
 
 class Session:
@@ -116,15 +116,19 @@ class Session:
         if snap is None:
             return None
         parsed = json.loads(snap)
-        authoritative = {"rev": parsed["rev"] + 1, "ops": patch.get("ops", [])}
-        # Validate the *result* against the hosted model BEFORE committing, so an invalid edit (e.g. a
-        # non-numeric string into an int field) is rejected cleanly — never crashing the host, and never
-        # leaving the core value inconsistent with the model. A client edit is a proposal; the server may
-        # reject it (the caller then re-sends the authoritative state so the client's UI reverts).
-        if not self._validates(mid, parsed["value"], authoritative):
-            return None
+        cur = parsed["value"]
+        # Validate AND canonicalize the proposal through the hosted model (on a copy, so a bad edit never
+        # touches the store): pydantic/msgspec reject an invalid value, and a *coercible* one is normalized
+        # to its canonical typed form — e.g. a number control sends the string "80", and the stored value
+        # becomes the int 80, so the core value, the Python model, and every client agree. The authoritative
+        # patch is the diff to that canonical value (not the client's raw ops), keeping all three in sync.
+        canonical = self._canonical(mid, cur, patch.get("ops", []))
+        if canonical is None:
+            return None  # invalid / malformed — rejected (the caller re-sends state so the proposer reverts)
+        ops = json.loads(_diff(json.dumps(cur), json.dumps(canonical))).get("ops", [])
+        authoritative = {"rev": parsed["rev"] + 1, "ops": ops}
         if not self._apply_authoritative(mid, authoritative):
-            return None  # reject a malformed proposal (bad path/type/index) without crashing the host
+            return None
         self._record(mid, authoritative)
         return authoritative
 
@@ -146,25 +150,25 @@ class Session:
             return None  # the next needed patch was evicted — gap, can't replay
         return [patch for rev, patch in log if rev > since_rev]
 
-    def _validates(self, mid: int, current_value: dict, patch: dict) -> bool:
-        """True if applying ``patch`` to ``current_value`` yields a value the hosted model accepts.
+    def _canonical(self, mid: int, current_value: dict, ops: list) -> Optional[dict]:
+        """The proposal applied to ``current_value`` and normalized through the hosted model — its canonical
+        typed `Value` — or ``None`` if the core rejects the patch or the model rejects the value.
 
         Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then
-        round-tripped through the model bridge (which lets pydantic / msgspec validate and reject). A model
-        with no typed object hosted here (a plain mirror) can't be validated and is accepted; dataclasses,
-        which don't validate, accept per their own semantics."""
+        round-tripped through the model bridge: pydantic / msgspec validate (rejecting bad input) and coerce
+        (so ``"80"`` for an int field comes back as ``80``). A model with no typed object hosted here (a plain
+        mirror) returns the candidate unchanged; dataclasses accept per their own semantics."""
+        try:
+            candidate = json.loads(_apply(json.dumps(current_value), json.dumps({"rev": 0, "ops": ops})))
+        except ValueError:
+            return None  # the core rejected a malformed patch (bad path/type/index)
         obj = self._models.get(mid)
         if obj is None:
-            return True
+            return candidate  # untyped mirror — nothing to canonicalize against
         try:
-            candidate = _apply(json.dumps(current_value), json.dumps(patch))
-        except ValueError:
-            return False  # the core rejected a malformed patch (bad path/type/index)
-        try:
-            from_value(json.loads(candidate), type(obj))
+            return to_value(from_value(candidate, type(obj)))  # validate + coerce to the canonical typed value
         except Exception:
-            return False  # the result doesn't validate against the model (pydantic / msgspec / ...)
-        return True
+            return None  # the result doesn't validate against the model (pydantic / msgspec / ...)
 
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
         try:
