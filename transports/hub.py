@@ -282,7 +282,13 @@ class Hub:
             return {}
         authoritative = sess.submit(wire_id, msg["patch"])
         if authoritative is None:
-            return {}
+            # Rejected (invalid edit / malformed patch): revert just the proposer to the authoritative
+            # state so its UI self-corrects; the host never crashes and other tenants are untouched.
+            snap = sess.snapshot(wire_id)
+            if snap is None:
+                return {}
+            revert = protocol.snapshot_msg(wire_id, snap["type_name"], snap["rev"], snap["value"])
+            return {conn: [self._encode_for(conn, revert)]}
         relay = protocol.patch_msg(wire_id, authoritative)
         return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key}
 
