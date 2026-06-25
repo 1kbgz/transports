@@ -51,6 +51,24 @@ def test_private_edit_relays_only_within_tenant():
     assert ca2.value(1)["Map"]["x"] == {"Int": 7}
 
 
+def test_private_invalid_edit_reverts_only_the_proposer():
+    """An invalid edit to a private model is rejected; the hub re-sends the authoritative snapshot to the
+    proposing connection alone (so its UI reverts) and relays nothing to the tenant's other connections."""
+    h = hub()
+    h.tenant("t1").host(Doc(x=5))
+    a1, a2 = ("t1", "a1"), ("t1", "a2")
+    h.open(a1)
+    h.open(a2)
+
+    bad = '{"t":"patch","id":1,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"x"}],"value":{"Str":""}}}]}}'
+    out = h.recv(a1, bad)
+    assert set(out) == {a1}  # only the proposer is messaged — no relay of the bad edit to a2
+    c = Client()
+    for m in out[a1]:
+        c.recv(m)
+    assert c.value(1)["Map"]["x"] == {"Int": 5}  # reverted to the authoritative value
+
+
 def test_shared_read_fanout_to_many_tenants():
     h = hub()
     sid = h.share(Doc())
