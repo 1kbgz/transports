@@ -43,12 +43,11 @@ class Backplane:
 
     def __init__(self) -> None:
         self._id = os.urandom(_ID_LEN)
-        self._inbox: asyncio.Queue | None = None
+        self._subscribers: set = set()  # one asyncio.Queue per live messages() consumer
         self._closed = False
 
     async def start(self) -> None:
         """Set up the transport and begin receiving. Call once, inside the running event loop."""
-        self._inbox = asyncio.Queue()
         await self._start()
 
     async def _start(self) -> None:  # pragma: no cover - overridden
@@ -59,28 +58,36 @@ class Backplane:
         raise NotImplementedError
 
     async def messages(self) -> AsyncIterator[bytes]:
-        """Yield frames published by other processes (never this one), until :meth:`stop`."""
-        assert self._inbox is not None, "start() the backplane first"
-        while not self._closed:
-            item = await self._inbox.get()
-            if item is _CLOSE:
-                break
-            yield item
+        """Yield frames published by other processes (never this one), until :meth:`stop`. Each call is an
+        independent stream, so several consumers in one process (e.g. a relay and an election) each receive
+        every frame and filter for the message type they care about."""
+        q: asyncio.Queue = asyncio.Queue()
+        self._subscribers.add(q)
+        try:
+            while not self._closed:
+                item = await q.get()
+                if item is _CLOSE:
+                    break
+                yield item
+        finally:
+            self._subscribers.discard(q)
 
     async def stop(self) -> None:
         self._closed = True
-        if self._inbox is not None:
-            self._inbox.put_nowait(_CLOSE)
+        for q in list(self._subscribers):
+            q.put_nowait(_CLOSE)
 
     # --- helpers for subclasses ---
     def _frame(self, data: bytes) -> bytes:
         return self._id + data
 
     def _deliver(self, framed: bytes) -> None:
-        """Hand a raw framed message to `messages()`, unless it's malformed or our own echo."""
-        if self._inbox is None or len(framed) < _ID_LEN or framed[:_ID_LEN] == self._id:
+        """Fan a raw framed message to every live `messages()` consumer, unless malformed or our own echo."""
+        if len(framed) < _ID_LEN or framed[:_ID_LEN] == self._id:
             return
-        self._inbox.put_nowait(framed[_ID_LEN:])
+        payload = framed[_ID_LEN:]
+        for q in self._subscribers:
+            q.put_nowait(payload)
 
 
 class ZmqBackplane(Backplane):
@@ -288,3 +295,22 @@ class QueueBackplane(Backplane):
         self._out.put(None)  # unblock the executor get
         if self._task:
             self._task.cancel()
+
+
+def serve_zmq_broker(front: str = "tcp://127.0.0.1:5599", back: str = "tcp://127.0.0.1:5600") -> None:
+    """Run a standalone ZeroMQ XSUB/XPUB proxy — a **dedicated broker** for :class:`ZmqBackplane`. Run it
+    as a sidecar so the bus is not hosted inside a worker: each `ZmqBackplane`'s brokerless election then
+    yields to it (their bind fails, so they connect), removing the single point of failure where the worker
+    that won the election would take the whole bus down with it. Blocks. Run with
+    ``python -m transports.backplane [front] [back]``."""
+    import zmq
+
+    ctx = zmq.Context.instance()
+    xsub, xpub = ctx.socket(zmq.XSUB), ctx.socket(zmq.XPUB)
+    xsub.bind(front)
+    xpub.bind(back)
+    zmq.proxy(xsub, xpub)  # blocks forever
+
+
+if __name__ == "__main__":  # a dedicated ZMQ broker: `python -m transports.backplane [front] [back]`
+    serve_zmq_broker(*sys.argv[1:3])

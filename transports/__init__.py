@@ -1,9 +1,10 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
 from .anywidget import serve_anywidget
-from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane
+from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane, serve_zmq_broker
 from .client import Client
 from .comm import serve_comm
+from .election import Election
 from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
 from .relay import RelayBroadcaster
@@ -55,12 +56,14 @@ __all__ = [
     "ws_endpoint",
     "sse_endpoint",
     "serve_comm",
-    # cross-process backplane (multi-worker fan-out)
+    # cross-process backplane (multi-worker fan-out) + clustering
     "Backplane",
     "QueueBackplane",
     "UnixSocketBackplane",
     "ZmqBackplane",
+    "serve_zmq_broker",
     "RelayBroadcaster",
+    "Election",
     "serve_anywidget",
     "autosync",
     "sync",
