@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 from bigbrother import watch
 
 from ._bridge import _annotations, from_value, schema_of, to_value
-from .transports import Store as _CoreStore
+from .transports import Store as _CoreStore, apply as _apply
 
 
 class Session:
@@ -115,8 +115,14 @@ class Session:
         snap = self._store.snapshot(mid)
         if snap is None:
             return None
-        cur_rev = json.loads(snap)["rev"]
-        authoritative = {"rev": cur_rev + 1, "ops": patch.get("ops", [])}
+        parsed = json.loads(snap)
+        authoritative = {"rev": parsed["rev"] + 1, "ops": patch.get("ops", [])}
+        # Validate the *result* against the hosted model BEFORE committing, so an invalid edit (e.g. a
+        # non-numeric string into an int field) is rejected cleanly — never crashing the host, and never
+        # leaving the core value inconsistent with the model. A client edit is a proposal; the server may
+        # reject it (the caller then re-sends the authoritative state so the client's UI reverts).
+        if not self._validates(mid, parsed["value"], authoritative):
+            return None
         if not self._apply_authoritative(mid, authoritative):
             return None  # reject a malformed proposal (bad path/type/index) without crashing the host
         self._record(mid, authoritative)
@@ -140,13 +146,37 @@ class Session:
             return None  # the next needed patch was evicted — gap, can't replay
         return [patch for rev, patch in log if rev > since_rev]
 
+    def _validates(self, mid: int, current_value: dict, patch: dict) -> bool:
+        """True if applying ``patch`` to ``current_value`` yields a value the hosted model accepts.
+
+        Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then
+        round-tripped through the model bridge (which lets pydantic / msgspec validate and reject). A model
+        with no typed object hosted here (a plain mirror) can't be validated and is accepted; dataclasses,
+        which don't validate, accept per their own semantics."""
+        obj = self._models.get(mid)
+        if obj is None:
+            return True
+        try:
+            candidate = _apply(json.dumps(current_value), json.dumps(patch))
+        except ValueError:
+            return False  # the core rejected a malformed patch (bad path/type/index)
+        try:
+            from_value(json.loads(candidate), type(obj))
+        except Exception:
+            return False  # the result doesn't validate against the model (pydantic / msgspec / ...)
+        return True
+
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
         try:
             if not self._store.apply(mid, json.dumps(patch)):
                 return False
         except ValueError:
             return False  # the core rejected a malformed patch (bad path/type/index)
-        self._refresh_model(mid)
+        try:
+            self._refresh_model(mid)
+        except Exception:
+            return False  # never crash the host: a model that rejects the value (caught pre-commit by
+            # `_validates`, but belt-and-suspenders for any caller that didn't pre-validate)
         return True
 
     def _refresh_model(self, mid: int) -> None:
