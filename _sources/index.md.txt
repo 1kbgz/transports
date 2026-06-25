@@ -39,7 +39,6 @@ JavaScript (wasm), so both sides use the same `Value`, diff, patch, and codec ma
 [![License](https://img.shields.io/github/license/1kbgz/transports)](https://github.com/1kbgz/transports)
 [![PyPI](https://img.shields.io/pypi/v/transports.svg)](https://pypi.python.org/pypi/transports)
 
-
 ```python
 import transports
 from pydantic import BaseModel

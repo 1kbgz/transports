@@ -255,7 +255,7 @@
 <span class="kn">from</span><span class="w"> </span><span class="nn">bigbrother</span><span class="w"> </span><span class="kn">import</span> <span class="n">watch</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">_annotations</span><span class="p">,</span> <span class="n">from_value</span><span class="p">,</span> <span class="n">schema_of</span><span class="p">,</span> <span class="n">to_value</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">Store</span> <span class="k">as</span> <span class="n">_CoreStore</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">Store</span> <span class="k">as</span> <span class="n">_CoreStore</span><span class="p">,</span> <span class="n">apply</span> <span class="k">as</span> <span class="n">_apply</span>
 
 
 <div class="viewcode-block" id="Session">
@@ -385,8 +385,14 @@
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="n">cur_rev</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
-        <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">cur_rev</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[])}</span>
+        <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)</span>
+        <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[])}</span>
+        <span class="c1"># Validate the *result* against the hosted model BEFORE committing, so an invalid edit (e.g. a</span>
+        <span class="c1"># non-numeric string into an int field) is rejected cleanly — never crashing the host, and never</span>
+        <span class="c1"># leaving the core value inconsistent with the model. A client edit is a proposal; the server may</span>
+        <span class="c1"># reject it (the caller then re-sends the authoritative state so the client&#39;s UI reverts).</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validates</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span> <span class="n">authoritative</span><span class="p">):</span>
+            <span class="k">return</span> <span class="kc">None</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">):</span>
             <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># reject a malformed proposal (bad path/type/index) without crashing the host</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">)</span>
@@ -414,13 +420,37 @@
         <span class="k">return</span> <span class="p">[</span><span class="n">patch</span> <span class="k">for</span> <span class="n">rev</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">log</span> <span class="k">if</span> <span class="n">rev</span> <span class="o">&gt;</span> <span class="n">since_rev</span><span class="p">]</span></div>
 
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">_validates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;True if applying ``patch`` to ``current_value`` yields a value the hosted model accepts.</span>
+
+<span class="sd">        Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then</span>
+<span class="sd">        round-tripped through the model bridge (which lets pydantic / msgspec validate and reject). A model</span>
+<span class="sd">        with no typed object hosted here (a plain mirror) can&#39;t be validated and is accepted; dataclasses,</span>
+<span class="sd">        which don&#39;t validate, accept per their own semantics.&quot;&quot;&quot;</span>
+        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">True</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">current_value</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># the core rejected a malformed patch (bad path/type/index)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">from_value</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">candidate</span><span class="p">),</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># the result doesn&#39;t validate against the model (pydantic / msgspec / ...)</span>
+        <span class="k">return</span> <span class="kc">True</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_apply_authoritative</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)):</span>
                 <span class="k">return</span> <span class="kc">False</span>
         <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># the core rejected a malformed patch (bad path/type/index)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_model</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_model</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># never crash the host: a model that rejects the value (caught pre-commit by</span>
+            <span class="c1"># `_validates`, but belt-and-suspenders for any caller that didn&#39;t pre-validate)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
