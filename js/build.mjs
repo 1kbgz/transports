@@ -22,18 +22,26 @@ async function build() {
   await bundle_css();
 
   // Copy HTML
-  cpy("src/html/*", "dist/");
+  await cpy("src/html/*", "dist/");
 
   // Copy images
-  fs.mkdirSync("dist/img", { recursive: true });
-  cpy("src/img/*", "dist/img");
+  if (fs.existsSync("src/img")) {
+    fs.mkdirSync("dist/img", { recursive: true });
+    await cpy("src/img/*", "dist/img");
+  }
 
   await Promise.all(BUNDLES.map(bundle)).catch(() => process.exit(1));
 
   // Copy servable assets to python extension (exclude esm/)
+  fs.rmSync("../transports/extension", {
+    recursive: true,
+    force: true,
+  });
   fs.mkdirSync("../transports/extension", { recursive: true });
-  cpy("dist/**/*", "../transports/extension", {
-    filter: (file) => !file.relativePath.startsWith("esm"),
+  await cpy("dist/**/*", "../transports/extension", {
+    filter: (file) =>
+      !file.relativePath.startsWith("esm/") &&
+      !file.relativePath.startsWith("dist/esm/"),
   });
 }
 

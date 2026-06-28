@@ -183,6 +183,11 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+    "js/dist",
     "js/node_modules",
     "rust/Makefile",
     "target",
@@ -191,6 +196,9 @@ exclude = [
 [tool.hatch.build.targets.wheel]
 packages = [
     "transports",
+]
+artifacts = [
+    "transports/extension/**/*",
 ]
 exclude = [
     "js",
