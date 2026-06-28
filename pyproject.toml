@@ -160,6 +160,17 @@ exclude_also = [
 ignore_errors = true
 fail_under = 50
 
+[tool.hatch.build]
+artifacts = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+]
+
+[tool.hatch.build.sources]
+src = "/"
+
 [tool.hatch.build.hooks.hatch-js]
 path = "js"
 build_cmd = "build"
@@ -183,6 +194,11 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+    "js/dist",
     "js/node_modules",
     "rust/Makefile",
     "target",
