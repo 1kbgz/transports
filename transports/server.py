@@ -83,7 +83,14 @@ class Server:
         if msg.get("t") == "patch":
             authoritative = self._session.submit(msg["id"], msg["patch"])
             if authoritative is None:
-                return {}
+                # Rejected (invalid edit, or a malformed patch): re-send the authoritative state to the
+                # proposer alone, so its optimistic UI reverts to the last good value. The server stays up
+                # and other connections are untouched — a round-trip validation failure self-corrects.
+                snap = self._session.snapshot(msg["id"])
+                if snap is None:
+                    return {}
+                revert = protocol.snapshot_msg(msg["id"], snap["type_name"], snap["rev"], snap["value"])
+                return {conn: [self._encode_for(conn, revert)]}
             relay = protocol.patch_msg(msg["id"], authoritative)
             return {c: [self._encode_for(c, relay)] for c in self._codecs}
         return {}

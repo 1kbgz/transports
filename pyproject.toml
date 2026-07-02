@@ -14,7 +14,7 @@ authors = [
 description = "Generic communication library"
 readme = "README.md"
 license = { text = "Apache-2.0" }
-version = "0.4.0"
+version = "0.5.0"
 requires-python = ">=3.10"
 keywords = []
 
@@ -88,7 +88,7 @@ Repository = "https://github.com/1kbgz/transports"
 Homepage = "https://github.com/1kbgz/transports"
 
 [tool.bumpversion]
-current_version = "0.4.0"
+current_version = "0.5.0"
 commit = true
 tag = false 
 commit_args = "-s"
@@ -160,6 +160,17 @@ exclude_also = [
 ignore_errors = true
 fail_under = 50
 
+[tool.hatch.build]
+artifacts = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+]
+
+[tool.hatch.build.sources]
+src = "/"
+
 [tool.hatch.build.hooks.hatch-js]
 path = "js"
 build_cmd = "build"
@@ -183,6 +194,11 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+    "js/dist",
     "js/node_modules",
     "rust/Makefile",
     "target",
@@ -237,13 +253,13 @@ title = "transports"
 root = "README.md"
 pages = [
     "docs/src/quickstart.md",
+    "docs/src/concepts.md",
     "docs/src/bridges.md",
     "docs/src/connections.md",
     "docs/src/codecs.md",
     "docs/src/multitenancy.md",
-    "docs/src/api.md",
     "docs/src/protocol-reference.md",
-    "docs/src/concepts.md",
+    "docs/src/api.md",
 ]
 exclude_patterns = [
     "README.md",
