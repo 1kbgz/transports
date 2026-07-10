@@ -250,7 +250,6 @@ section-order = [
 [tool.yardang]
 title = "transports"
 root = "README.md"
-<<<<<<< before updating
 pages = [
     "docs/src/quickstart.md",
     "docs/src/concepts.md",
@@ -268,8 +267,3 @@ exclude_patterns = [
     ".github",
 ]
 use-autoapi = false
-=======
-pages = []
-use-autoapi = true
-
->>>>>>> after updating
