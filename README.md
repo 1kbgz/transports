@@ -62,3 +62,6 @@ describes `Value`, patch operations, protocol messages, codecs, and model ids.
 
 [Concepts](docs/src/concepts.md) explains why transports uses incremental patches, server-owned
 revisions, a shared Rust core, and transport-agnostic adapters.
+
+> [!NOTE]
+> This library was generated using [copier](https://copier.readthedocs.io/en/stable/) from the [Base Python Project Template repository](https://github.com/python-project-templates/base)
