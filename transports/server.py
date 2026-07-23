@@ -13,12 +13,12 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 
 import asyncio
 import json
-from typing import Any, Dict, List, Optional, Protocol, Union
+from typing import Any, Protocol
 
 from . import protocol
 from .session import Session
 
-Wire = Union[str, bytes]
+Wire = str | bytes
 
 
 class Broadcaster(Protocol):
@@ -27,11 +27,11 @@ class Broadcaster(Protocol):
     #: the codec a connection gets when it doesn't request one (the I/O adapters read this)
     default_codec: str
 
-    def open(self, conn: Any, codec: str = ..., since: Optional[Dict[int, int]] = ...) -> List[Wire]: ...
+    def open(self, conn: Any, codec: str = ..., since: dict[int, int] | None = ...) -> list[Wire]: ...
 
-    def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]: ...
+    def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]: ...
 
-    def flush(self) -> Dict[Any, List[Wire]]: ...
+    def flush(self) -> dict[Any, list[Wire]]: ...
 
     def close(self, conn: Any) -> None: ...
 
@@ -45,13 +45,13 @@ class Server:
 
     def __init__(self, session: Session, *, default_codec: str = protocol.JSON) -> None:
         self._session = session
-        self._codecs: Dict[Any, str] = {}
+        self._codecs: dict[Any, str] = {}
         self.default_codec = protocol.normalize_codec(default_codec)
 
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: Optional[str] = None, since: Optional[Dict[int, int]] = None) -> List[Wire]:
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
         """Register a connection; return the messages that bring it up to date.
 
         Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only
@@ -59,7 +59,7 @@ class Server:
         replay log can't bridge the gap. So a reconnecting client replays the delta, not the whole model.
         """
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
-        out: List[Wire] = []
+        out: list[Wire] = []
         for mid in self._session.ids():
             client_rev = since.get(mid) if since else None
             delta = self._session.since(mid, client_rev) if client_rev is not None else None
@@ -71,7 +71,7 @@ class Server:
                 out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
         return out
 
-    def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
+    def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         """Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.
 
         A client patch is a *proposal*: the server applies it, bumps its own authoritative `rev`, and
@@ -95,7 +95,7 @@ class Server:
             return {c: [self._encode_for(c, relay)] for c in self._codecs}
         return {}
 
-    def flush(self) -> Dict[Any, List[Wire]]:
+    def flush(self) -> dict[Any, list[Wire]]:
         """Drain the session and return the patch messages to broadcast, encoded per connection."""
         msgs = [protocol.patch_msg(mid, patch) for mid, patch in self._session.drain()]
         if not msgs or not self._codecs:
@@ -164,7 +164,7 @@ async def autosync(server: Broadcaster, interval: float = 0.01) -> None:
             for msg in msgs:
                 try:
                     await _send(conn, msg)
-                except Exception:
+                except Exception:  # noqa: BLE001
                     server.close(conn)
 
 

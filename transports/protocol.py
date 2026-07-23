@@ -11,7 +11,8 @@ Two message kinds:
 """
 
 import json
-from typing import Any, Callable, Dict, Tuple, Union
+from collections.abc import Callable
+from typing import Any
 
 from .transports import (
     cbor_to_json as _cbor_to_json,
@@ -32,12 +33,12 @@ _BUILTIN = {"", "json", "application/json", "msgpack", "application/msgpack", "x
 
 #: Registered custom codecs: ``content_type -> (encode, decode)``. ``encode`` maps a JSON-able object
 #: (a protocol message, or a model ``Value``) to wire bytes/str; ``decode`` is its inverse.
-_CODECS: Dict[str, Tuple[Callable[[Any], Union[str, bytes]], Callable[[Union[str, bytes]], Any]]] = {}
+_CODECS: dict[str, tuple[Callable[[Any], str | bytes], Callable[[str | bytes], Any]]] = {}
 
-Codec = Tuple[Callable[[Any], Union[str, bytes]], Callable[[Union[str, bytes]], Any]]
+Codec = tuple[Callable[[Any], str | bytes], Callable[[str | bytes], Any]]
 
 
-def register_codec(content_type: str, encode: Callable[[Any], Union[str, bytes]], decode: Callable[[Union[str, bytes]], Any]) -> None:
+def register_codec(content_type: str, encode: Callable[[Any], str | bytes], decode: Callable[[str | bytes], Any]) -> None:
     """Register a custom wire codec under ``content_type``.
 
     ``encode`` turns a JSON-able object (a protocol message or a model ``Value``) into wire bytes (or
@@ -56,12 +57,12 @@ def unregister_codec(content_type: str) -> None:
     _CODECS.pop(content_type, None)
 
 
-def registered_codecs() -> Tuple[str, ...]:
+def registered_codecs() -> tuple[str, ...]:
     """The content types of the currently registered custom codecs."""
     return tuple(_CODECS)
 
 
-def normalize_codec(name: Union[str, None]) -> str:
+def normalize_codec(name: str | None) -> str:
     """Map a codec name or content-type to a canonical name (:data:`JSON`, :data:`MSGPACK`,
     :data:`CBOR`, or a registered custom content type)."""
     if name in (None, "", "json", "application/json"):
@@ -83,7 +84,7 @@ def patch_msg(model_id: int, patch: dict) -> str:
     return json.dumps({"t": "patch", "id": model_id, "patch": patch})
 
 
-def encode(msg_json: str, codec: str = JSON) -> Union[str, bytes]:
+def encode(msg_json: str, codec: str = JSON) -> str | bytes:
     """Encode a JSON message string into the wire form for ``codec``.
 
     Returns the string unchanged for JSON, MessagePack ``bytes`` for the msgpack codec, or whatever a
@@ -99,7 +100,7 @@ def encode(msg_json: str, codec: str = JSON) -> Union[str, bytes]:
     return msg_json
 
 
-def decode(data: Union[str, bytes], codec: Union[str, None] = None) -> dict:
+def decode(data: str | bytes, codec: str | None = None) -> dict:
     """Parse an inbound frame to a message dict.
 
     Pass the connection's ``codec`` to select the decoder (required for custom codecs). With no
@@ -126,7 +127,7 @@ def encode_as(value_json: str, content_type: str) -> bytes:
     return _core_encode_as(value_json, content_type)
 
 
-def decode_as(data: Union[str, bytes], content_type: str) -> str:
+def decode_as(data: str | bytes, content_type: str) -> str:
     """Decode bytes back to a model ``Value`` (JSON string) with the named codec (built-in or registered)."""
     if content_type in _CODECS:
         return json.dumps(_CODECS[content_type][1](data))

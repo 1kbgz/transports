@@ -29,7 +29,7 @@ async def _serve(hub: Hub, sid: int, port: int, stop: asyncio.Event) -> None:
                 for conn, msgs in hub.recv(ws, frame).items():
                     for msg in msgs:
                         await conn.send(msg)
-        except Exception:
+        except Exception:  # noqa: BLE001, S110
             pass
         finally:
             hub.close(ws)

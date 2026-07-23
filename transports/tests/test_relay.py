@@ -84,8 +84,8 @@ def test_concurrent_cross_worker_edits_converge():
 
 # --- catch-up + durability (relay logic over a tiny in-process bus) ---
 
-from transports import DeepLwwCrdt, Hub, RelayBroadcaster  # noqa: E402
-from transports.backplane import Backplane  # noqa: E402
+from transports import DeepLwwCrdt, Hub, RelayBroadcaster
+from transports.backplane import Backplane
 
 
 class _Bus:

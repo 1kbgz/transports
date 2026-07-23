@@ -20,7 +20,7 @@ list diffs; see ROADMAP 6.2.)
 
 import json
 from fractions import Fraction
-from typing import Any, List, Optional
+from typing import Any
 
 from .hub import MergeStrategy
 from .transports import apply as _apply
@@ -28,7 +28,7 @@ from .transports import apply as _apply
 START, END = Fraction(0), Fraction(1)
 
 
-def seq_key_between(left: Optional[str], right: Optional[str]) -> str:
+def seq_key_between(left: str | None, right: str | None) -> str:
     """A rational position strictly between `left` and `right` (`None` = the sequence start / end)."""
     lo = Fraction(left) if left else START
     hi = Fraction(right) if right else END
@@ -40,10 +40,10 @@ def _ordered(entries: Any) -> list:
     return sorted(entries, key=lambda e: (Fraction(e["k"]), e["o"]))
 
 
-def seq_new(items: List[Any], origin: Any) -> str:
+def seq_new(items: list[Any], origin: Any) -> str:
     """Build a sequence from `items`, each placed in order and attributed to `origin`."""
-    entries: List[dict] = []
-    left: Optional[str] = None
+    entries: list[dict] = []
+    left: str | None = None
     for it in items:
         k = seq_key_between(left, None)
         entries.append({"k": k, "o": str(origin), "v": it, "x": False})

@@ -8,7 +8,7 @@ network).
 
 import json
 import urllib.parse
-from typing import Any, Dict, List, Type, Union
+from typing import Any
 
 from . import protocol
 from ._bridge import M, from_value
@@ -23,12 +23,12 @@ class Client:
     (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound edits and decodes inbound frames."""
 
     def __init__(self, codec: str = protocol.JSON) -> None:
-        self._values: Dict[int, Any] = {}
-        self._rev: Dict[int, int] = {}
-        self._type: Dict[int, str] = {}
+        self._values: dict[int, Any] = {}
+        self._rev: dict[int, int] = {}
+        self._type: dict[int, str] = {}
         self._codec = protocol.normalize_codec(codec)
 
-    def recv(self, data: Union[str, bytes]) -> None:
+    def recv(self, data: str | bytes) -> None:
         """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror."""
         msg = protocol.decode(data, self._codec)
         mid = msg["id"]
@@ -49,14 +49,14 @@ class Client:
         """The current mirrored core `Value` of a model."""
         return self._values[mid]
 
-    def model(self, mid: int, cls: Type[M]) -> M:
+    def model(self, mid: int, cls: type[M]) -> M:
         """Materialize the mirrored model as an instance of `cls`."""
         return from_value(self._values[mid], cls)
 
-    def ids(self) -> List[int]:
+    def ids(self) -> list[int]:
         return list(self._values)
 
-    def edit(self, mid: int, new_value: Any) -> Union[str, bytes]:
+    def edit(self, mid: int, new_value: Any) -> str | bytes:
         """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
 
         Models are server-authoritative: the edit is a proposal, and the local mirror updates only

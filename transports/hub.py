@@ -20,7 +20,8 @@ patch back.
 """
 
 import json
-from typing import Any, Callable, Dict, List, Optional
+from collections.abc import Callable
+from typing import Any
 
 from . import protocol
 from ._bridge import to_value
@@ -74,7 +75,7 @@ class LwwMapCrdt(MergeStrategy):
     """
 
     def __init__(self) -> None:
-        self._clock: Dict[str, tuple] = {}
+        self._clock: dict[str, tuple] = {}
 
     def merge(self, current: Any, patch: dict, origin: Any) -> Any:
         new = json.loads(json.dumps(current))
@@ -125,7 +126,7 @@ class DeepLwwCrdt(MergeStrategy):
     """
 
     def __init__(self) -> None:
-        self._clock: Dict[tuple, tuple] = {}
+        self._clock: dict[tuple, tuple] = {}
 
     def merge(self, current: Any, patch: dict, origin: Any) -> Any:
         new = json.loads(json.dumps(current))
@@ -161,9 +162,9 @@ class _Shared:
         self.value = value
         self.rev = rev
         self.merge = merge
-        self.subs: Dict[Any, str] = {}  # tenant key -> mode
+        self.subs: dict[Any, str] = {}  # tenant key -> mode
         self.replay = replay
-        self.log: List[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
+        self.log: list[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
         self.log_cap = log_cap
 
 
@@ -178,13 +179,13 @@ class Hub:
     def __init__(self, key: Callable[[Any], Any], *, default_codec: str = protocol.JSON) -> None:
         self._key = key
         self.default_codec = protocol.normalize_codec(default_codec)
-        self._tenants: Dict[Any, Session] = {}
-        self._shared: Dict[int, _Shared] = {}
+        self._tenants: dict[Any, Session] = {}
+        self._shared: dict[int, _Shared] = {}
         self._next_shared = 0
-        self._conn_key: Dict[Any, Any] = {}
-        self._codecs: Dict[Any, str] = {}
-        self._shared_outbox: List[tuple] = []  # (sid, fan_patch) from host-side writes
-        self._on_shared_write: Optional[Callable] = None
+        self._conn_key: dict[Any, Any] = {}
+        self._codecs: dict[Any, str] = {}
+        self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
+        self._on_shared_write: Callable | None = None
 
     def tenant(self, key: Any) -> Session:
         """Get (or create) the `Session` holding a tenant's private models."""
@@ -196,12 +197,12 @@ class Hub:
     def share(
         self,
         model_or_value: Any,
-        type_name: Optional[str] = None,
+        type_name: str | None = None,
         *,
         merge: Any = LastWriteWins,
         replay: bool = False,
         rev: int = 0,
-        merge_state: Optional[dict] = None,
+        merge_state: dict | None = None,
     ) -> int:
         """Register a shared data structure; returns its shared id.
 
@@ -235,7 +236,7 @@ class Hub:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: Optional[str] = None, since: Optional[Dict[int, int]] = None) -> List[Wire]:
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
         """Register a connection; return the messages to bring it up to date — its tenant's private models
         and its subscribed shared models. With ``since={mid: last_rev}`` a reconnecting client resumes its
         **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on)."""
@@ -243,7 +244,7 @@ class Hub:
         self._conn_key[conn] = key
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         sess = self.tenant(key)
-        out: List[Wire] = []
+        out: list[Wire] = []
         for mid in sess.ids():
             client_rev = since.get(mid) if since else None
             delta = sess.since(mid, client_rev) if client_rev is not None else None
@@ -258,7 +259,7 @@ class Hub:
                 out.append(self._encode_for(conn, protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)))
         return out
 
-    def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
+    def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         """Handle an inbound patch; returns messages to send, keyed by connection.
 
         A patch to a private model is applied as the server (the tenant's session owns `rev`) and the
@@ -292,9 +293,9 @@ class Hub:
         relay = protocol.patch_msg(wire_id, authoritative)
         return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key}
 
-    def flush(self) -> Dict[Any, List[Wire]]:
+    def flush(self) -> dict[Any, list[Wire]]:
         """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription."""
-        out: Dict[Any, List[Wire]] = {}
+        out: dict[Any, list[Wire]] = {}
         for key, sess in self._tenants.items():
             drained = sess.drain()
             if not drained:
@@ -331,7 +332,7 @@ class Hub:
         if fan:
             self._shared_outbox.append((sid, fan))
 
-    def on_shared_write(self, callback: Optional[Callable]) -> None:
+    def on_shared_write(self, callback: Callable | None) -> None:
         """Register a callback fired after each authoritative shared write, with
         ``(sid, type_name, value, rev, patch, merge_state)``. transports stores nothing durably; persist
         these (the value+rev+merge_state, or append the patch) to make a model survive a full-cluster
@@ -346,7 +347,7 @@ class Hub:
         sh = self._shared[sid]
         return {"type_name": sh.type_name, "value": sh.value, "rev": sh.rev, "merge_state": sh.merge.state()}
 
-    def since_shared(self, sid: int, since_rev: int) -> Optional[List[dict]]:
+    def since_shared(self, sid: int, since_rev: int) -> list[dict] | None:
         """Patches after `since_rev` for a delta catch-up, or ``None`` if it is outside the kept log (the
         caller should fall back to a snapshot). Requires ``share(replay=True)``. Mirrors `Session.since`."""
         sh = self._shared.get(sid)
@@ -358,7 +359,7 @@ class Hub:
             return None  # the needed delta has scrolled out of the bounded log
         return [p for r, p in sh.log if r > since_rev]
 
-    def apply_snapshot_shared(self, sid: int, value: dict, rev: int, merge_state: Optional[dict]) -> None:
+    def apply_snapshot_shared(self, sid: int, value: dict, rev: int, merge_state: dict | None) -> None:
         """Adopt a peer's snapshot of a shared model: set value/rev and restore the merge clock, so later
         merges respect the transferred causal stamps."""
         sh = self._shared.get(sid)
@@ -368,7 +369,7 @@ class Hub:
         sh.rev = max(sh.rev, rev)
         sh.merge.restore(merge_state or {})
 
-    def apply_delta_shared(self, sid: int, patches: List[dict], rev: int, merge_state: Optional[dict]) -> None:
+    def apply_delta_shared(self, sid: int, patches: list[dict], rev: int, merge_state: dict | None) -> None:
         """Catch up by applying replay patches onto the current (restored) value, then restoring the merge
         clock — cheaper than a snapshot when a recent checkpoint is held."""
         sh = self._shared.get(sid)
@@ -385,7 +386,7 @@ class Hub:
         self._conn_key.pop(conn, None)
         self._codecs.pop(conn, None)
 
-    def _write_shared(self, sid: int, patch: dict, origin: Any) -> Optional[dict]:
+    def _write_shared(self, sid: int, patch: dict, origin: Any) -> dict | None:
         """Merge a write into a shared model; return the authoritative fan-out patch (or None)."""
         sh = self._shared[sid]
         new = sh.merge.merge(sh.value, patch, origin)
@@ -404,7 +405,7 @@ class Hub:
             self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, fan, sh.merge.state())
         return fan
 
-    def _fanout(self, sid: int, fan: dict) -> Dict[Any, List[Wire]]:
+    def _fanout(self, sid: int, fan: dict) -> dict[Any, list[Wire]]:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
         return {c: [self._encode_for(c, msg)] for c, k in self._conn_key.items() if k in sh.subs}
