@@ -1,4 +1,5 @@
 import itertools
+import json
 
 from pydantic import BaseModel
 
@@ -98,7 +99,7 @@ def test_read_only_subscriber_cannot_write():
     h.subscribe("t1", sid, READ)
     c = ("t1", "a")
     h.open(c)
-    edit = '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"x"}],"value":{"Int":9}}}]}}' % sid
+    edit = json.dumps({"t": "patch", "id": sid, "patch": {"rev": 1, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 9}}}]}})
     assert h.recv(c, edit) == {}  # write ignored
     assert h._shared[sid].value["Map"]["x"] == {"Int": 0}  # authoritative value untouched
 
@@ -235,8 +236,26 @@ def test_hub_shares_with_deep_lww_merge():
     h.subscribe("t2", sid, WRITE)
     h.open(("t1", "a"))
     h.open(("t2", "b"))
-    h.recv(("t1", "a"), '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"a"},{"Key":"b"}],"value":{"Int":1}}}]}}' % sid)
-    h.recv(("t2", "b"), '{"t":"patch","id":%d,"patch":{"rev":1,"ops":[{"Set":{"path":[{"Key":"a"},{"Key":"c"}],"value":{"Int":2}}}]}}' % sid)
+    h.recv(
+        ("t1", "a"),
+        json.dumps(
+            {
+                "t": "patch",
+                "id": sid,
+                "patch": {"rev": 1, "ops": [{"Set": {"path": [{"Key": "a"}, {"Key": "b"}], "value": {"Int": 1}}}]},
+            }
+        ),
+    )
+    h.recv(
+        ("t2", "b"),
+        json.dumps(
+            {
+                "t": "patch",
+                "id": sid,
+                "patch": {"rev": 1, "ops": [{"Set": {"path": [{"Key": "a"}, {"Key": "c"}], "value": {"Int": 2}}}]},
+            }
+        ),
+    )
     shared = h._shared[sid].value["Map"]["a"]["Map"]
     assert shared["b"] == {"Int": 1} and shared["c"] == {"Int": 2}
 

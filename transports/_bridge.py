@@ -15,7 +15,7 @@ Nested models are inlined as `Map`s; `Submodel`-by-id references are a later ref
 
 import dataclasses
 from types import UnionType
-from typing import Any, Type, TypeVar, Union, cast, get_args, get_origin, get_type_hints
+from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
 import msgspec
 from pydantic import BaseModel
@@ -65,7 +65,7 @@ def to_value(model: Any) -> Any:
     return _value_of(plain)
 
 
-def from_value(value: Any, cls: Type[M]) -> M:
+def from_value(value: Any, cls: type[M]) -> M:
     """Reconstruct a model of type `cls` from a core `Value`."""
     plain = _py_of(value)
     if isinstance(cls, type) and issubclass(cls, BaseModel):

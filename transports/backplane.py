@@ -30,7 +30,7 @@ import os
 import struct
 import sys
 import threading
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 _ID_LEN = 16  # per-instance sender id, prefixed to every frame so a backplane can skip its own messages
 _CLOSE = object()  # sentinel pushed on stop() to unblock messages()

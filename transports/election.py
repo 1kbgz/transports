@@ -18,7 +18,7 @@ import asyncio
 import json
 import os
 import time
-from typing import Awaitable, Callable, Optional
+from collections.abc import Awaitable, Callable
 
 from .backplane import Backplane
 
@@ -29,14 +29,14 @@ class Election:
     tagged so they don't collide with other traffic. The backplane must already be ``start()``ed (the relay
     or your app does that)."""
 
-    def __init__(self, backplane: Backplane, *, id: Optional[str] = None, interval: float = 1.0, timeout: float = 3.0) -> None:
+    def __init__(self, backplane: Backplane, *, id: str | None = None, interval: float = 1.0, timeout: float = 3.0) -> None:
         self.backplane = backplane
         self.id = id or os.urandom(8).hex()
         self.interval = interval
         self.timeout = timeout
         self._seen: dict = {}  # peer id -> monotonic last-seen
         self._tasks: list = []
-        self._singleton: Optional[asyncio.Task] = None
+        self._singleton: asyncio.Task | None = None
         self._stopped = False
 
     @property

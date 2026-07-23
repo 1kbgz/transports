@@ -11,7 +11,8 @@ back it with fan-out, backpressure, and authorization.
 """
 
 import json
-from typing import Any, Callable, Dict, List, Optional, Set, Tuple
+from collections.abc import Callable
+from typing import Any
 
 from bigbrother import watch
 
@@ -22,13 +23,13 @@ from .transports import Store as _CoreStore, apply as _apply, diff as _diff
 class Session:
     def __init__(self) -> None:
         self._store = _CoreStore()
-        self._models: Dict[int, Any] = {}
-        self._schemas: Dict[str, dict] = {}
-        self._dirty: Set[int] = set()
-        self._suppress: Set[int] = set()  # ids whose observation is suspended (during inbound apply)
-        self.outbox: List[Tuple[int, dict]] = []
-        self._on_patch: Optional[Callable[[int, dict], None]] = None
-        self._log: Dict[int, List[Tuple[int, dict]]] = {}  # per-model replay log of (rev, patch), bounded
+        self._models: dict[int, Any] = {}
+        self._schemas: dict[str, dict] = {}
+        self._dirty: set[int] = set()
+        self._suppress: set[int] = set()  # ids whose observation is suspended (during inbound apply)
+        self.outbox: list[tuple[int, dict]] = []
+        self._on_patch: Callable[[int, dict], None] | None = None
+        self._log: dict[int, list[tuple[int, dict]]] = {}  # per-model replay log of (rev, patch), bounded
         self._log_cap = 512  # patches retained per model for resume; older are evicted (resume → snapshot)
 
     def host(self, model: Any) -> int:
@@ -44,7 +45,7 @@ class Session:
         self._models[mid] = watch(model, _watcher, deepstate=True)
         return mid
 
-    def ids(self) -> List[int]:
+    def ids(self) -> list[int]:
         """The ids of all hosted models."""
         return list(self._models.keys())
 
@@ -52,9 +53,9 @@ class Session:
         """Register a callback invoked as `fn(model_id, patch)` for each emitted patch."""
         self._on_patch = fn
 
-    def flush(self) -> List[Tuple[int, dict]]:
+    def flush(self) -> list[tuple[int, dict]]:
         """Diff every dirty model against the core and emit the minimal patches. Returns them."""
-        emitted: List[Tuple[int, dict]] = []
+        emitted: list[tuple[int, dict]] = []
         for mid in sorted(self._dirty):
             patch_json = self._store.mutate(mid, json.dumps(to_value(self._models[mid])))
             if patch_json is None:
@@ -69,7 +70,7 @@ class Session:
         self._dirty.clear()
         return emitted
 
-    def update(self, mid: int) -> List[Tuple[int, dict]]:
+    def update(self, mid: int) -> list[tuple[int, dict]]:
         """Force a diff+emit for one hosted model and flush.
 
         Automatic emission needs bigbrother to observe the model; models without a ``__dict__``
@@ -79,7 +80,7 @@ class Session:
         self._dirty.add(mid)
         return self.flush()
 
-    def drain(self) -> List[Tuple[int, dict]]:
+    def drain(self) -> list[tuple[int, dict]]:
         """Flush, then return and clear the accumulated outbox."""
         self.flush()
         out, self.outbox = self.outbox, []
@@ -105,7 +106,7 @@ class Session:
         """
         return self._apply_authoritative(mid, patch)
 
-    def submit(self, mid: int, patch: dict) -> Optional[dict]:
+    def submit(self, mid: int, patch: dict) -> dict | None:
         """Apply a client-proposed patch *as the server*: the server owns `rev`.
 
         The proposal's ops are applied to the hosted value, the server's `rev` is bumped (not the
@@ -139,7 +140,7 @@ class Session:
         if len(log) > self._log_cap:
             del log[: len(log) - self._log_cap]
 
-    def since(self, mid: int, since_rev: int) -> Optional[List[dict]]:
+    def since(self, mid: int, since_rev: int) -> list[dict] | None:
         """Patches to advance a mirror from `since_rev` to current, or `None` if the log can't bridge the
         gap (the next needed patch was evicted) — then the caller should send a fresh snapshot instead."""
         cur = self.snapshot(mid)["rev"]  # flush pending changes (recording them) before reading the log
@@ -150,7 +151,7 @@ class Session:
             return None  # the next needed patch was evicted — gap, can't replay
         return [patch for rev, patch in log if rev > since_rev]
 
-    def _canonical(self, mid: int, current_value: dict, ops: list) -> Optional[dict]:
+    def _canonical(self, mid: int, current_value: dict, ops: list) -> dict | None:
         """The proposal applied to ``current_value`` and normalized through the hosted model — its canonical
         typed `Value` — or ``None`` if the core rejects the patch or the model rejects the value.
 
@@ -167,7 +168,7 @@ class Session:
             return candidate  # untyped mirror — nothing to canonicalize against
         try:
             return to_value(from_value(candidate, type(obj)))  # validate + coerce to the canonical typed value
-        except Exception:
+        except Exception:  # noqa: BLE001
             return None  # the result doesn't validate against the model (pydantic / msgspec / ...)
 
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
@@ -178,7 +179,7 @@ class Session:
             return False  # the core rejected a malformed patch (bad path/type/index)
         try:
             self._refresh_model(mid)
-        except Exception:
+        except Exception:  # noqa: BLE001
             return False  # never crash the host: a model that rejects the value (caught pre-commit by
             # `_validates`, but belt-and-suspenders for any caller that didn't pre-validate)
         return True
@@ -197,5 +198,5 @@ class Session:
         finally:
             self._suppress.discard(mid)
 
-    def schema(self, type_name: str) -> Optional[dict]:
+    def schema(self, type_name: str) -> dict | None:
         return self._schemas.get(type_name)

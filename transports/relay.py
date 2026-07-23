@@ -28,7 +28,7 @@ writer.
 import asyncio
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from . import protocol
 from .backplane import Backplane
@@ -47,9 +47,9 @@ class RelayBroadcaster:
         self.backplane = backplane
         self.default_codec = hub.default_codec
         self._id = os.urandom(8).hex()
-        self._task: Optional[asyncio.Task] = None
+        self._task: asyncio.Task | None = None
         self._catching_up = False
-        self._buffer: List[tuple] = []
+        self._buffer: list[tuple] = []
         self._caught: set = set()
 
     @property
@@ -146,10 +146,10 @@ class RelayBroadcaster:
         self._caught.add(sid)
 
     # --- broadcaster contract: delegate to the hub; recv also publishes shared writes to the cluster ---
-    def open(self, conn: Any, codec: Optional[str] = None, since: Optional[Dict[int, int]] = None) -> List[Wire]:
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
         return self.hub.open(conn, codec, since)
 
-    def recv(self, conn: Any, data: Wire) -> Dict[Any, List[Wire]]:
+    def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         out = self.hub.recv(conn, data)  # apply + fan to this worker's clients
         msg = protocol.decode(data, self.hub._codecs.get(conn))
         if msg.get("t") == "patch" and msg.get("id", 0) >= SHARED_ID_BASE:
@@ -171,7 +171,7 @@ class RelayBroadcaster:
         self.hub.apply_shared(sid, patch, origin="<host>")
         await self.backplane.publish(json.dumps({"t": "w", "sid": sid, "patch": patch, "origin": "<host>"}).encode())
 
-    def flush(self) -> Dict[Any, List[Wire]]:
+    def flush(self) -> dict[Any, list[Wire]]:
         return self.hub.flush()
 
     def close(self, conn: Any) -> None:
