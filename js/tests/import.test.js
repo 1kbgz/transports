@@ -248,6 +248,32 @@ test("Client.onChange fires for accepted changes only", async () => {
   expect(seen.length).toBe(2); // unsubscribed
 });
 
+test("Client.onReject surfaces a server rejection; the mirror is untouched", async () => {
+  const c = new Client();
+  const rejections = [];
+  const off = c.onReject((r) => rejections.push(r));
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 3,
+      value: { Map: { brightness: { Int: 60 } } },
+    }),
+  );
+  const result = c.recv(
+    JSON.stringify({ t: "reject", id: 1, rev: 3, error: "not an int" }),
+  );
+  expect(result).toBeUndefined(); // a reject is not a change
+  expect(rejections).toEqual([
+    { t: "reject", id: 1, rev: 3, error: "not an int" },
+  ]);
+  expect(c.value(1)).toEqual({ Map: { brightness: { Int: 60 } } });
+  off();
+  c.recv(JSON.stringify({ t: "reject", id: 1, rev: 3, error: "again" }));
+  expect(rejections.length).toBe(1); // unsubscribed
+});
+
 test("Client patch application matches the wasm core apply", async () => {
   // differential test: the mirror is maintained by the pure-TS applyPatch, not the fuzz-tested
   // core — pin the two implementations together across randomized diffs. Seeded PRNG (mulberry32)

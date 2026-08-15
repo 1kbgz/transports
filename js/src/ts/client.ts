@@ -27,6 +27,9 @@ type PatchMsg = {
   id: number;
   patch: ModelPatch;
 };
+/** The server refused a proposed edit; `rev` is its current revision and `error` says why (the
+ * model's validation message). Sent to the proposer only, after the authoritative revert. */
+export type RejectMsg = { t: "reject"; id: number; rev: number; error: string };
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
@@ -144,8 +147,21 @@ export class Client {
   private values = new Map<number, unknown>();
   private revs = new Map<number, number>();
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
+  private rejectListeners: Array<(reject: RejectMsg) => void> = [];
 
   constructor(private codec: string = "json") {}
+
+  /** Register a listener fired when the server refuses a proposed edit, with the decoded `reject`
+   * frame (model id, the server's current rev, and the validation error). The mirror itself reverts
+   * via the authoritative snapshot the server sends alongside. Returns an unsubscribe function.
+   */
+  onReject(listener: (reject: RejectMsg) => void): () => void {
+    this.rejectListeners.push(listener);
+    return () => {
+      const i = this.rejectListeners.indexOf(listener);
+      if (i >= 0) this.rejectListeners.splice(i, 1);
+    };
+  }
 
   /** Register a listener fired after each accepted snapshot or patch — the same `ReceiveChange`
    * `recv` returns — so `connect`/`run`/`connectSSE` consumers get path-level changes without
@@ -178,9 +194,9 @@ export class Client {
    */
   recv(data: string | Uint8Array): ReceiveChange | undefined {
     const custom = codecFor(this.codec);
-    let msg: SnapshotMsg | PatchMsg;
+    let msg: SnapshotMsg | PatchMsg | RejectMsg;
     if (custom) {
-      msg = custom.decode(data) as SnapshotMsg | PatchMsg;
+      msg = custom.decode(data) as SnapshotMsg | PatchMsg | RejectMsg;
     } else if (typeof data === "string") {
       msg = JSON.parse(data);
     } else {
@@ -204,9 +220,13 @@ export class Client {
       this.values.set(msg.id, applyPatch(current as Value, msg.patch));
       this.revs.set(msg.id, msg.patch.rev);
       return this.accepted(msg);
+    } else if (msg.t === "reject") {
+      // the mirror is untouched: the server reverts the proposer with the snapshot sent alongside
+      for (const listener of [...this.rejectListeners]) listener(msg);
+      return undefined;
     }
     // an unrecognized message type is ignored (not an error): the server may be newer than this
-    // client and send types it predates (e.g. a future reject or presence frame)
+    // client and send types it predates (e.g. a future presence frame)
     return undefined;
   }
 

@@ -118,16 +118,35 @@ A patch advances an existing mirror.
 Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.
 
-The JavaScript `Client.recv()` method returns `{t: "snapshot", id, rev}` for an accepted snapshot, the
-decoded patch message for an accepted patch, and `undefined` for an ignored revision or an
-unrecognized message type — unknown types are ignored, not errors, so a newer server can add message
-types without breaking older clients. Reactive adapters can consume the returned patch paths without
-reading and decoding the complete mirror, either from the `recv()` return value or via
-`Client.onChange(listener)`, which fires with the same accepted change under the managed
-`connect()`/`run()`/`connectSSE()` paths. The returned change and `Client.value()` share immutable
-branches with the mirror and must not be mutated. A patch before its snapshot, an unknown patch
-operation, or an invalid path throws; failed frames leave the mirror and its accepted revision
-unchanged.
+`Client.recv()` (Python and JavaScript alike) returns `{t: "snapshot", id, rev}` for an accepted
+snapshot, the decoded patch message for an accepted patch, and `None`/`undefined` for an ignored
+revision or an unrecognized message type — unknown types are ignored, not errors, so a newer server
+can add message types without breaking older clients. Reactive adapters can consume the returned
+patch paths without reading and decoding the complete mirror, either from the `recv()` return value
+or via `Client.on_change` / `Client.onChange`, which fires with the same accepted change under the
+managed connect/run/SSE paths. The returned change and `Client.value()` share immutable branches
+with the mirror and must not be mutated. A patch before its snapshot, an unknown patch operation, or
+an invalid path raises; failed frames leave the mirror and its accepted revision unchanged.
+
+### Reject
+
+The server refuses a proposed edit that fails validation — or a write to a shared model the tenant
+cannot write — by sending the proposer (and only the proposer) the authoritative revert followed by a
+typed reject saying why. `rev` is the server's current revision for the model, and `error` carries
+the model's validation message where available (e.g. pydantic's).
+
+```json
+{
+  "t": "reject",
+  "id": 1,
+  "rev": 4,
+  "error": "1 validation error for Device\nbrightness\n  Input should be a valid integer ..."
+}
+```
+
+A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
+`Client.on_reject` / `Client.onReject` so an app can show *why* the edit died instead of a silent
+revert.
 
 ## Model ids
 
