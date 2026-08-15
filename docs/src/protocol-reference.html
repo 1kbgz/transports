@@ -394,6 +394,12 @@ path.</p>
 </div>
 <p>Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.</p>
+<p>The JavaScript <code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> method returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted snapshot, the
+decoded patch message for an accepted patch, and <code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored revision. Reactive
+adapters can consume the returned patch paths without reading and decoding the complete mirror. The
+returned change and <code class="docutils literal notranslate"><span class="pre">Client.value()</span></code> share immutable branches with the mirror and must not be mutated.
+A patch before its snapshot, an unknown message or operation, or an invalid path throws; failed frames
+leave the mirror and its accepted revision unchanged.</p>
 </section>
 </section>
 <section id="model-ids">
