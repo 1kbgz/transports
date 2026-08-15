@@ -157,15 +157,17 @@ test("a registered custom codec drives a Client", async () => {
 
 test("Client mirrors a snapshot then a patch", async () => {
   const c = new Client();
-  c.recv(
-    JSON.stringify({
-      t: "snapshot",
-      id: 1,
-      type: "Device",
-      rev: 0,
-      value: { Map: { on: { Bool: false } } },
-    }),
-  );
+  expect(
+    c.recv(
+      JSON.stringify({
+        t: "snapshot",
+        id: 1,
+        type: "Device",
+        rev: 0,
+        value: { Map: { on: { Bool: false } } },
+      }),
+    ),
+  ).toEqual({ t: "snapshot", id: 1, rev: 0 });
   c.recv(
     JSON.stringify({
       t: "patch",
@@ -177,6 +179,158 @@ test("Client mirrors a snapshot then a patch", async () => {
     }),
   );
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
+});
+
+test("Client rejects unknown messages and patch operations", async () => {
+  const c = new Client();
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 0,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  expect(() => c.recv(JSON.stringify({ t: "other", id: 1 }))).toThrow(
+    /unknown message type/,
+  );
+  expect(() =>
+    c.recv(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: { rev: 1, ops: [{ Other: {} }] },
+      }),
+    ),
+  ).toThrow(/unknown patch op/);
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: false } } });
+});
+
+test("Client applies patches without rebuilding unchanged branches", async () => {
+  const c = new Client();
+  const snapshot = {
+    Map: {
+      profile: {
+        Map: { name: { Str: "old" }, obsolete: { Bool: true } },
+      },
+      rows: { List: [{ Int: 1 }, { Int: 2 }] },
+      untouched: { Map: { value: { Str: "same" } } },
+    },
+  };
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Model",
+      rev: 0,
+      value: snapshot,
+    }),
+  );
+  const before = c.value(1);
+  const unchanged = before.Map.untouched;
+  const change = c.recv(
+    JSON.stringify({
+      t: "patch",
+      id: 1,
+      patch: {
+        rev: 1,
+        ops: [
+          {
+            Set: {
+              path: [{ Key: "profile" }, { Key: "name" }],
+              value: { Str: "new" },
+            },
+          },
+          { Remove: { path: [{ Key: "profile" }, { Key: "obsolete" }] } },
+          {
+            Insert: {
+              path: [{ Key: "rows" }],
+              index: 1,
+              value: { Int: 5 },
+            },
+          },
+          { RemoveAt: { path: [{ Key: "rows" }], index: 0 } },
+        ],
+      },
+    }),
+  );
+
+  expect(change).toEqual({
+    t: "patch",
+    id: 1,
+    patch: expect.objectContaining({ rev: 1 }),
+  });
+  expect(c.value(1)).toEqual({
+    Map: {
+      profile: { Map: { name: { Str: "new" } } },
+      rows: { List: [{ Int: 5 }, { Int: 2 }] },
+      untouched: { Map: { value: { Str: "same" } } },
+    },
+  });
+  expect(c.value(1).Map.untouched).toBe(unchanged);
+  expect(c.value(1)).not.toBe(before);
+});
+
+test("Client rejects a malformed patch atomically", async () => {
+  const c = new Client();
+  const value = { Map: { rows: { List: [{ Int: 1 }] } } };
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Model",
+      rev: 0,
+      value,
+    }),
+  );
+  const before = c.value(1);
+
+  expect(() =>
+    c.recv(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: {
+          rev: 1,
+          ops: [
+            {
+              Set: {
+                path: [{ Key: "rows" }, { Index: 0 }],
+                value: { Int: 2 },
+              },
+            },
+            { RemoveAt: { path: [{ Key: "rows" }], index: 9 } },
+          ],
+        },
+      }),
+    ),
+  ).toThrow(/out of bounds/);
+  expect(c.value(1)).toBe(before);
+  expect(
+    c.recv(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: {
+          rev: 1,
+          ops: [
+            {
+              Set: {
+                path: [{ Key: "rows" }, { Index: 0 }],
+                value: { Int: 3 },
+              },
+            },
+          ],
+        },
+      }),
+    ),
+  ).toEqual({
+    t: "patch",
+    id: 1,
+    patch: expect.objectContaining({ rev: 1 }),
+  });
+  expect(c.value(1)).toEqual({ Map: { rows: { List: [{ Int: 3 }] } } });
 });
 
 test("Client.edit is send-only; mirror updates on the server echo", async () => {

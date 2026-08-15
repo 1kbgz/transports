@@ -1,12 +1,12 @@
 import { codecFor } from "./codecs";
 import {
-  apply,
   cborToJson,
   diff,
   jsonToCbor,
   jsonToMsgpack,
   msgpackToJson,
 } from "./index";
+import type { Value } from "./bridge";
 
 type SnapshotMsg = {
   t: "snapshot";
@@ -15,17 +15,130 @@ type SnapshotMsg = {
   rev: number;
   value: unknown;
 };
+export type PathSeg = { Key: string } | { Index: number };
+export type PatchOp =
+  | { Set: { path: PathSeg[]; value: Value } }
+  | { Remove: { path: PathSeg[] } }
+  | { Insert: { path: PathSeg[]; index: number; value: Value } }
+  | { RemoveAt: { path: PathSeg[]; index: number } };
+export type ModelPatch = { rev: number; ops: PatchOp[] };
 type PatchMsg = {
   t: "patch";
   id: number;
-  patch: { rev: number; ops: unknown[] };
+  patch: ModelPatch;
 };
+/** Frame metadata returned after the mirror accepts a snapshot or patch. */
+export type ReceiveChange =
+  | { t: "snapshot"; id: number; rev: number }
+  | PatchMsg;
+
+function mapValue(value: Value | undefined): Record<string, Value> {
+  if (
+    value &&
+    typeof value === "object" &&
+    "Map" in value &&
+    value.Map &&
+    typeof value.Map === "object" &&
+    !Array.isArray(value.Map)
+  )
+    return value.Map;
+  throw new Error("patch path expected a map");
+}
+
+function listValue(value: Value | undefined): Value[] {
+  if (
+    value &&
+    typeof value === "object" &&
+    "List" in value &&
+    Array.isArray(value.List)
+  )
+    return value.List;
+  throw new Error("patch path expected a list");
+}
+
+function updateAt(
+  value: Value | undefined,
+  path: PathSeg[],
+  update: (current: Value | undefined) => Value,
+): Value {
+  if (!path.length) return update(value);
+  const [segment, ...rest] = path;
+  if ("Key" in segment) {
+    const map = mapValue(value);
+    if (rest.length && !Object.prototype.hasOwnProperty.call(map, segment.Key))
+      throw new Error(
+        `patch path key ${JSON.stringify(segment.Key)} not found`,
+      );
+    return {
+      Map: {
+        ...map,
+        [segment.Key]: updateAt(map[segment.Key], rest, update),
+      },
+    };
+  }
+  const list = listValue(value);
+  if (segment.Index < 0 || segment.Index >= list.length)
+    throw new Error(
+      `patch path index ${segment.Index} out of bounds (len ${list.length})`,
+    );
+  const next = [...list];
+  next[segment.Index] = updateAt(next[segment.Index], rest, update);
+  return { List: next };
+}
+
+function applyOp(value: Value, op: PatchOp): Value {
+  if ("Set" in op) return updateAt(value, op.Set.path, () => op.Set.value);
+  if ("Remove" in op) {
+    const { path } = op.Remove;
+    const segment = path[path.length - 1];
+    if (!segment || !("Key" in segment))
+      throw new Error("remove path must end in a map key");
+    return updateAt(value, path.slice(0, -1), (container) => {
+      const map = { ...mapValue(container) };
+      delete map[segment.Key];
+      return { Map: map };
+    });
+  }
+  if ("Insert" in op) {
+    const { path, index, value: inserted } = op.Insert;
+    return updateAt(value, path, (container) => {
+      const list = listValue(container);
+      if (index < 0 || index > list.length)
+        throw new Error(
+          `insert index ${index} out of bounds (len ${list.length})`,
+        );
+      const next = [...list];
+      next.splice(index, 0, inserted);
+      return { List: next };
+    });
+  }
+  if ("RemoveAt" in op) {
+    const { path, index } = op.RemoveAt;
+    return updateAt(value, path, (container) => {
+      const list = listValue(container);
+      if (index < 0 || index >= list.length)
+        throw new Error(
+          `remove index ${index} out of bounds (len ${list.length})`,
+        );
+      const next = [...list];
+      next.splice(index, 1);
+      return { List: next };
+    });
+  }
+  throw new Error("unknown patch op");
+}
+
+function applyPatch(value: Value, patch: ModelPatch): Value {
+  let next = value;
+  for (const op of patch.ops) next = applyOp(next, op);
+  return next;
+}
 
 /** Mirrors a remote transports `Session` from connection messages.
  *
  * Inbound frames are decoded by type — text frames are JSON, binary frames are MessagePack — so a
- * client transparently mirrors a server regardless of the negotiated codec. Requires the wasm core
- * to be initialized before applying patches.
+ * client transparently mirrors a server regardless of the negotiated codec. Binary built-in codecs
+ * and edit generation require the wasm core to be initialized.
  */
 export class Client {
   private values = new Map<number, unknown>();
@@ -36,9 +149,12 @@ export class Client {
   /** Apply an inbound snapshot or patch frame to the mirror.
    *
    * Decodes by the client's codec: a registered custom codec, else built-in JSON (text) / msgpack
-   * (binary).
+   * (binary). Returns the accepted change so reactive adapters can update only its paths; returns
+   * `undefined` for a patch whose revision was already applied. The returned change and values from
+   * `value()` share immutable branches with the mirror; consumers must not mutate them. Invalid frames
+   * throw without changing the mirror or its accepted revision.
    */
-  recv(data: string | Uint8Array): void {
+  recv(data: string | Uint8Array): ReceiveChange | undefined {
     const custom = codecFor(this.codec);
     let msg: SnapshotMsg | PatchMsg;
     if (custom) {
@@ -54,18 +170,22 @@ export class Client {
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);
+      return { t: "snapshot", id: msg.id, rev: msg.rev };
     } else if (msg.t === "patch") {
       // rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. one
       // the opening snapshot already captured, which the server then also broadcasts).
       const seen = this.revs.get(msg.id);
-      if (seen !== undefined && msg.patch.rev <= seen) return;
-      const cur = JSON.stringify(this.values.get(msg.id));
-      this.values.set(
-        msg.id,
-        JSON.parse(apply(cur, JSON.stringify(msg.patch))),
-      );
+      if (seen !== undefined && msg.patch.rev <= seen) return undefined;
+      const current = this.values.get(msg.id);
+      if (current === undefined)
+        throw new Error(`patch received before snapshot for model ${msg.id}`);
+      this.values.set(msg.id, applyPatch(current as Value, msg.patch));
       this.revs.set(msg.id, msg.patch.rev);
+      return msg;
     }
+    throw new Error(
+      `unknown message type ${JSON.stringify((msg as { t?: unknown }).t)}`,
+    );
   }
 
   /** The current mirrored core `Value` of a model. */
@@ -152,7 +272,10 @@ export class Client {
           // rectify: once the server has (re)snapshotted a model, push our copy back to it
           for (const id of this.values.keys()) {
             if (!pushed.has(id) && pre.has(id)) {
-              ws.send(this.edit(id, pre.get(id)));
+              const frame = this.edit(id, pre.get(id));
+              ws.send(
+                typeof frame === "string" ? frame : new Uint8Array(frame),
+              );
               pushed.add(id);
             }
           }
