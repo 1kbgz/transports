@@ -118,6 +118,13 @@ A patch advances an existing mirror.
 Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.
 
+The JavaScript `Client.recv()` method returns `{t: "snapshot", id, rev}` for an accepted snapshot, the
+decoded patch message for an accepted patch, and `undefined` for an ignored revision. Reactive
+adapters can consume the returned patch paths without reading and decoding the complete mirror. The
+returned change and `Client.value()` share immutable branches with the mirror and must not be mutated.
+A patch before its snapshot, an unknown message or operation, or an invalid path throws; failed frames
+leave the mirror and its accepted revision unchanged.
+
 ## Model ids
 
 `Session` model ids start at `1` inside each store. Tenant-local ids in a `Hub` are isolated per
