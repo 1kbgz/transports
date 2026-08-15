@@ -119,11 +119,15 @@ Clients ignore patch messages whose revision is less than or equal to the revisi
 that model.
 
 The JavaScript `Client.recv()` method returns `{t: "snapshot", id, rev}` for an accepted snapshot, the
-decoded patch message for an accepted patch, and `undefined` for an ignored revision. Reactive
-adapters can consume the returned patch paths without reading and decoding the complete mirror. The
-returned change and `Client.value()` share immutable branches with the mirror and must not be mutated.
-A patch before its snapshot, an unknown message or operation, or an invalid path throws; failed frames
-leave the mirror and its accepted revision unchanged.
+decoded patch message for an accepted patch, and `undefined` for an ignored revision or an
+unrecognized message type — unknown types are ignored, not errors, so a newer server can add message
+types without breaking older clients. Reactive adapters can consume the returned patch paths without
+reading and decoding the complete mirror, either from the `recv()` return value or via
+`Client.onChange(listener)`, which fires with the same accepted change under the managed
+`connect()`/`run()`/`connectSSE()` paths. The returned change and `Client.value()` share immutable
+branches with the mirror and must not be mutated. A patch before its snapshot, an unknown patch
+operation, or an invalid path throws; failed frames leave the mirror and its accepted revision
+unchanged.
 
 ## Model ids
 

@@ -143,16 +143,38 @@ function applyPatch(value: Value, patch: ModelPatch): Value {
 export class Client {
   private values = new Map<number, unknown>();
   private revs = new Map<number, number>();
+  private changeListeners: Array<(change: ReceiveChange) => void> = [];
 
   constructor(private codec: string = "json") {}
+
+  /** Register a listener fired after each accepted snapshot or patch — the same `ReceiveChange`
+   * `recv` returns — so `connect`/`run`/`connectSSE` consumers get path-level changes without
+   * managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
+   * type). Returns an unsubscribe function. A listener exception propagates to the `recv` caller;
+   * the mirror has already updated by then.
+   */
+  onChange(listener: (change: ReceiveChange) => void): () => void {
+    this.changeListeners.push(listener);
+    return () => {
+      const i = this.changeListeners.indexOf(listener);
+      if (i >= 0) this.changeListeners.splice(i, 1);
+    };
+  }
+
+  private accepted(change: ReceiveChange): ReceiveChange {
+    for (const listener of [...this.changeListeners]) listener(change);
+    return change;
+  }
 
   /** Apply an inbound snapshot or patch frame to the mirror.
    *
    * Decodes by the client's codec: a registered custom codec, else built-in JSON (text) / msgpack
    * (binary). Returns the accepted change so reactive adapters can update only its paths; returns
-   * `undefined` for a patch whose revision was already applied. The returned change and values from
-   * `value()` share immutable branches with the mirror; consumers must not mutate them. Invalid frames
-   * throw without changing the mirror or its accepted revision.
+   * `undefined` for a patch whose revision was already applied, and for an unrecognized message
+   * type — ignored, not an error, so a newer server can add message types without breaking older
+   * clients. The returned change and values from `value()` share immutable branches with the
+   * mirror; consumers must not mutate them. Invalid frames throw without changing the mirror or its
+   * accepted revision.
    */
   recv(data: string | Uint8Array): ReceiveChange | undefined {
     const custom = codecFor(this.codec);
@@ -170,7 +192,7 @@ export class Client {
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);
-      return { t: "snapshot", id: msg.id, rev: msg.rev };
+      return this.accepted({ t: "snapshot", id: msg.id, rev: msg.rev });
     } else if (msg.t === "patch") {
       // rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. one
       // the opening snapshot already captured, which the server then also broadcasts).
@@ -181,11 +203,11 @@ export class Client {
         throw new Error(`patch received before snapshot for model ${msg.id}`);
       this.values.set(msg.id, applyPatch(current as Value, msg.patch));
       this.revs.set(msg.id, msg.patch.rev);
-      return msg;
+      return this.accepted(msg);
     }
-    throw new Error(
-      `unknown message type ${JSON.stringify((msg as { t?: unknown }).t)}`,
-    );
+    // an unrecognized message type is ignored (not an error): the server may be newer than this
+    // client and send types it predates (e.g. a future reject or presence frame)
+    return undefined;
   }
 
   /** The current mirrored core `Value` of a model. */
@@ -272,9 +294,10 @@ export class Client {
           // rectify: once the server has (re)snapshotted a model, push our copy back to it
           for (const id of this.values.keys()) {
             if (!pushed.has(id) && pre.has(id)) {
-              const frame = this.edit(id, pre.get(id));
+              // cast, not copy: wasm-bindgen types its output Uint8Array<ArrayBufferLike>, but it
+              // is always ArrayBuffer-backed, which is what WebSocket.send requires
               ws.send(
-                typeof frame === "string" ? frame : new Uint8Array(frame),
+                this.edit(id, pre.get(id)) as string | Uint8Array<ArrayBuffer>,
               );
               pushed.add(id);
             }
