@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="How to use codecs" href="codecs.html"><link rel="prev" title="How to bridge models and objects" href="bridges.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>How to connect live clients - transports v0.6.0</title>
+        <title>How to connect live clients - transports v0.7.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.6.0</code></div></a>
+      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.6.0</code></span>
+  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -392,8 +392,16 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 </section>
 <section id="use-anywidget-custom-messages">
 <h2>Use anywidget custom messages<a class="headerlink" href="#use-anywidget-custom-messages" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> uses an anywidget-style <code class="docutils literal notranslate"><span class="pre">send</span></code> / <code class="docutils literal notranslate"><span class="pre">on_msg</span></code> object. The frontend sends
-<code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> before snapshots are delivered.</p>
+<p>For the common case, <code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> is turnkey: it builds an <code class="docutils literal notranslate"><span class="pre">anywidget.AnyWidget</span></code>
+whose frontend ships inside the wheel — display it and every hosted model mirrors live, with
+<code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events and a wasm-free <code class="docutils literal notranslate"><span class="pre">el.transports.edit</span></code> for
+proposals. See <a class="reference internal" href="pyodide.html"><span class="std std-doc">Pyodide</span></a> for details.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">w</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">widget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>   <span class="c1"># pip install anywidget</span>
+<span class="n">w</span>                               <span class="c1"># display; then mutate models + transports.sync(server)</span>
+</pre></div>
+</div>
+<p>For a custom frontend, <code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> wires any anywidget-style <code class="docutils literal notranslate"><span class="pre">send</span></code> / <code class="docutils literal notranslate"><span class="pre">on_msg</span></code> object — you
+supply the <code class="docutils literal notranslate"><span class="pre">_esm</span></code>. The frontend sends <code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> before snapshots are delivered.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conn</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">widget</span><span class="p">)</span>
 
 <span class="c1"># after mutating hosted models</span>
@@ -499,7 +507,7 @@ frames to that connection and can still serve JSON clients at the same time.</p>
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="../../_static/documentation_options.js?v=fe7df9b0"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

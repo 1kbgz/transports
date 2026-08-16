@@ -5,7 +5,7 @@
     <meta name="color-scheme" content="light dark"><link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>transports.client - transports v0.6.0</title>
+        <title>transports.client - transports v0.7.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -166,7 +166,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.6.0</code></div></a>
+      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -187,7 +187,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.6.0</code></span>
+  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -246,6 +246,7 @@
 <span class="sd">network).</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
+<span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">urllib.parse</span>
@@ -399,11 +400,44 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
 
-    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;`run` over the browser&#39;s native `WebSocket` (the Pyodide path): reconnect forever with</span>
+<span class="sd">        ``?since=`` resume, same ``authority`` semantics as the native loop.&quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;client&quot;</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
+
+            <span class="k">def</span><span class="w"> </span><span class="nf">_rectify</span><span class="p">(</span><span class="n">ws</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pre</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">pre</span><span class="p">,</span> <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="n">pushed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">pre</span><span class="p">:</span>  <span class="c1"># server-authoritative (or nothing mirrored before the drop)</span>
+                    <span class="k">return</span>
+                <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">):</span>
+                    <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pushed</span> <span class="ow">and</span> <span class="n">mid</span> <span class="ow">in</span> <span class="n">pre</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_send_browser</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">pre</span><span class="p">[</span><span class="n">mid</span><span class="p">]))</span>
+                        <span class="n">pushed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+
+            <span class="c1"># construction/FFI errors fall through to the retry, like the native loop&#39;s dropped socket</span>
+            <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+                <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_browser</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">on_frame</span><span class="o">=</span><span class="n">_rectify</span><span class="p">)</span>
+            <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry</span><span class="p">)</span>
+
+    <span class="nd">@staticmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_send_browser</span><span class="p">(</span><span class="n">ws</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Send a frame over a browser `WebSocket`: text as-is, binary converted for the FFI.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">to_js</span>
+
+            <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">to_js</span><span class="p">(</span><span class="n">frame</span><span class="p">))</span>
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">on_frame</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror over the browser&#39;s native `WebSocket` (the Pyodide path) until it closes.</span>
 
-<span class="sd">        Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is testable with fake</span>
-<span class="sd">        modules injected into ``sys.modules`` off-browser.&quot;&quot;&quot;</span>
+<span class="sd">        ``on_frame(ws)`` fires after each applied frame — `_run_browser` uses it to rectify under</span>
+<span class="sd">        client authority. Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is</span>
+<span class="sd">        testable with fake modules injected into ``sys.modules`` off-browser.&quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
         <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_proxy</span>
@@ -418,6 +452,8 @@
             <span class="n">data</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span>
             <span class="c1"># a text frame arrives as str; a binary frame as an ArrayBuffer proxy -&gt; bytes</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">data</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()))</span>
+            <span class="k">if</span> <span class="n">on_frame</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">on_frame</span><span class="p">(</span><span class="n">ws</span><span class="p">)</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">_on_close</span><span class="p">(</span><span class="n">_event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">if</span> <span class="ow">not</span> <span class="n">closed</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
@@ -445,14 +481,19 @@
 <span class="sd">          With a CRDT model the push merges (newer stamps win); otherwise it overwrites.</span>
 
 <span class="sd">        Runs until cancelled. The choice of *where the authoritative state lives* is yours — pair this</span>
-<span class="sd">        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs.</span>
+<span class="sd">        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs. Under</span>
+<span class="sd">        Pyodide this rides the browser&#39;s native ``WebSocket`` (like `connect`), same semantics.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
-        <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
-
         <span class="k">if</span> <span class="n">authority</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="s2">&quot;client&quot;</span><span class="p">):</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;authority must be &#39;server&#39; or &#39;client&#39;, not </span><span class="si">{</span><span class="n">authority</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_browser</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">authority</span><span class="o">=</span><span class="n">authority</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">retry</span><span class="p">)</span>
+            <span class="k">return</span>
+
+        <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
+
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
             <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;client&quot;</span> <span class="k">else</span> <span class="kc">None</span>
             <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
@@ -550,7 +591,7 @@
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=8fa8b3e9"></script>
+</div><script src="../../_static/documentation_options.js?v=fe7df9b0"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
