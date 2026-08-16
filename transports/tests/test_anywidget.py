@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from pydantic import BaseModel
 
 import transports
@@ -68,3 +69,22 @@ def test_inbound_edit_is_relayed_back_authoritatively():
     widget.fire({"wire": json.dumps({"t": "patch", "id": mid, "patch": proposal})})
     assert _wires(widget)[-1]["t"] == "patch"
     assert model.x == 9  # the hosted model was refreshed from the authoritative apply
+
+
+def test_widget_factory_builds_a_served_anywidget():
+    """`transports.widget(server)` returns a real anywidget wired to the server: its frontend module
+    ships inside the wheel, and the frontend's ready handshake triggers the opening snapshots."""
+    anywidget = pytest.importorskip("anywidget")
+
+    session = transports.Session()
+    mid = session.host(Model())
+    server = transports.Server(session)
+    w = transports.widget(server)
+    assert isinstance(w, anywidget.AnyWidget)
+    assert "msg:custom" in w._esm  # anywidget inlined the frontend module from inside the wheel
+
+    sends = []
+    w.send = sends.append  # capture outbound custom messages without a live comm
+    w._msg_callbacks(w, {"ready": True}, None)  # what the frontend sends once a view listens
+    assert json.loads(sends[0]["wire"])["t"] == "snapshot"
+    assert json.loads(sends[0]["wire"])["id"] == mid

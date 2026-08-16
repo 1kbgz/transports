@@ -38,6 +38,29 @@ class _WidgetConn:
         self.widget.send({"wire": wire})
 
 
+def widget(server: Broadcaster) -> Any:
+    """A turnkey anywidget serving ``server``: display it and every hosted model mirrors live.
+
+    Builds an ``anywidget.AnyWidget`` whose frontend (shipped inside the wheel at
+    ``transports/extension/cdn/widget.js``) opens the wire, renders a live view of each mirrored
+    model, bubbles ``transports-change`` / ``transports-reject`` DOM events, and exposes
+    ``el.transports = {client, edit}`` for custom frontends. Mirroring and edits are pure TS — the
+    frontend never fetches wasm. Push kernel-side changes with ``transports.sync(server)``.
+
+    Lazy-imports ``anywidget`` (``pip install anywidget``); works under Jupyter and JupyterLite.
+    """
+    import pathlib
+
+    import anywidget as _anywidget
+
+    class TransportsWidget(_anywidget.AnyWidget):
+        _esm = pathlib.Path(__file__).parent / "extension" / "cdn" / "widget.js"
+
+    instance = TransportsWidget()
+    serve_anywidget(server, instance)
+    return instance
+
+
 def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json") -> _WidgetConn:
     """Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.
 

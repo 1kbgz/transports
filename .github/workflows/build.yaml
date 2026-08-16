@@ -96,7 +96,7 @@ jobs:
         if: matrix.target == 'native'
 
       - name: Build and test Pyodide wheel
-        run: make test-pyodide test-pyodide-browser
+        run: make test-pyodide test-pyodide-browser test-jupyterlite
         if: matrix.target == 'pyodide'
 
       - name: Upload test results (Python)

@@ -54,6 +54,7 @@ jupyter = [
     "comm",
 ]
 develop = [
+    "anywidget",
     "build",
     "bump-my-version",
     "check-dist",
@@ -187,6 +188,7 @@ build_cmd = "build"
 tool = "pnpm"
 targets = [
     "transports/extension/cdn/index.js",
+    "transports/extension/cdn/widget.js",
 ]
 
 [tool.hatch.build.hooks.hatch-rs]

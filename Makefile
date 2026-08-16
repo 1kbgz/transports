@@ -141,6 +141,15 @@ test-pyodide:  ## build and test the Python package in Pyodide
 test-pyodide-browser:  ## test the Pyodide wheel in a browser
 	test -n "$(firstword $(wildcard dist/pyodide/*.whl))"
 	cd js; TRANSPORTS_PYODIDE_WHEEL="/$(firstword $(wildcard dist/pyodide/*.whl))" pnpm exec playwright test tests/pyodide.test.js
+
+.PHONY: jupyterlite test-jupyterlite
+jupyterlite:  ## build the JupyterLite demo site into dist/lite (needs the Pyodide wheel)
+	test -n "$(firstword $(wildcard dist/pyodide/*.whl))"
+	mkdir -p examples/lite/pypi
+	cp dist/pyodide/*.whl examples/lite/pypi/
+	uvx --with jupyterlite-pyodide-kernel --with jupyter-server --from jupyterlite-core jupyter lite build --lite-dir examples/lite --output-dir $(CURDIR)/dist/lite
+test-jupyterlite: jupyterlite  ## drive the JupyterLite demo in a browser
+	cd js; pnpm exec playwright test tests/jupyterlite.test.js
 coverage: coverage-py coverage-js coverage-rs  ## run all tests and collect test coverage
 
 # alias
