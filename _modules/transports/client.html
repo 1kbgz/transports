@@ -389,7 +389,7 @@
 <span class="sd">        Under Pyodide (``sys.platform == &quot;emscripten&quot;``) the browser gives Python no raw sockets, so</span>
 <span class="sd">        this rides the browser&#39;s native ``WebSocket`` through the ``js`` FFI instead of the</span>
 <span class="sd">        ``websockets`` library — same API, same wire.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
             <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
@@ -479,7 +479,7 @@
 <span class="sd">        `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides</span>
 <span class="sd">        the browser&#39;s native ``EventSource`` (no raw sockets for `httpx`).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_sse_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
             <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
