@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Concepts" href="concepts.html"><link rel="prev" title="transports" href="../../index.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Wire protocol reference" href="protocol-reference.html"><link rel="prev" title="How to isolate tenants and share models" href="multitenancy.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Quickstart - transports v0.6.0</title>
+        <title>How to run transports in a browser with Pyodide - transports v0.6.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -197,13 +197,13 @@
 </form>
 <div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
   <ul class="current">
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Quickstart</a></li>
+<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
 <li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
-<li class="toctree-l1"><a class="reference internal" href="pyodide.html">How to run transports in a browser with Pyodide</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to run transports in a browser with Pyodide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
@@ -226,7 +226,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../../_sources/docs/src/quickstart.md.txt" title="View this page">
+  <a class="muted-link" href="../../_sources/docs/src/pyodide.md.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -244,97 +244,93 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="quickstart">
-<h1>Quickstart<a class="headerlink" href="#quickstart" title="Link to this heading">¶</a></h1>
-<p>In this tutorial, we will host one Python model, mirror it with a <code class="docutils literal notranslate"><span class="pre">Client</span></code>, send one server-side
-change, and send one client proposal back to the server.</p>
-<section id="install">
-<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
+          <section class="tex2jax_ignore mathjax_ignore" id="how-to-run-transports-in-a-browser-with-pyodide">
+<h1>How to run transports in a browser with Pyodide<a class="headerlink" href="#how-to-run-transports-in-a-browser-with-pyodide" title="Link to this heading">¶</a></h1>
+<p>This guide shows you how to build the Pyodide wheel and load it in a browser.</p>
+<section id="build-the-wheel">
+<h2>Build the wheel<a class="headerlink" href="#build-the-wheel" title="Link to this heading">¶</a></h2>
+<p>Build and test the Python 3.14 Pyodide wheel:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>test-pyodide
 </pre></div>
 </div>
+<p>The wheel is written to <code class="docutils literal notranslate"><span class="pre">dist/pyodide/</span></code>.</p>
 </section>
-<section id="create-a-model">
-<h2>Create a model<a class="headerlink" href="#create-a-model" title="Link to this heading">¶</a></h2>
-<p>Create a file or Python session with this model:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<section id="open-the-example">
+<h2>Open the example<a class="headerlink" href="#open-the-example" title="Link to this heading">¶</a></h2>
+<p>Serve the repository root:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>http.server<span class="w"> </span><span class="m">8000</span>
+</pre></div>
+</div>
+<p>Open the example with the wheel URL in its query string, replacing <code class="docutils literal notranslate"><span class="pre">&lt;wheel&gt;</span></code> with the filename in
+<code class="docutils literal notranslate"><span class="pre">dist/pyodide/</span></code>:</p>
+<div class="highlight-text notranslate"><div class="highlight"><pre><span></span>http://127.0.0.1:8000/examples/pyodide.html?wheel=/dist/pyodide/&lt;wheel&gt;
+</pre></div>
+</div>
+<p>The page loads Pyodide 314.0.4, installs the local wheel and its dependencies, then creates a Python
+server and client mirror. Use <strong>Toggle on server</strong> to stream a server patch and <strong>Rename from client</strong>
+to send a client proposal through the authoritative server.</p>
+</section>
+<section id="connect-to-a-live-server">
+<h2>Connect to a live server<a class="headerlink" href="#connect-to-a-live-server" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Client.connect</span></code> and <code class="docutils literal notranslate"><span class="pre">Client.connect_sse</span></code> detect Pyodide (<code class="docutils literal notranslate"><span class="pre">sys.platform</span> <span class="pre">==</span> <span class="pre">&quot;emscripten&quot;</span></code>) and ride
+the browser’s native <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code> / <code class="docutils literal notranslate"><span class="pre">EventSource</span></code> through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI — the <code class="docutils literal notranslate"><span class="pre">websockets</span></code> and <code class="docutils literal notranslate"><span class="pre">httpx</span></code>
+libraries need raw sockets, which the browser does not give Python. The API is unchanged:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
-<span class="k">class</span><span class="w"> </span><span class="nc">Device</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+<span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">&quot;msgpack&quot;</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;wss://example.com/ws&quot;</span><span class="p">)</span>  <span class="c1"># the browser&#39;s WebSocket under Pyodide</span>
 </pre></div>
 </div>
+<p>Snapshots and patches update the mirror as they arrive; register <code class="docutils literal notranslate"><span class="pre">client.on_change</span></code> /
+<code class="docutils literal notranslate"><span class="pre">client.on_reject</span></code> to react. Reconnect-with-resume (<code class="docutils literal notranslate"><span class="pre">Client.run</span></code>) is not wired to the browser path
+yet.</p>
 </section>
-<section id="host-it">
-<h2>Host it<a class="headerlink" href="#host-it" title="Link to this heading">¶</a></h2>
-<p>Host the model in a <code class="docutils literal notranslate"><span class="pre">Session</span></code>. The returned id names this model on the wire.</p>
+<section id="run-the-browser-test">
+<h2>Run the browser test<a class="headerlink" href="#run-the-browser-test" title="Link to this heading">¶</a></h2>
+<p>Install the JavaScript test dependencies once, then run the focused Playwright test:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>develop-js
+make<span class="w"> </span>test-pyodide-browser
+</pre></div>
+</div>
+<p>The browser test uses the wheel already present in <code class="docutils literal notranslate"><span class="pre">dist/pyodide/</span></code>. Run <code class="docutils literal notranslate"><span class="pre">make</span> <span class="pre">test-pyodide</span></code> first
+after changing Python or Rust code.</p>
+</section>
+<section id="use-the-jupyter-widget">
+<h2>Use the Jupyter widget<a class="headerlink" href="#use-the-jupyter-widget" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds a turnkey <a class="reference external" href="https://anywidget.dev">anywidget</a>: display it and every
+hosted model mirrors live in the notebook frontend, updating on each <code class="docutils literal notranslate"><span class="pre">transports.sync(server)</span></code>. The
+frontend ships inside the wheel (<code class="docutils literal notranslate"><span class="pre">transports/extension/cdn/widget.js</span></code>) — mirroring and edits are pure
+TypeScript, so it never fetches wasm. Custom frontends hook the bubbled <code class="docutils literal notranslate"><span class="pre">transports-change</span></code> /
+<code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events or use <code class="docutils literal notranslate"><span class="pre">el.transports</span> <span class="pre">=</span> <span class="pre">{client,</span> <span class="pre">edit}</span></code> —
+<code class="docutils literal notranslate"><span class="pre">el.transports.edit(id,</span> <span class="pre">[&quot;brightness&quot;],</span> <span class="pre">75)</span></code> sends a wasm-free server-authoritative proposal, and a
+value the model rejects surfaces inline through the <code class="docutils literal notranslate"><span class="pre">reject</span></code> frame.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
-<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-<span class="c1"># 1</span>
-</pre></div>
-</div>
-<p>Mutate the model and drain the session:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
-<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]})]</span>
-</pre></div>
-</div>
-<p>Notice that only <code class="docutils literal notranslate"><span class="pre">on</span></code> is present in the patch.</p>
-</section>
-<section id="mirror-it-with-a-client">
-<h2>Mirror it with a client<a class="headerlink" href="#mirror-it-with-a-client" title="Link to this heading">¶</a></h2>
-<p>Create an in-process server and client. This uses the same messages as a real WebSocket connection,
-but no network is needed for the tutorial.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
-<span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-
-<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;browser&quot;</span><span class="p">):</span>
-    <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;lamp&#39; on=True</span>
+<span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+<span class="n">w</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">widget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>   <span class="c1"># pip install anywidget</span>
+<span class="n">w</span>                               <span class="c1"># display; then mutate models + transports.sync(server)</span>
 </pre></div>
 </div>
 </section>
-<section id="send-another-server-side-change">
-<h2>Send another server-side change<a class="headerlink" href="#send-another-server-side-change" title="Link to this heading">¶</a></h2>
-<p>Mutate the hosted model again, flush the server, and feed the outbound frame to the client.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;desk lamp&quot;</span>
-
-<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()[</span><span class="s2">&quot;browser&quot;</span><span class="p">]:</span>
-    <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;desk lamp&#39; on=True</span>
+<section id="run-it-all-in-jupyterlite">
+<h2>Run it all in JupyterLite<a class="headerlink" href="#run-it-all-in-jupyterlite" title="Link to this heading">¶</a></h2>
+<p>Both ends WebAssembly: the Pyodide kernel hosts the <code class="docutils literal notranslate"><span class="pre">Session</span></code>, the widget frontend mirrors it —
+no server, no sockets.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>jupyterlite<span class="w">        </span><span class="c1"># builds the site into dist/lite (wheel + demo notebook included)</span>
+make<span class="w"> </span>test-jupyterlite<span class="w">   </span><span class="c1"># or: drive the site&#39;s REPL in Chromium end-to-end</span>
 </pre></div>
 </div>
+<p>Serve <code class="docutils literal notranslate"><span class="pre">dist/lite</span></code> from any static host and open <code class="docutils literal notranslate"><span class="pre">lab/index.html</span></code> → <code class="docutils literal notranslate"><span class="pre">transports-demo.ipynb</span></code>. The
+transports wheel installs from the site’s own wheel index (<code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code>); <code class="docutils literal notranslate"><span class="pre">anywidget</span></code>
+comes from PyPI.</p>
 </section>
-<section id="send-a-client-proposal">
-<h2>Send a client proposal<a class="headerlink" href="#send-a-client-proposal" title="Link to this heading">¶</a></h2>
-<p>A client edit is a proposal. The server applies it, assigns the revision, and echoes the
-accepted patch back.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">next_value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;desk lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
-<span class="n">proposal</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">next_value</span><span class="p">)</span>
-
-<span class="k">for</span> <span class="n">_conn</span><span class="p">,</span> <span class="n">frames</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="s2">&quot;browser&quot;</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
-    <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">frames</span><span class="p">:</span>
-        <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
-
-<span class="nb">print</span><span class="p">(</span><span class="n">lamp</span><span class="o">.</span><span class="n">on</span><span class="p">)</span>
-<span class="c1"># False</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;desk lamp&#39; on=False</span>
-</pre></div>
-</div>
-<p>You have now hosted a model, mirrored it, streamed a patch, and sent a client edit through the same
-server-authoritative path used by live connections.</p>
-<p>Next: use <a class="reference internal" href="bridges.html"><span class="std std-doc">model bridges</span></a> for dataclasses and msgspec, or <a class="reference internal" href="connections.html"><span class="std std-doc">connections</span></a>
-for WebSocket, SSE, Jupyter comm, and anywidget adapters.</p>
+<section id="deploy-the-example">
+<h2>Deploy the example<a class="headerlink" href="#deploy-the-example" title="Link to this heading">¶</a></h2>
+<p>Host the wheel on the same origin as the page and pass its URL through <code class="docutils literal notranslate"><span class="pre">?wheel=</span></code>. After a release
+publishes a compatible Pyodide wheel to PyPI, omit the query parameter to install <code class="docutils literal notranslate"><span class="pre">transports</span></code>
+directly from PyPI.</p>
 </section>
 </section>
 
@@ -343,23 +339,23 @@ for WebSocket, SSE, Jupyter comm, and anywidget adapters.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="concepts.html">
+          <a class="next-page" href="protocol-reference.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">Concepts</div>
+                <div class="title">Wire protocol reference</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="../../index.html">
+          <a class="prev-page" href="multitenancy.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">Home</div>
+                <div class="title">How to isolate tenants and share models</div>
                 
               </div>
             </a>
@@ -393,13 +389,14 @@ for WebSocket, SSE, Jupyter comm, and anywidget adapters.</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">Quickstart</a><ul>
-<li><a class="reference internal" href="#install">Install</a></li>
-<li><a class="reference internal" href="#create-a-model">Create a model</a></li>
-<li><a class="reference internal" href="#host-it">Host it</a></li>
-<li><a class="reference internal" href="#mirror-it-with-a-client">Mirror it with a client</a></li>
-<li><a class="reference internal" href="#send-another-server-side-change">Send another server-side change</a></li>
-<li><a class="reference internal" href="#send-a-client-proposal">Send a client proposal</a></li>
+<li><a class="reference internal" href="#">How to run transports in a browser with Pyodide</a><ul>
+<li><a class="reference internal" href="#build-the-wheel">Build the wheel</a></li>
+<li><a class="reference internal" href="#open-the-example">Open the example</a></li>
+<li><a class="reference internal" href="#connect-to-a-live-server">Connect to a live server</a></li>
+<li><a class="reference internal" href="#run-the-browser-test">Run the browser test</a></li>
+<li><a class="reference internal" href="#use-the-jupyter-widget">Use the Jupyter widget</a></li>
+<li><a class="reference internal" href="#run-it-all-in-jupyterlite">Run it all in JupyterLite</a></li>
+<li><a class="reference internal" href="#deploy-the-example">Deploy the example</a></li>
 </ul>
 </li>
 </ul>

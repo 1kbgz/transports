@@ -202,6 +202,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/connections.html">How to connect live clients</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/multitenancy.html">How to isolate tenants and share models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/pyodide.html">How to run transports in a browser with Pyodide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/api.html">API Reference</a></li>
 </ul>
@@ -275,6 +276,29 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">widget</span><span class="o">.</span><span class="n">send</span><span class="p">({</span><span class="s2">&quot;wire&quot;</span><span class="p">:</span> <span class="n">wire</span><span class="p">})</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">widget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;A turnkey anywidget serving ``server``: display it and every hosted model mirrors live.</span>
+
+<span class="sd">    Builds an ``anywidget.AnyWidget`` whose frontend (shipped inside the wheel at</span>
+<span class="sd">    ``transports/extension/cdn/widget.js``) opens the wire, renders a live view of each mirrored</span>
+<span class="sd">    model, bubbles ``transports-change`` / ``transports-reject`` DOM events, and exposes</span>
+<span class="sd">    ``el.transports = {client, edit}`` for custom frontends. Mirroring and edits are pure TS — the</span>
+<span class="sd">    frontend never fetches wasm. Push kernel-side changes with ``transports.sync(server)``.</span>
+
+<span class="sd">    Lazy-imports ``anywidget`` (``pip install anywidget``); works under Jupyter and JupyterLite.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
+
+    <span class="kn">import</span><span class="w"> </span><span class="nn">anywidget</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_anywidget</span>
+
+    <span class="k">class</span><span class="w"> </span><span class="nc">TransportsWidget</span><span class="p">(</span><span class="n">_anywidget</span><span class="o">.</span><span class="n">AnyWidget</span><span class="p">):</span>
+        <span class="n">_esm</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;extension&quot;</span> <span class="o">/</span> <span class="s2">&quot;cdn&quot;</span> <span class="o">/</span> <span class="s2">&quot;widget.js&quot;</span>
+
+    <span class="n">instance</span> <span class="o">=</span> <span class="n">TransportsWidget</span><span class="p">()</span>
+    <span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">instance</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">instance</span>
 
 
 <div class="viewcode-block" id="serve_anywidget">

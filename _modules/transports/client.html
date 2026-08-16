@@ -202,6 +202,7 @@
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/connections.html">How to connect live clients</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/multitenancy.html">How to isolate tenants and share models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../docs/src/pyodide.html">How to run transports in a browser with Pyodide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../../docs/src/api.html">API Reference</a></li>
 </ul>
@@ -246,6 +247,7 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">urllib.parse</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
@@ -382,13 +384,53 @@
 <div class="viewcode-block" id="Client.connect">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes (one connection).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes (one connection).</span>
+
+<span class="sd">        Under Pyodide (``sys.platform == &quot;emscripten&quot;``) the browser gives Python no raw sockets, so</span>
+<span class="sd">        this rides the browser&#39;s native ``WebSocket`` through the ``js`` FFI instead of the</span>
+<span class="sd">        ``websockets`` library — same API, same wire.&quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
 
         <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
             <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror over the browser&#39;s native `WebSocket` (the Pyodide path) until it closes.</span>
+
+<span class="sd">        Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is testable with fake</span>
+<span class="sd">        modules injected into ``sys.modules`` off-browser.&quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_proxy</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">js</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocket</span>  <span class="c1"># the browser global via the Pyodide FFI</span>
+
+        <span class="n">ws</span> <span class="o">=</span> <span class="n">WebSocket</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
+        <span class="n">ws</span><span class="o">.</span><span class="n">binaryType</span> <span class="o">=</span> <span class="s2">&quot;arraybuffer&quot;</span>
+        <span class="n">closed</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Future</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span><span class="o">.</span><span class="n">create_future</span><span class="p">()</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_on_message</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">data</span> <span class="o">=</span> <span class="n">event</span><span class="o">.</span><span class="n">data</span>
+            <span class="c1"># a text frame arrives as str; a binary frame as an ArrayBuffer proxy -&gt; bytes</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">data</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">to_bytes</span><span class="p">()))</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_on_close</span><span class="p">(</span><span class="n">_event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">closed</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                <span class="n">closed</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">proxies</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">&quot;message&quot;</span><span class="p">,</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
+            <span class="n">ws</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">proxy</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">closed</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="n">proxies</span><span class="p">:</span>
+                <span class="n">proxy</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
 
 <div class="viewcode-block" id="Client.run">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.run">[docs]</a>
@@ -434,15 +476,47 @@
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</span>
 
 <span class="sd">        SSE is a one-way server→client channel, so this only receives snapshots and patches; use</span>
-<span class="sd">        `connect()` (WebSocket) when the client also needs to send edits.</span>
+<span class="sd">        `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides</span>
+<span class="sd">        the browser&#39;s native ``EventSource`` (no raw sockets for `httpx`).</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>
+            <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_sse_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+            <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">httpx_sse</span><span class="w"> </span><span class="kn">import</span> <span class="n">aconnect_sse</span>
 
         <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">http</span><span class="p">,</span> <span class="n">aconnect_sse</span><span class="p">(</span><span class="n">http</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
             <span class="k">async</span> <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">aiter_sse</span><span class="p">():</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">)</span></div>
-</div>
+
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_sse_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror over the browser&#39;s native `EventSource` (the Pyodide path) until it errors/closes.&quot;&quot;&quot;</span>
+        <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_proxy</span>
+
+        <span class="kn">from</span><span class="w"> </span><span class="nn">js</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSource</span>  <span class="c1"># the browser global via the Pyodide FFI</span>
+
+        <span class="n">source</span> <span class="o">=</span> <span class="n">EventSource</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
+        <span class="n">closed</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Future</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span><span class="o">.</span><span class="n">create_future</span><span class="p">()</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_on_message</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>  <span class="c1"># SSE is text-only</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">_on_error</span><span class="p">(</span><span class="n">_event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">closed</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
+                <span class="n">closed</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+
+        <span class="n">on_message</span><span class="p">,</span> <span class="n">on_error</span> <span class="o">=</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_error</span><span class="p">)</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">,</span> <span class="n">on_message</span><span class="p">)</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="n">on_error</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">await</span> <span class="n">closed</span>
+        <span class="k">finally</span><span class="p">:</span>
+            <span class="n">source</span><span class="o">.</span><span class="n">close</span><span class="p">()</span>
+            <span class="n">on_message</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
+            <span class="n">on_error</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span></div>
 
 </pre></div>
         </article>

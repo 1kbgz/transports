@@ -203,6 +203,7 @@
 <li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
 <li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
+<li class="toctree-l1"><a class="reference internal" href="pyodide.html">How to run transports in a browser with Pyodide</a></li>
 <li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
 </ul>
@@ -479,6 +480,9 @@ keeps <cite>rev</cite> owned by the server and avoids client/server <cite>rev</c
 <dt class="sig sig-object py" id="transports.Client.connect">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect" title="Link to this definition">¶</a></dt>
 <dd><p>Connect to a transports server and mirror it until the connection closes (one connection).</p>
+<p>Under Pyodide (<code class="docutils literal notranslate"><span class="pre">sys.platform</span> <span class="pre">==</span> <span class="pre">&quot;emscripten&quot;</span></code>) the browser gives Python no raw sockets, so
+this rides the browser’s native <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code> through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI instead of the
+<code class="docutils literal notranslate"><span class="pre">websockets</span></code> library — same API, same wire.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -502,7 +506,8 @@ with the server-side durability hooks (<cite>Hub.on_shared_write</cite>) as your
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect_sse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">url</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect_sse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect_sse" title="Link to this definition">¶</a></dt>
 <dd><p>Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</p>
 <p>SSE is a one-way server→client channel, so this only receives snapshots and patches; use
-<cite>connect()</cite> (WebSocket) when the client also needs to send edits.</p>
+<cite>connect()</cite> (WebSocket) when the client also needs to send edits. Under Pyodide this rides
+the browser’s native <code class="docutils literal notranslate"><span class="pre">EventSource</span></code> (no raw sockets for <cite>httpx</cite>).</p>
 </dd></dl>
 
 </dd></dl>
