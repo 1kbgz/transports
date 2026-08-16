@@ -6,6 +6,7 @@ client loop for live use; the rest of the class is sync and transport-agnostic (
 network).
 """
 
+import contextlib
 import json
 import sys
 import urllib.parse
@@ -133,11 +134,44 @@ class Client:
             async for frame in ws:
                 self.recv(frame)
 
-    async def _connect_browser(self, url: str) -> None:
+    async def _run_browser(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
+        """`run` over the browser's native `WebSocket` (the Pyodide path): reconnect forever with
+        ``?since=`` resume, same ``authority`` semantics as the native loop."""
+        import asyncio
+
+        while True:
+            pre = dict(self._values) if authority == "client" else None
+            pushed: set = set()
+
+            def _rectify(ws: Any, pre: dict | None = pre, pushed: set = pushed) -> None:
+                if not pre:  # server-authoritative (or nothing mirrored before the drop)
+                    return
+                for mid in list(self._values):
+                    if mid not in pushed and mid in pre:
+                        self._send_browser(ws, self.edit(mid, pre[mid]))
+                        pushed.add(mid)
+
+            # construction/FFI errors fall through to the retry, like the native loop's dropped socket
+            with contextlib.suppress(Exception):
+                await self._connect_browser(url, on_frame=_rectify)
+            await asyncio.sleep(retry)
+
+    @staticmethod
+    def _send_browser(ws: Any, frame: str | bytes) -> None:
+        """Send a frame over a browser `WebSocket`: text as-is, binary converted for the FFI."""
+        if isinstance(frame, str):
+            ws.send(frame)
+        else:
+            from pyodide.ffi import to_js
+
+            ws.send(to_js(frame))
+
+    async def _connect_browser(self, url: str, on_frame: Callable[[Any], None] | None = None) -> None:
         """Mirror over the browser's native `WebSocket` (the Pyodide path) until it closes.
 
-        Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is testable with fake
-        modules injected into ``sys.modules`` off-browser."""
+        ``on_frame(ws)`` fires after each applied frame — `_run_browser` uses it to rectify under
+        client authority. Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is
+        testable with fake modules injected into ``sys.modules`` off-browser."""
         import asyncio
 
         from pyodide.ffi import create_proxy
@@ -152,6 +186,8 @@ class Client:
             data = event.data
             # a text frame arrives as str; a binary frame as an ArrayBuffer proxy -> bytes
             self.recv(data if isinstance(data, str) else bytes(data.to_bytes()))
+            if on_frame is not None:
+                on_frame(ws)
 
         def _on_close(_event: Any) -> None:
             if not closed.done():
@@ -177,14 +213,19 @@ class Client:
           With a CRDT model the push merges (newer stamps win); otherwise it overwrites.
 
         Runs until cancelled. The choice of *where the authoritative state lives* is yours — pair this
-        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs.
+        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs. Under
+        Pyodide this rides the browser's native ``WebSocket`` (like `connect`), same semantics.
         """
         import asyncio
 
-        import websockets
-
         if authority not in ("server", "client"):
             raise ValueError(f"authority must be 'server' or 'client', not {authority!r}")
+        if sys.platform == "emscripten":  # pragma: no cover - exercised by the in-Pyodide suite
+            await self._run_browser(url, authority=authority, retry=retry)
+            return
+
+        import websockets
+
         while True:
             pre = dict(self._values) if authority == "client" else None
             pushed: set = set()

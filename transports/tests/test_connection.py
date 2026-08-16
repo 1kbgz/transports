@@ -282,6 +282,96 @@ def test_browser_websocket_path_mirrors_frames():
                 sys.modules[name] = mod
 
 
+def test_browser_run_reconnects_with_resume_and_client_authority():
+    """`Client._run_browser` (the Pyodide `run`) reconnects with `?since=` resume and, under client
+    authority, pushes the pre-drop state back once the server has (re)snapshotted."""
+    import asyncio
+    import sys
+    import types
+    import typing
+
+    class FakeEvent:
+        def __init__(self, data):
+            self.data = data
+
+    class FakeProxy:
+        def __init__(self, fn):
+            self._fn = fn
+
+        def __call__(self, *args):
+            return self._fn(*args)
+
+        def destroy(self) -> None:
+            pass
+
+    class FakeSocket:
+        instances: typing.ClassVar[list] = []
+
+        def __init__(self, url: str):
+            self.url = url
+            self.listeners = {}
+            self.sent = []
+            FakeSocket.instances.append(self)
+
+        def addEventListener(self, name: str, cb) -> None:
+            self.listeners[name] = cb
+
+        def send(self, frame) -> None:
+            self.sent.append(frame)
+
+    js_mod = types.ModuleType("js")
+    js_mod.WebSocket = types.SimpleNamespace(new=FakeSocket)
+    pyodide_mod = types.ModuleType("pyodide")
+    ffi_mod = types.ModuleType("pyodide.ffi")
+    ffi_mod.create_proxy = FakeProxy
+    ffi_mod.to_js = lambda x: x
+    pyodide_mod.ffi = ffi_mod
+    saved = {name: sys.modules.get(name) for name in ("js", "pyodide", "pyodide.ffi")}
+    sys.modules.update({"js": js_mod, "pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
+    try:
+
+        async def run():
+            sess = Session()
+            d = Device(name="lamp")
+            mid = sess.host(d)
+            server = Server(sess)
+
+            client = Client()
+            task = asyncio.ensure_future(client._run_browser("ws://host/ws", authority="client", retry=0.01))
+            await asyncio.sleep(0)
+            first = FakeSocket.instances[-1]
+            for wire in server.open("c1"):
+                first.listeners["message"](FakeEvent(wire))
+            assert client.model(mid, Device).name == "lamp"
+
+            first.listeners["close"](FakeEvent(None))  # drop; the loop retries
+            for _ in range(100):
+                await asyncio.sleep(0.01)
+                if FakeSocket.instances[-1] is not first:
+                    break
+            second = FakeSocket.instances[-1]
+            assert second is not first
+            assert "since=" in second.url  # resume: the server replays only the delta
+
+            for wire in server.open("c2"):
+                second.listeners["message"](FakeEvent(wire))
+            # client authority: once the server (re)snapshots, the pre-drop state is pushed back
+            assert second.sent and json.loads(second.sent[0])["t"] == "patch"
+            task.cancel()
+
+            # binary frames go through pyodide.ffi.to_js on the way out
+            Client._send_browser(second, b"\x01")
+            assert second.sent[-1] == b"\x01"
+
+        asyncio.run(run())
+    finally:
+        for name, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
+
+
 def test_starlette_msgpack_connection():
     from starlette.applications import Starlette
     from starlette.routing import WebSocketRoute
