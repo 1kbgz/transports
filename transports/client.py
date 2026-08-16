@@ -7,6 +7,7 @@ network).
 """
 
 import json
+import sys
 import urllib.parse
 from collections.abc import Callable
 from typing import Any
@@ -118,12 +119,52 @@ class Client:
         return f"{url}{sep}{params}"
 
     async def connect(self, url: str) -> None:
-        """Connect to a transports server and mirror it until the connection closes (one connection)."""
+        """Connect to a transports server and mirror it until the connection closes (one connection).
+
+        Under Pyodide (``sys.platform == "emscripten"``) the browser gives Python no raw sockets, so
+        this rides the browser's native ``WebSocket`` through the ``js`` FFI instead of the
+        ``websockets`` library — same API, same wire."""
+        if sys.platform == "emscripten":
+            await self._connect_browser(url)
+            return
         import websockets
 
         async with websockets.connect(self._connect_url(url)) as ws:
             async for frame in ws:
                 self.recv(frame)
+
+    async def _connect_browser(self, url: str) -> None:
+        """Mirror over the browser's native `WebSocket` (the Pyodide path) until it closes.
+
+        Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is testable with fake
+        modules injected into ``sys.modules`` off-browser."""
+        import asyncio
+
+        from pyodide.ffi import create_proxy
+
+        from js import WebSocket  # the browser global via the Pyodide FFI
+
+        ws = WebSocket.new(self._connect_url(url))
+        ws.binaryType = "arraybuffer"
+        closed: asyncio.Future = asyncio.get_running_loop().create_future()
+
+        def _on_message(event: Any) -> None:
+            data = event.data
+            # a text frame arrives as str; a binary frame as an ArrayBuffer proxy -> bytes
+            self.recv(data if isinstance(data, str) else bytes(data.to_bytes()))
+
+        def _on_close(_event: Any) -> None:
+            if not closed.done():
+                closed.set_result(None)
+
+        proxies = [create_proxy(_on_message), create_proxy(_on_close), create_proxy(_on_close)]
+        for name, proxy in zip(("message", "close", "error"), proxies):
+            ws.addEventListener(name, proxy)
+        try:
+            await closed
+        finally:
+            for proxy in proxies:
+                proxy.destroy()
 
     async def run(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
         """Connect and mirror, **reconnecting** whenever the connection drops — so the client survives a
@@ -164,11 +205,43 @@ class Client:
         """Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.
 
         SSE is a one-way server→client channel, so this only receives snapshots and patches; use
-        `connect()` (WebSocket) when the client also needs to send edits.
+        `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides
+        the browser's native ``EventSource`` (no raw sockets for `httpx`).
         """
+        if sys.platform == "emscripten":
+            await self._connect_sse_browser(url)
+            return
         import httpx
         from httpx_sse import aconnect_sse
 
         async with httpx.AsyncClient() as http, aconnect_sse(http, "GET", url) as source:
             async for event in source.aiter_sse():
                 self.recv(event.data)
+
+    async def _connect_sse_browser(self, url: str) -> None:
+        """Mirror over the browser's native `EventSource` (the Pyodide path) until it errors/closes."""
+        import asyncio
+
+        from pyodide.ffi import create_proxy
+
+        from js import EventSource  # the browser global via the Pyodide FFI
+
+        source = EventSource.new(url)
+        closed: asyncio.Future = asyncio.get_running_loop().create_future()
+
+        def _on_message(event: Any) -> None:
+            self.recv(event.data)  # SSE is text-only
+
+        def _on_error(_event: Any) -> None:
+            if not closed.done():
+                closed.set_result(None)
+
+        on_message, on_error = create_proxy(_on_message), create_proxy(_on_error)
+        source.addEventListener("message", on_message)
+        source.addEventListener("error", on_error)
+        try:
+            await closed
+        finally:
+            source.close()
+            on_message.destroy()
+            on_error.destroy()

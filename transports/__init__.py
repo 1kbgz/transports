@@ -1,6 +1,6 @@
 from . import protocol
 from ._bridge import from_value, schema_of, schema_to_ts, to_value
-from .anywidget import serve_anywidget
+from .anywidget import serve_anywidget, widget
 from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane, serve_zmq_broker
 from .client import Client
 from .comm import serve_comm
@@ -82,5 +82,6 @@ __all__ = [
     "sync",
     "to_value",
     "unregister_codec",
+    "widget",
     "ws_endpoint",
 ]

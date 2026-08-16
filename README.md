@@ -51,7 +51,7 @@ server/client protocol.
 JavaScript objects. [Connections](docs/src/connections.md) covers WebSocket, SSE, Jupyter comm, and
 anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, and custom codecs.
 [Multi-tenancy and sharing](docs/src/multitenancy.md) covers tenant isolation, shared models, and
-merge strategies.
+merge strategies. [Pyodide](docs/src/pyodide.md) covers building and loading transports in a browser.
 
 ### Reference
 

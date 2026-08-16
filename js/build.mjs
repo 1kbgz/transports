@@ -15,6 +15,11 @@ const BUNDLES = [
     entryPoints: ["src/ts/index.ts"],
     outfile: "dist/cdn/index.js",
   },
+  {
+    // the anywidget frontend: self-contained ESM served from inside the wheel (extension/cdn)
+    entryPoints: ["src/ts/widget.ts"],
+    outfile: "dist/cdn/widget.js",
+  },
 ];
 
 async function build() {

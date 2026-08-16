@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>transports in Pyodide</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+        background: #0b1020;
+        color: #e8ecf7;
+      }
+      body {
+        display: grid;
+        min-height: 100vh;
+        margin: 0;
+        place-items: center;
+      }
+      main {
+        width: min(42rem, calc(100% - 2rem));
+      }
+      .eyebrow,
+      code {
+        color: #78dce8;
+      }
+      h1 {
+        margin: 0.35rem 0 0.75rem;
+        font-size: clamp(2rem, 6vw, 3.75rem);
+        line-height: 1;
+      }
+      .intro {
+        max-width: 38rem;
+        color: #aab4cc;
+        line-height: 1.6;
+      }
+      .card {
+        margin-top: 2rem;
+        padding: 1.5rem;
+        border: 1px solid #26304a;
+        border-radius: 1rem;
+        background: #121a2f;
+        box-shadow: 0 1.5rem 4rem rgb(0 0 0 / 25%);
+      }
+      .status {
+        display: flex;
+        gap: 0.6rem;
+        align-items: center;
+        color: #aab4cc;
+      }
+      .dot {
+        width: 0.65rem;
+        height: 0.65rem;
+        border-radius: 50%;
+        background: #f5c26b;
+      }
+      [data-ready="true"] .dot {
+        background: #61d095;
+      }
+      dl {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin: 1.5rem 0;
+      }
+      dl div {
+        padding: 1rem;
+        border-radius: 0.7rem;
+        background: #0b1020;
+      }
+      dt {
+        color: #7f8aa3;
+        font-size: 0.75rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      dd {
+        margin: 0.35rem 0 0;
+        font-size: 1.25rem;
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem;
+      }
+      button {
+        padding: 0.7rem 1rem;
+        border: 1px solid #394563;
+        border-radius: 0.6rem;
+        background: #1a2540;
+        color: inherit;
+        cursor: pointer;
+        font: inherit;
+      }
+      button:hover:not(:disabled) {
+        border-color: #78dce8;
+      }
+      button:disabled {
+        cursor: wait;
+        opacity: 0.45;
+      }
+      #error {
+        color: #ff8f9c;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">Python · Rust · WebAssembly</div>
+      <h1>transports in the browser</h1>
+      <p class="intro">
+        Pyodide runs the Python package and its compiled Rust core. The buttons
+        move server patches and client proposals through MessagePack without a
+        Python process outside this page.
+      </p>
+
+      <section class="card">
+        <div class="status"><span class="dot"></span><span id="status">Loading Pyodide…</span></div>
+        <dl>
+          <div><dt>Device</dt><dd id="name">—</dd></div>
+          <div><dt>Enabled</dt><dd id="enabled">—</dd></div>
+        </dl>
+        <div class="actions">
+          <button id="server" disabled>Toggle on server</button>
+          <button id="client" disabled>Rename from client</button>
+        </div>
+        <p id="error" hidden></p>
+      </section>
+    </main>
+
+    <script type="module">
+      const PYODIDE_VERSION = "314.0.4";
+      const params = new URLSearchParams(location.search);
+      const wheel = params.get("wheel") || "transports";
+      const buttons = [...document.querySelectorAll("button")];
+
+      function render(raw) {
+        const state = JSON.parse(raw);
+        document.querySelector("#name").textContent = state.name;
+        document.querySelector("#enabled").textContent = state.enabled ? "yes" : "no";
+      }
+
+      try {
+        const { loadPyodide } = await import(
+          `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/pyodide.mjs`
+        );
+        const pyodide = await loadPyodide();
+        document.querySelector("#status").textContent = "Installing transports…";
+        await pyodide.loadPackage("micropip");
+        pyodide.globals.set("wheel", wheel);
+        await pyodide.runPythonAsync(`
+import micropip
+await micropip.install(wheel)
+
+from pydantic import BaseModel
+from transports import Client, Server, Session, to_value
+
+class Device(BaseModel):
+    name: str
+    enabled: bool = False
+
+session = Session()
+device = Device(name="workbench")
+model_id = session.host(device)
+server = Server(session, default_codec="msgpack")
+client = Client(codec="msgpack")
+
+for frame in server.open("browser", "msgpack"):
+    client.recv(frame)
+
+def state():
+    return client.model(model_id, Device).model_dump_json()
+
+def toggle_server():
+    device.enabled = not device.enabled
+    for frame in server.flush()["browser"]:
+        client.recv(frame)
+    return state()
+
+def rename_from_client():
+    proposed = client.model(model_id, Device)
+    proposed.name = "browser" if proposed.name == "workbench" else "workbench"
+    outbound = client.edit(model_id, to_value(proposed))
+    for frame in server.recv("browser", outbound)["browser"]:
+        client.recv(frame)
+    return state()
+`);
+
+        render(pyodide.runPython("state()"));
+        document.documentElement.dataset.ready = "true";
+        document.querySelector("#status").textContent = "Python mirror ready";
+        for (const button of buttons) button.disabled = false;
+
+        document.querySelector("#server").addEventListener("click", () => {
+          render(pyodide.runPython("toggle_server()"));
+        });
+        document.querySelector("#client").addEventListener("click", () => {
+          render(pyodide.runPython("rename_from_client()"));
+        });
+      } catch (error) {
+        document.documentElement.dataset.error = "true";
+        document.querySelector("#status").textContent = "Unable to start";
+        const output = document.querySelector("#error");
+        output.hidden = false;
+        output.textContent = String(error);
+      }
+    </script>
+  </body>
+</html>

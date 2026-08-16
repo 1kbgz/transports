@@ -42,7 +42,7 @@
     "preinstall": "npx only-allow pnpm",
     "prepack": "pnpm run build",
     "start": "http-server -p 3000 -o examples/",
-    "start:tests": "http-server -p 3000 ",
+    "start:tests": "http-server .. -p 3000",
     "test:js": "playwright test",
     "test:rust": "cargo test -- --show-output",
     "test": "npm-run-all test:rust test:js",
