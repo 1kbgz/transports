@@ -274,8 +274,13 @@ class Hub:
         key = self._conn_key.get(conn)
         if wire_id >= SHARED_ID_BASE:
             sh = self._shared.get(wire_id)
-            if sh is None or sh.subs.get(key) != WRITE:
-                return {}  # unknown shared model, or this tenant may not write it
+            if sh is None:
+                reject = protocol.reject_msg(wire_id, 0, "unknown shared model")
+                return {conn: [self._encode_for(conn, reject)]}
+            if sh.subs.get(key) != WRITE:
+                # a read-only (or unsubscribed) tenant's write is refused; tell the proposer why
+                reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription")
+                return {conn: [self._encode_for(conn, reject)]}
             fan = self._write_shared(wire_id, msg["patch"], origin=key)
             return self._fanout(wire_id, fan) if fan else {}
         sess = self._tenants.get(key)
@@ -284,12 +289,16 @@ class Hub:
         authoritative = sess.submit(wire_id, msg["patch"])
         if authoritative is None:
             # Rejected (invalid edit / malformed patch): revert just the proposer to the authoritative
-            # state so its UI self-corrects; the host never crashes and other tenants are untouched.
+            # state so its UI self-corrects, followed by a typed `reject` frame saying why; the host
+            # never crashes and other tenants are untouched.
+            error = sess.reject_reason or "rejected"
             snap = sess.snapshot(wire_id)
             if snap is None:
-                return {}
+                reject = protocol.reject_msg(wire_id, 0, error)
+                return {conn: [self._encode_for(conn, reject)]}
             revert = protocol.snapshot_msg(wire_id, snap["type_name"], snap["rev"], snap["value"])
-            return {conn: [self._encode_for(conn, revert)]}
+            reject = protocol.reject_msg(wire_id, snap["rev"], error)
+            return {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
         relay = protocol.patch_msg(wire_id, authoritative)
         return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key}
 

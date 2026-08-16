@@ -57,7 +57,8 @@ def test_submit_rejects_an_edit_the_model_cannot_validate():
 
 def test_server_reverts_only_the_proposer_on_a_rejected_edit():
     """A rejected edit makes the server re-send the authoritative snapshot to the *proposing* connection
-    (so its optimistic UI reverts to the last good value) and broadcast nothing to the others."""
+    (so its optimistic UI reverts to the last good value), followed by a typed `reject` frame saying
+    why, and broadcast nothing to the others."""
     sess = transports.Session()
     mid = sess.host(Device(brightness=60))
     server = transports.Server(sess)
@@ -72,6 +73,38 @@ def test_server_reverts_only_the_proposer_on_a_rejected_edit():
     revert = transports.protocol.decode(out[proposer][0], transports.protocol.JSON)
     assert revert["t"] == "snapshot"  # a fresh authoritative snapshot…
     assert transports.from_value(revert["value"], Device).brightness == 60  # …restoring the good value
+    reject = transports.protocol.decode(out[proposer][1], transports.protocol.JSON)
+    assert reject["t"] == "reject"  # …and a typed reject saying why
+    assert reject["id"] == mid
+    assert reject["rev"] == revert["rev"]  # the server's current authoritative rev
+    assert "int" in reject["error"]  # pydantic's validation message travels
+
+
+def test_reject_frame_reaches_the_client_on_reject_callback():
+    """The proposing client surfaces *why* an edit died: the reject frame fires `on_reject` with the
+    validation error, the mirror reverts via the snapshot sent alongside, and `recv` stays quiet for
+    the other message kinds it doesn't know."""
+    sess = transports.Session()
+    mid = sess.host(Device(brightness=60))
+    server = transports.Server(sess)
+    conn = object()
+
+    client = transports.Client()
+    rejections, changes = [], []
+    client.on_reject(rejections.append)
+    client.on_change(changes.append)
+    for wire in server.open(conn):
+        client.recv(wire)
+
+    bad = client.edit(mid, {"Map": {"brightness": {"Str": ""}}})
+    for wire in server.recv(conn, bad).get(conn, []):
+        client.recv(wire)
+
+    assert len(rejections) == 1
+    assert rejections[0]["id"] == mid
+    assert "int" in rejections[0]["error"]
+    assert client.model(mid, Device).brightness == 60  # mirror reverted to the good value
+    assert [c["t"] for c in changes] == ["snapshot", "snapshot"]  # open + revert; the reject is not a change
 
 
 def test_a_coercible_edit_is_canonicalized_to_the_models_type():

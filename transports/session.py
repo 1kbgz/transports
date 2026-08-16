@@ -31,6 +31,9 @@ class Session:
         self._on_patch: Callable[[int, dict], None] | None = None
         self._log: dict[int, list[tuple[int, dict]]] = {}  # per-model replay log of (rev, patch), bounded
         self._log_cap = 512  # patches retained per model for resume; older are evicted (resume → snapshot)
+        #: why the last `submit` was rejected (None after a successful submit) — the model's validation
+        #: message where available, so callers can put it on the wire (the `reject` frame)
+        self.reject_reason: str | None = None
 
     def host(self, model: Any) -> int:
         """Host a model: register its schema, store its value in the core, and watch it. Returns id."""
@@ -111,10 +114,13 @@ class Session:
 
         The proposal's ops are applied to the hosted value, the server's `rev` is bumped (not the
         client's guess), the hosted Python object is refreshed, and the authoritative patch (with the
-        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown.
+        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown or the
+        proposal is rejected — then `reject_reason` says why.
         """
+        self.reject_reason = None
         snap = self._store.snapshot(mid)
         if snap is None:
+            self.reject_reason = f"unknown model {mid}"
             return None
         parsed = json.loads(snap)
         cur = parsed["value"]
@@ -123,12 +129,15 @@ class Session:
         # to its canonical typed form — e.g. a number control sends the string "80", and the stored value
         # becomes the int 80, so the core value, the Python model, and every client agree. The authoritative
         # patch is the diff to that canonical value (not the client's raw ops), keeping all three in sync.
-        canonical = self._canonical(mid, cur, patch.get("ops", []))
+        canonical, error = self._canonical(mid, cur, patch.get("ops", []))
         if canonical is None:
-            return None  # invalid / malformed — rejected (the caller re-sends state so the proposer reverts)
+            # invalid / malformed — rejected (the caller re-sends state so the proposer reverts)
+            self.reject_reason = error or "invalid edit"
+            return None
         ops = json.loads(_diff(json.dumps(cur), json.dumps(canonical))).get("ops", [])
         authoritative = {"rev": parsed["rev"] + 1, "ops": ops}
         if not self._apply_authoritative(mid, authoritative):
+            self.reject_reason = "malformed patch"
             return None
         self._record(mid, authoritative)
         return authoritative
@@ -151,9 +160,10 @@ class Session:
             return None  # the next needed patch was evicted — gap, can't replay
         return [patch for rev, patch in log if rev > since_rev]
 
-    def _canonical(self, mid: int, current_value: dict, ops: list) -> dict | None:
+    def _canonical(self, mid: int, current_value: dict, ops: list) -> tuple[dict | None, str | None]:
         """The proposal applied to ``current_value`` and normalized through the hosted model — its canonical
-        typed `Value` — or ``None`` if the core rejects the patch or the model rejects the value.
+        typed `Value` — as ``(value, None)``, or ``(None, error)`` if the core rejects the patch or the
+        model rejects the value.
 
         Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then
         round-tripped through the model bridge: pydantic / msgspec validate (rejecting bad input) and coerce
@@ -161,15 +171,15 @@ class Session:
         mirror) returns the candidate unchanged; dataclasses accept per their own semantics."""
         try:
             candidate = json.loads(_apply(json.dumps(current_value), json.dumps({"rev": 0, "ops": ops})))
-        except ValueError:
-            return None  # the core rejected a malformed patch (bad path/type/index)
+        except ValueError as e:
+            return None, f"malformed patch: {e}"  # the core rejected it (bad path/type/index)
         obj = self._models.get(mid)
         if obj is None:
-            return candidate  # untyped mirror — nothing to canonicalize against
+            return candidate, None  # untyped mirror — nothing to canonicalize against
         try:
-            return to_value(from_value(candidate, type(obj)))  # validate + coerce to the canonical typed value
-        except Exception:  # noqa: BLE001
-            return None  # the result doesn't validate against the model (pydantic / msgspec / ...)
+            return to_value(from_value(candidate, type(obj))), None  # validate + coerce to the canonical typed value
+        except Exception as e:  # noqa: BLE001
+            return None, str(e)  # the model rejected the value (pydantic / msgspec / ...) — its message travels
 
     def _apply_authoritative(self, mid: int, patch: dict) -> bool:
         try:

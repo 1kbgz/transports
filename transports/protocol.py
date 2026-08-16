@@ -4,10 +4,13 @@ WebSocket messages (and Jupyter comm messages) are self-delimiting, so the binar
 in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small
 JSON envelope carries the routing metadata around a model snapshot or a patch.
 
-Two message kinds:
+Three message kinds:
 
 - ``{"t": "snapshot", "id": <int>, "type": <str>, "rev": <int>, "value": <Value>}``
 - ``{"t": "patch", "id": <int>, "patch": {"rev": <int>, "ops": [...]}}``
+- ``{"t": "reject", "id": <int>, "rev": <int>, "error": <str>}`` — a proposed edit was refused;
+  sent to the proposing connection only, alongside the authoritative revert. ``rev`` is the
+  server's current revision for the model. Clients that predate a message kind ignore it.
 """
 
 import json
@@ -82,6 +85,10 @@ def snapshot_msg(model_id: int, type_name: str, rev: int, value: Any) -> str:
 
 def patch_msg(model_id: int, patch: dict) -> str:
     return json.dumps({"t": "patch", "id": model_id, "patch": patch})
+
+
+def reject_msg(model_id: int, rev: int, error: str) -> str:
+    return json.dumps({"t": "reject", "id": model_id, "rev": rev, "error": error})
 
 
 def encode(msg_json: str, codec: str = JSON) -> str | bytes:

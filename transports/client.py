@@ -8,6 +8,7 @@ network).
 
 import json
 import urllib.parse
+from collections.abc import Callable
 from typing import Any
 
 from . import protocol
@@ -27,23 +28,64 @@ class Client:
         self._rev: dict[int, int] = {}
         self._type: dict[int, str] = {}
         self._codec = protocol.normalize_codec(codec)
+        self._change_cbs: list[Callable[[dict], None]] = []
+        self._reject_cbs: list[Callable[[dict], None]] = []
 
-    def recv(self, data: str | bytes) -> None:
-        """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror."""
+    def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Register a callback fired after each accepted snapshot or patch — the same change dict
+        `recv` returns — so `connect`/`run`/`connect_sse` consumers get path-level changes without
+        managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
+        type). Returns an unsubscribe function."""
+        self._change_cbs.append(callback)
+        return lambda: self._change_cbs.remove(callback)
+
+    def on_reject(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Register a callback fired when the server refuses a proposed edit — with the decoded
+        ``reject`` message (``{"t": "reject", "id", "rev", "error"}``). The mirror itself reverts via
+        the authoritative snapshot the server sends alongside. Returns an unsubscribe function."""
+        self._reject_cbs.append(callback)
+        return lambda: self._reject_cbs.remove(callback)
+
+    def _accepted(self, change: dict) -> dict:
+        for callback in list(self._change_cbs):
+            callback(change)
+        return change
+
+    def recv(self, data: str | bytes) -> dict | None:
+        """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.
+
+        Returns the accepted change so reactive consumers can update only its paths —
+        ``{"t": "snapshot", "id", "rev"}`` for a snapshot, the decoded patch message for a patch — or
+        ``None`` for a patch whose revision was already applied, a ``reject`` (dispatched to
+        `on_reject`), and an unrecognized message type, which is ignored so a newer server can add
+        message types without breaking older clients. Invalid frames raise without changing the
+        mirror or its accepted revision."""
         msg = protocol.decode(data, self._codec)
-        mid = msg["id"]
-        if msg["t"] == "snapshot":
+        t = msg.get("t")
+        if t == "snapshot":
+            mid: int = msg["id"]
             self._values[mid] = msg["value"]
             self._type[mid] = msg["type"]
             self._rev[mid] = msg["rev"]
-        elif msg["t"] == "patch":
+            return self._accepted({"t": "snapshot", "id": mid, "rev": msg["rev"]})
+        elif t == "patch":
+            mid = msg["id"]
             rev = msg["patch"]["rev"]
             # rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a
             # patch the opening snapshot already captured, which the server then also broadcasts).
             if mid in self._rev and rev <= self._rev[mid]:
-                return
+                return None
+            if mid not in self._values:
+                raise ValueError(f"patch received before snapshot for model {mid}")
             self._values[mid] = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
             self._rev[mid] = rev
+            return self._accepted(msg)
+        elif t == "reject":
+            for callback in list(self._reject_cbs):
+                callback(msg)
+            return None
+        # an unrecognized message type is ignored (not an error): the server may be newer than this client
+        return None
 
     def value(self, mid: int) -> Any:
         """The current mirrored core `Value` of a model."""

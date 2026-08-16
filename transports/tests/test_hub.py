@@ -100,7 +100,10 @@ def test_read_only_subscriber_cannot_write():
     c = ("t1", "a")
     h.open(c)
     edit = json.dumps({"t": "patch", "id": sid, "patch": {"rev": 1, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 9}}}]}})
-    assert h.recv(c, edit) == {}  # write ignored
+    out = h.recv(c, edit)
+    assert set(out) == {c}  # the write is refused and only the proposer hears about it
+    reject = json.loads(out[c][0])
+    assert reject["t"] == "reject" and reject["error"] == "read-only subscription"
     assert h._shared[sid].value["Map"]["x"] == {"Int": 0}  # authoritative value untouched
 
 

@@ -181,7 +181,7 @@ test("Client mirrors a snapshot then a patch", async () => {
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
 
-test("Client rejects unknown messages and patch operations", async () => {
+test("Client ignores unknown message types and rejects unknown patch operations", async () => {
   const c = new Client();
   c.recv(
     JSON.stringify({
@@ -192,9 +192,8 @@ test("Client rejects unknown messages and patch operations", async () => {
       value: { Map: { on: { Bool: false } } },
     }),
   );
-  expect(() => c.recv(JSON.stringify({ t: "other", id: 1 }))).toThrow(
-    /unknown message type/,
-  );
+  // forward compatibility: a newer server's message types are ignored, not an error
+  expect(c.recv(JSON.stringify({ t: "other", id: 1 }))).toBeUndefined();
   expect(() =>
     c.recv(
       JSON.stringify({
@@ -205,6 +204,135 @@ test("Client rejects unknown messages and patch operations", async () => {
     ),
   ).toThrow(/unknown patch op/);
   expect(c.value(1)).toEqual({ Map: { on: { Bool: false } } });
+});
+
+test("Client.onChange fires for accepted changes only", async () => {
+  const c = new Client();
+  const seen = [];
+  const off = c.onChange((change) => seen.push(change));
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 0,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  const patch = {
+    t: "patch",
+    id: 1,
+    patch: {
+      rev: 1,
+      ops: [{ Set: { path: [{ Key: "on" }], value: { Bool: true } } }],
+    },
+  };
+  c.recv(JSON.stringify(patch));
+  c.recv(JSON.stringify(patch)); // stale rev: ignored, no notification
+  c.recv(JSON.stringify({ t: "other", id: 1 })); // unknown type: ignored, no notification
+  expect(seen).toEqual([
+    { t: "snapshot", id: 1, rev: 0 },
+    { t: "patch", id: 1, patch: expect.objectContaining({ rev: 1 }) },
+  ]);
+  off();
+  c.recv(
+    JSON.stringify({
+      t: "patch",
+      id: 1,
+      patch: {
+        rev: 2,
+        ops: [{ Set: { path: [{ Key: "on" }], value: { Bool: false } } }],
+      },
+    }),
+  );
+  expect(seen.length).toBe(2); // unsubscribed
+});
+
+test("Client.onReject surfaces a server rejection; the mirror is untouched", async () => {
+  const c = new Client();
+  const rejections = [];
+  const off = c.onReject((r) => rejections.push(r));
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 3,
+      value: { Map: { brightness: { Int: 60 } } },
+    }),
+  );
+  const result = c.recv(
+    JSON.stringify({ t: "reject", id: 1, rev: 3, error: "not an int" }),
+  );
+  expect(result).toBeUndefined(); // a reject is not a change
+  expect(rejections).toEqual([
+    { t: "reject", id: 1, rev: 3, error: "not an int" },
+  ]);
+  expect(c.value(1)).toEqual({ Map: { brightness: { Int: 60 } } });
+  off();
+  c.recv(JSON.stringify({ t: "reject", id: 1, rev: 3, error: "again" }));
+  expect(rejections.length).toBe(1); // unsubscribed
+});
+
+test("Client patch application matches the wasm core apply", async () => {
+  // differential test: the mirror is maintained by the pure-TS applyPatch, not the fuzz-tested
+  // core — pin the two implementations together across randomized diffs. Seeded PRNG (mulberry32)
+  // so a failure reproduces.
+  let seed = 0x1b6b92;
+  const rand = () => {
+    seed = (seed + 0x6d2b79f5) | 0;
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+  const int = (n) => Math.floor(rand() * n);
+  const scalar = () => {
+    const pick = int(4);
+    if (pick === 0) return { Int: int(100) };
+    if (pick === 1) return { Str: `s${int(100)}` };
+    if (pick === 2) return { Bool: rand() < 0.5 };
+    return "Null";
+  };
+  const value = (depth) => {
+    if (depth <= 0 || rand() < 0.3) return scalar();
+    if (rand() < 0.5) {
+      const map = {};
+      for (let i = 1 + int(4); i > 0; i--) map[`k${int(6)}`] = value(depth - 1);
+      return { Map: map };
+    }
+    return { List: Array.from({ length: int(4) }, () => value(depth - 1)) };
+  };
+  // perturb a copy: replace/drop/add branches so diffs mix Set/Remove/Insert/RemoveAt and
+  // type changes
+  const mutate = (v) => {
+    if (rand() < 0.2) return value(2);
+    if (v && typeof v === "object" && "Map" in v) {
+      const map = {};
+      for (const [k, child] of Object.entries(v.Map))
+        if (rand() >= 0.15) map[k] = mutate(child);
+      if (rand() < 0.3) map[`k${int(6)}`] = value(2);
+      return { Map: map };
+    }
+    if (v && typeof v === "object" && "List" in v) {
+      const list = v.List.filter(() => rand() >= 0.15).map(mutate);
+      if (rand() < 0.3) list.splice(int(list.length + 1), 0, value(2));
+      return { List: list };
+    }
+    return rand() < 0.3 ? scalar() : v;
+  };
+  for (let i = 0; i < 300; i++) {
+    const a = { Map: { root: value(3) } };
+    const b = mutate(a);
+    const patch = JSON.parse(diff(JSON.stringify(a), JSON.stringify(b)));
+    const viaWasm = JSON.parse(apply(JSON.stringify(a), JSON.stringify(patch)));
+    const c = new Client();
+    c.recv(
+      JSON.stringify({ t: "snapshot", id: 1, type: "M", rev: 0, value: a }),
+    );
+    c.recv(JSON.stringify({ t: "patch", id: 1, patch: { ...patch, rev: 1 } }));
+    expect(c.value(1)).toEqual(viaWasm);
+    expect(viaWasm).toEqual(b); // the core round-trip property, from JS
+  }
 });
 
 test("Client applies patches without rebuilding unchanged branches", async () => {
