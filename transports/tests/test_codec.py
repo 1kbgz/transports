@@ -9,6 +9,7 @@ from transports import (
     Session,
     cbor_to_json,
     decode_as,
+    diff,
     encode,
     encode_as,
     json_to_cbor,
@@ -35,6 +36,29 @@ def test_msgpack_is_smaller_than_json():
 
 def test_json_via_encode_as_matches_encode():
     assert encode_as(MODEL, "application/json") == encode(MODEL)
+
+
+def test_encodings_and_diff_match_golden_vectors():
+    """Byte-identity across build targets: these exact bytes must come out of the native wheel, the
+    Pyodide (emscripten) wheel, and the wasm-bindgen JS binding alike — the vectors were produced by
+    the native build, and this test runs unchanged on the others."""
+    assert encode_as(MODEL, "application/msgpack").hex() == (
+        "81a34d617083a5636f756e7481a3496e74ce0001e240a46e616d6581a3537472a46c616d70a26f6e81a4426f6f6cc3"
+    )
+    assert encode_as(MODEL, "application/cbor").hex() == (
+        "a1634d6170a365636f756e74a163496e741a0001e240646e616d65a163537472646c616d70626f6ea164426f6f6cf5"
+    )
+    old = json.dumps({"Map": {"name": {"Str": "lamp"}, "tags": {"List": [{"Int": 1}, {"Int": 2}]}}})
+    new = json.dumps({"Map": {"name": {"Str": "beacon"}, "tags": {"List": [{"Int": 1}]}}})
+    assert json.loads(diff(old, new)) == {
+        "rev": 0,
+        "ops": [
+            {"Set": {"path": [{"Key": "name"}], "value": {"Str": "beacon"}}},
+            {"RemoveAt": {"path": [{"Key": "tags"}], "index": 1}},
+        ],
+    }
+    wire = json.dumps({"t": "patch", "id": 7, "patch": {"rev": 2, "ops": []}})
+    assert json_to_msgpack(wire).hex() == "83a2696407a5706174636882a36f707390a372657602a174a57061746368"
 
 
 def test_unknown_codec_raises():

@@ -200,6 +200,88 @@ def test_msgpack_client_edit_relays_to_json_client():
     assert j.model(mid, Device).on is True
 
 
+def test_browser_websocket_path_mirrors_frames():
+    """`Client._connect_browser` (the Pyodide path) rides the browser WebSocket through the js FFI.
+    Fake `js` / `pyodide.ffi` in sys.modules to drive the wiring off-browser: the codec rides the
+    query string, text and binary (ArrayBuffer -> bytes) frames update the mirror, close resolves."""
+    import asyncio
+    import sys
+    import types
+    import typing
+
+    class FakeBuffer:
+        def __init__(self, data: bytes):
+            self._data = data
+
+        def to_bytes(self) -> bytes:
+            return self._data
+
+    class FakeEvent:
+        def __init__(self, data):
+            self.data = data
+
+    class FakeProxy:
+        def __init__(self, fn):
+            self._fn = fn
+
+        def __call__(self, *args):
+            return self._fn(*args)
+
+        def destroy(self) -> None:
+            pass
+
+    class FakeSocket:
+        instances: typing.ClassVar[list] = []
+
+        def __init__(self, url: str):
+            self.url = url
+            self.listeners = {}
+            FakeSocket.instances.append(self)
+
+        def addEventListener(self, name: str, cb) -> None:
+            self.listeners[name] = cb
+
+    js_mod = types.ModuleType("js")
+    js_mod.WebSocket = types.SimpleNamespace(new=FakeSocket)
+    pyodide_mod = types.ModuleType("pyodide")
+    ffi_mod = types.ModuleType("pyodide.ffi")
+    ffi_mod.create_proxy = FakeProxy
+    pyodide_mod.ffi = ffi_mod
+    saved = {name: sys.modules.get(name) for name in ("js", "pyodide", "pyodide.ffi")}
+    sys.modules.update({"js": js_mod, "pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
+    try:
+
+        async def run():
+            sess = Session()
+            d = Device(name="lamp")
+            mid = sess.host(d)
+            server = Server(sess)
+
+            client = Client(codec="msgpack")
+            task = asyncio.ensure_future(client._connect_browser("ws://host/ws"))
+            await asyncio.sleep(0)  # let the task build the socket + register listeners
+            sock = FakeSocket.instances[-1]
+            assert "codec=msgpack" in sock.url
+
+            for wire in server.open(("conn"), "msgpack"):  # binary frames, as the browser delivers them
+                sock.listeners["message"](FakeEvent(FakeBuffer(wire)))
+            d.name = "beacon"
+            for msgs in server.flush().values():
+                for wire in msgs:
+                    sock.listeners["message"](FakeEvent(FakeBuffer(wire)))
+            sock.listeners["close"](FakeEvent(None))
+            await asyncio.wait_for(task, 1)
+            assert client.model(mid, Device).name == "beacon"
+
+        asyncio.run(run())
+    finally:
+        for name, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
+
+
 def test_starlette_msgpack_connection():
     from starlette.applications import Starlette
     from starlette.routing import WebSocketRoute

@@ -133,11 +133,14 @@ tests-rs: test-rs
 coverage-rs:  ## run rust tests and collect test coverage
 	make -C rust coverage
 
-.PHONY: test test-pyodide coverage tests
+.PHONY: test test-pyodide test-pyodide-browser coverage tests
 test: test-py test-js test-rs  ## run all tests
 test-pyodide:  ## build and test the Python package in Pyodide
 	rustup target add wasm32-unknown-emscripten
 	uvx --from cibuildwheel==4.2.0 cibuildwheel --only cp314-pyodide_wasm32 --output-dir dist/pyodide .
+test-pyodide-browser:  ## test the Pyodide wheel in a browser
+	test -n "$(firstword $(wildcard dist/pyodide/*.whl))"
+	cd js; TRANSPORTS_PYODIDE_WHEEL="/$(firstword $(wildcard dist/pyodide/*.whl))" pnpm exec playwright test tests/pyodide.test.js
 coverage: coverage-py coverage-js coverage-rs  ## run all tests and collect test coverage
 
 # alias

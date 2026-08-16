@@ -151,7 +151,9 @@ skip = "*win32 *arm_64"
 
 [tool.cibuildwheel.pyodide]
 environment = {SKIP_HATCH_JS="1"}
-test-command = "python -m pytest {project}/transports/tests/test_pyodide.py -x"
+# the offline-safe suite: everything but the process/socket-bound files (backplane/relay/election/
+# client-durability) and the Starlette TestClient tests (threads, which emscripten doesn't have)
+test-command = """python -m pytest {project}/transports/tests -x -k "not starlette" --ignore={project}/transports/tests/test_backplane.py --ignore={project}/transports/tests/test_relay.py --ignore={project}/transports/tests/test_election.py --ignore={project}/transports/tests/test_client_durability.py"""
 test-extras = []
 test-requires = ["pytest"]
 xbuild-tools = ["cargo", "rustc", "rustup"]
@@ -266,6 +268,7 @@ pages = [
     "docs/src/connections.md",
     "docs/src/codecs.md",
     "docs/src/multitenancy.md",
+    "docs/src/pyodide.md",
     "docs/src/protocol-reference.md",
     "docs/src/api.md",
 ]
