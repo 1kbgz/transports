@@ -137,6 +137,7 @@ coverage-rs:  ## run rust tests and collect test coverage
 test: test-py test-js test-rs  ## run all tests
 test-pyodide:  ## build and test the Python package in Pyodide
 	rustup target add wasm32-unknown-emscripten
+	rm -rf dist/pyodide
 	uvx --from cibuildwheel==4.2.0 cibuildwheel --only cp314-pyodide_wasm32 --output-dir dist/pyodide .
 test-pyodide-browser:  ## test the Pyodide wheel in a browser
 	test -n "$(firstword $(wildcard dist/pyodide/*.whl))"
@@ -145,6 +146,7 @@ test-pyodide-browser:  ## test the Pyodide wheel in a browser
 .PHONY: jupyterlite test-jupyterlite
 jupyterlite:  ## build the JupyterLite demo site into dist/lite (needs the Pyodide wheel)
 	test -n "$(firstword $(wildcard dist/pyodide/*.whl))"
+	rm -rf examples/lite/pypi examples/lite/.cache
 	mkdir -p examples/lite/pypi
 	cp dist/pyodide/*.whl examples/lite/pypi/
 	uvx --with jupyterlite-pyodide-kernel --with jupyter-server --from jupyterlite-core jupyter lite build --lite-dir examples/lite --output-dir $(CURDIR)/dist/lite

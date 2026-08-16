@@ -2,6 +2,9 @@ import fs from "fs";
 import { test, expect } from "@playwright/test";
 
 const built = fs.existsSync("../dist/lite/repl/index.html");
+// the repo version (bumpversion keeps package.json in sync): asserting it proves the lite site
+// serves the freshly built wheel, not a stale one — without hardcoding a version that rots on bump
+const { version } = JSON.parse(fs.readFileSync("./package.json", "utf8"));
 
 test("JupyterLite pyodide kernel installs the wheel and hosts a session", async ({
   page,
@@ -26,7 +29,7 @@ test("JupyterLite pyodide kernel installs the wheel and hosts a session", async 
     ].join("\n"),
   );
   await page.goto(url.toString());
-  await expect(page.getByText(/lite-ok 0\.6\.0 0/)).toBeVisible({
+  await expect(page.getByText(`lite-ok ${version} 0`)).toBeVisible({
     timeout: 240_000,
   });
 });
