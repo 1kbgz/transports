@@ -32,7 +32,8 @@ type PatchMsg = {
 export type RejectMsg = { t: "reject"; id: number; rev: number; error: string };
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
-  { t: "snapshot"; id: number; rev: number } | PatchMsg;
+  | { t: "snapshot"; id: number; rev: number }
+  | PatchMsg;
 
 function mapValue(value: Value | undefined): Record<string, Value> {
   if (
