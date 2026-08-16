@@ -124,7 +124,7 @@ class Client:
         Under Pyodide (``sys.platform == "emscripten"``) the browser gives Python no raw sockets, so
         this rides the browser's native ``WebSocket`` through the ``js`` FFI instead of the
         ``websockets`` library — same API, same wire."""
-        if sys.platform == "emscripten":
+        if sys.platform == "emscripten":  # pragma: no cover - exercised by the in-Pyodide suite
             await self._connect_browser(url)
             return
         import websockets
@@ -208,7 +208,7 @@ class Client:
         `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides
         the browser's native ``EventSource`` (no raw sockets for `httpx`).
         """
-        if sys.platform == "emscripten":
+        if sys.platform == "emscripten":  # pragma: no cover - exercised by the in-Pyodide suite
             await self._connect_sse_browser(url)
             return
         import httpx
