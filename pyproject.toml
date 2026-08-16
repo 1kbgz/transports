@@ -2,7 +2,7 @@
 requires = [
     "hatchling",
     "hatch-js",
-    "hatch-rs",
+    "hatch-rs>=0.3.0",
 ]
 build-backend = "hatchling.build"
 
@@ -61,7 +61,7 @@ develop = [
     "codespell",
     "comm",
     "hatch-js",
-    "hatch-rs",
+    "hatch-rs>=0.3.0",
     "hatchling",
     "httpx",
     "httpx-sse",
@@ -149,6 +149,13 @@ archs = "arm64"
 environment = {PATH="$UserProfile\\.cargo\bin;$PATH", CARGO_TERM_COLOR="always"}
 skip = "*win32 *arm_64"
 
+[tool.cibuildwheel.pyodide]
+environment = {SKIP_HATCH_JS="1"}
+test-command = "python -m pytest {project}/transports/tests/test_pyodide.py -x"
+test-extras = []
+test-requires = ["pytest"]
+xbuild-tools = ["cargo", "rustc", "rustup"]
+
 [tool.coverage.run]
 branch = true
 omit = [
@@ -166,9 +173,6 @@ fail_under = 50
 
 [tool.hatch.build]
 artifacts = [
-    "transports/*.dll",
-    "transports/*.dylib",
-    "transports/*.so",
     "transports/extension",
 ]
 
