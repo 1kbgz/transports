@@ -243,10 +243,13 @@
 <span class="sd">in the Rust core — which exists for byte-stream transports like TCP — isn&#39;t needed here. A small</span>
 <span class="sd">JSON envelope carries the routing metadata around a model snapshot or a patch.</span>
 
-<span class="sd">Two message kinds:</span>
+<span class="sd">Three message kinds:</span>
 
 <span class="sd">- ``{&quot;t&quot;: &quot;snapshot&quot;, &quot;id&quot;: &lt;int&gt;, &quot;type&quot;: &lt;str&gt;, &quot;rev&quot;: &lt;int&gt;, &quot;value&quot;: &lt;Value&gt;}``</span>
 <span class="sd">- ``{&quot;t&quot;: &quot;patch&quot;, &quot;id&quot;: &lt;int&gt;, &quot;patch&quot;: {&quot;rev&quot;: &lt;int&gt;, &quot;ops&quot;: [...]}}``</span>
+<span class="sd">- ``{&quot;t&quot;: &quot;reject&quot;, &quot;id&quot;: &lt;int&gt;, &quot;rev&quot;: &lt;int&gt;, &quot;error&quot;: &lt;str&gt;}`` — a proposed edit was refused;</span>
+<span class="sd">  sent to the proposing connection only, alongside the authoritative revert. ``rev`` is the</span>
+<span class="sd">  server&#39;s current revision for the model. Clients that predate a message kind ignore it.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -339,6 +342,10 @@
 <span class="k">def</span><span class="w"> </span><span class="nf">patch_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;patch&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span> <span class="n">patch</span><span class="p">})</span></div>
 
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">reject_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">error</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;reject&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">:</span> <span class="n">error</span><span class="p">})</span>
 
 
 <div class="viewcode-block" id="encode">

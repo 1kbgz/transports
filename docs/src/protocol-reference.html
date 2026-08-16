@@ -394,12 +394,33 @@ path.</p>
 </div>
 <p>Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.</p>
-<p>The JavaScript <code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> method returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted snapshot, the
-decoded patch message for an accepted patch, and <code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored revision. Reactive
-adapters can consume the returned patch paths without reading and decoding the complete mirror. The
-returned change and <code class="docutils literal notranslate"><span class="pre">Client.value()</span></code> share immutable branches with the mirror and must not be mutated.
-A patch before its snapshot, an unknown message or operation, or an invalid path throws; failed frames
-leave the mirror and its accepted revision unchanged.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> (Python and JavaScript alike) returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted
+snapshot, the decoded patch message for an accepted patch, and <code class="docutils literal notranslate"><span class="pre">None</span></code>/<code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored
+revision or an unrecognized message type — unknown types are ignored, not errors, so a newer server
+can add message types without breaking older clients. Reactive adapters can consume the returned
+patch paths without reading and decoding the complete mirror, either from the <code class="docutils literal notranslate"><span class="pre">recv()</span></code> return value
+or via <code class="docutils literal notranslate"><span class="pre">Client.on_change</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onChange</span></code>, which fires with the same accepted change under the
+managed connect/run/SSE paths. The returned change and <code class="docutils literal notranslate"><span class="pre">Client.value()</span></code> share immutable branches
+with the mirror and must not be mutated. A patch before its snapshot, an unknown patch operation, or
+an invalid path raises; failed frames leave the mirror and its accepted revision unchanged.</p>
+</section>
+<section id="reject">
+<h3>Reject<a class="headerlink" href="#reject" title="Link to this heading">¶</a></h3>
+<p>The server refuses a proposed edit that fails validation — or a write to a shared model the tenant
+cannot write — by sending the proposer (and only the proposer) the authoritative revert followed by a
+typed reject saying why. <code class="docutils literal notranslate"><span class="pre">rev</span></code> is the server’s current revision for the model, and <code class="docutils literal notranslate"><span class="pre">error</span></code> carries
+the model’s validation message where available (e.g. pydantic’s).</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">&quot;t&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;reject&quot;</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;rev&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1 validation error for Device\nbrightness\n  Input should be a valid integer ...&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
+<code class="docutils literal notranslate"><span class="pre">Client.on_reject</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onReject</span></code> so an app can show <em>why</em> the edit died instead of a silent
+revert.</p>
 </section>
 </section>
 <section id="model-ids">
@@ -531,6 +552,7 @@ implementations in every Python or JavaScript process that uses the content type
 <li><a class="reference internal" href="#protocol-messages">Protocol messages</a><ul>
 <li><a class="reference internal" href="#snapshot">Snapshot</a></li>
 <li><a class="reference internal" href="#id1">Patch</a></li>
+<li><a class="reference internal" href="#reject">Reject</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#model-ids">Model ids</a></li>

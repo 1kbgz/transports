@@ -272,6 +272,9 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_log</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># per-model replay log of (rev, patch), bounded</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_log_cap</span> <span class="o">=</span> <span class="mi">512</span>  <span class="c1"># patches retained per model for resume; older are evicted (resume → snapshot)</span>
+        <span class="c1">#: why the last `submit` was rejected (None after a successful submit) — the model&#39;s validation</span>
+        <span class="c1">#: message where available, so callers can put it on the wire (the `reject` frame)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Session.host">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.host">[docs]</a>
@@ -381,10 +384,13 @@
 
 <span class="sd">        The proposal&#39;s ops are applied to the hosted value, the server&#39;s `rev` is bumped (not the</span>
 <span class="sd">        client&#39;s guess), the hosted Python object is refreshed, and the authoritative patch (with the</span>
-<span class="sd">        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown.</span>
+<span class="sd">        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown or the</span>
+<span class="sd">        proposal is rejected — then `reject_reason` says why.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;unknown model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">&quot;</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)</span>
         <span class="n">cur</span> <span class="o">=</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
@@ -393,12 +399,15 @@
         <span class="c1"># to its canonical typed form — e.g. a number control sends the string &quot;80&quot;, and the stored value</span>
         <span class="c1"># becomes the int 80, so the core value, the Python model, and every client agree. The authoritative</span>
         <span class="c1"># patch is the diff to that canonical value (not the client&#39;s raw ops), keeping all three in sync.</span>
-        <span class="n">canonical</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canonical</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="n">canonical</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canonical</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="k">if</span> <span class="n">canonical</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># invalid / malformed — rejected (the caller re-sends state so the proposer reverts)</span>
+            <span class="c1"># invalid / malformed — rejected (the caller re-sends state so the proposer reverts)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="n">error</span> <span class="ow">or</span> <span class="s2">&quot;invalid edit&quot;</span>
+            <span class="k">return</span> <span class="kc">None</span>
         <span class="n">ops</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">cur</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">canonical</span><span class="p">)))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[])</span>
         <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">ops</span><span class="p">}</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="s2">&quot;malformed patch&quot;</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">authoritative</span></div>
@@ -425,9 +434,10 @@
         <span class="k">return</span> <span class="p">[</span><span class="n">patch</span> <span class="k">for</span> <span class="n">rev</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">log</span> <span class="k">if</span> <span class="n">rev</span> <span class="o">&gt;</span> <span class="n">since_rev</span><span class="p">]</span></div>
 
 
-    <span class="k">def</span><span class="w"> </span><span class="nf">_canonical</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_canonical</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;The proposal applied to ``current_value`` and normalized through the hosted model — its canonical</span>
-<span class="sd">        typed `Value` — or ``None`` if the core rejects the patch or the model rejects the value.</span>
+<span class="sd">        typed `Value` — as ``(value, None)``, or ``(None, error)`` if the core rejects the patch or the</span>
+<span class="sd">        model rejects the value.</span>
 
 <span class="sd">        Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then</span>
 <span class="sd">        round-tripped through the model bridge: pydantic / msgspec validate (rejecting bad input) and coerce</span>
@@ -435,15 +445,15 @@
 <span class="sd">        mirror) returns the candidate unchanged; dataclasses accept per their own semantics.&quot;&quot;&quot;</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="n">candidate</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">current_value</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">ops</span><span class="p">})))</span>
-        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># the core rejected a malformed patch (bad path/type/index)</span>
+        <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;malformed patch: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>  <span class="c1"># the core rejected it (bad path/type/index)</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">candidate</span>  <span class="c1"># untyped mirror — nothing to canonicalize against</span>
+            <span class="k">return</span> <span class="n">candidate</span><span class="p">,</span> <span class="kc">None</span>  <span class="c1"># untyped mirror — nothing to canonicalize against</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="k">return</span> <span class="n">to_value</span><span class="p">(</span><span class="n">from_value</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)))</span>  <span class="c1"># validate + coerce to the canonical typed value</span>
-        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
-            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># the result doesn&#39;t validate against the model (pydantic / msgspec / ...)</span>
+            <span class="k">return</span> <span class="n">to_value</span><span class="p">(</span><span class="n">from_value</span><span class="p">(</span><span class="n">candidate</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))),</span> <span class="kc">None</span>  <span class="c1"># validate + coerce to the canonical typed value</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>  <span class="c1"># the model rejected the value (pydantic / msgspec / ...) — its message travels</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_apply_authoritative</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="k">try</span><span class="p">:</span>

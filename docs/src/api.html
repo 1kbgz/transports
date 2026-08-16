@@ -252,6 +252,13 @@
 <dt class="sig sig-object py" id="transports.Session">
 <em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Session</span></span><a class="reference internal" href="../../_modules/transports/session.html#Session"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="transports.Session.reject_reason">
+<span class="sig-name descname"><span class="pre">reject_reason</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></em><a class="headerlink" href="#transports.Session.reject_reason" title="Link to this definition">¶</a></dt>
+<dd><p>why the last <cite>submit</cite> was rejected (None after a successful submit) — the model’s validation
+message where available, so callers can put it on the wire (the <cite>reject</cite> frame)</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Session.host">
 <span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.host"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.host" title="Link to this definition">¶</a></dt>
@@ -317,7 +324,8 @@ update is made under observation suppression so it doesn’t echo back as a new 
 <dd><p>Apply a client-proposed patch <em>as the server</em>: the server owns <cite>rev</cite>.</p>
 <p>The proposal’s ops are applied to the hosted value, the server’s <cite>rev</cite> is bumped (not the
 client’s guess), the hosted Python object is refreshed, and the authoritative patch (with the
-server <cite>rev</cite>) is returned to broadcast to every connection. <cite>None</cite> if the id is unknown.</p>
+server <cite>rev</cite>) is returned to broadcast to every connection. <cite>None</cite> if the id is unknown or the
+proposal is rejected — then <cite>reject_reason</cite> says why.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -413,9 +421,32 @@ arrives, not optimistically.</p>
 connection via <cite>connect(url)</cite>, or feed it messages directly with <cite>recv(data)</cite>. The <cite>codec</cite>
 (<cite>“json”</cite>, <cite>“msgpack”</cite>, or <cite>“cbor”</cite>) frames outbound edits and decodes inbound frames.</p>
 <dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.on_change">
+<span class="sig-name descname"><span class="pre">on_change</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_change"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_change" title="Link to this definition">¶</a></dt>
+<dd><p>Register a callback fired after each accepted snapshot or patch — the same change dict
+<cite>recv</cite> returns — so <cite>connect</cite>/<cite>run</cite>/<cite>connect_sse</cite> consumers get path-level changes without
+managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
+type). Returns an unsubscribe function.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.on_reject">
+<span class="sig-name descname"><span class="pre">on_reject</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_reject"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_reject" title="Link to this definition">¶</a></dt>
+<dd><p>Register a callback fired when the server refuses a proposed edit — with the decoded
+<code class="docutils literal notranslate"><span class="pre">reject</span></code> message (<code class="docutils literal notranslate"><span class="pre">{&quot;t&quot;:</span> <span class="pre">&quot;reject&quot;,</span> <span class="pre">&quot;id&quot;,</span> <span class="pre">&quot;rev&quot;,</span> <span class="pre">&quot;error&quot;}</span></code>). The mirror itself reverts via
+the authoritative snapshot the server sends alongside. Returns an unsubscribe function.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.recv">
-<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.recv" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.recv" title="Link to this definition">¶</a></dt>
 <dd><p>Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.</p>
+<p>Returns the accepted change so reactive consumers can update only its paths —
+<code class="docutils literal notranslate"><span class="pre">{&quot;t&quot;:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">&quot;id&quot;,</span> <span class="pre">&quot;rev&quot;}</span></code> for a snapshot, the decoded patch message for a patch — or
+<code class="docutils literal notranslate"><span class="pre">None</span></code> for a patch whose revision was already applied, a <code class="docutils literal notranslate"><span class="pre">reject</span></code> (dispatched to
+<cite>on_reject</cite>), and an unrecognized message type, which is ignored so a newer server can add
+message types without breaking older clients. Invalid frames raise without changing the
+mirror or its accepted revision.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -930,6 +961,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#">API Reference</a><ul>
 <li><a class="reference internal" href="#session">Session</a><ul>
 <li><a class="reference internal" href="#transports.Session"><code class="docutils literal notranslate"><span class="pre">Session</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Session.reject_reason"><code class="docutils literal notranslate"><span class="pre">Session.reject_reason</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.host"><code class="docutils literal notranslate"><span class="pre">Session.host()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.ids"><code class="docutils literal notranslate"><span class="pre">Session.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Session.on_patch"><code class="docutils literal notranslate"><span class="pre">Session.on_patch()</span></code></a></li>
@@ -962,6 +994,8 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 </ul>
 </li>
 <li><a class="reference internal" href="#transports.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Client.on_change"><code class="docutils literal notranslate"><span class="pre">Client.on_change()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.on_reject"><code class="docutils literal notranslate"><span class="pre">Client.on_reject()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.value"><code class="docutils literal notranslate"><span class="pre">Client.value()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.model"><code class="docutils literal notranslate"><span class="pre">Client.model()</span></code></a></li>
