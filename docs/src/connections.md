@@ -172,8 +172,18 @@ The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON c
 
 ## Use anywidget custom messages
 
-`serve_anywidget` uses an anywidget-style `send` / `on_msg` object. The frontend sends
-`{"ready": true}` before snapshots are delivered.
+For the common case, `transports.widget(server)` is turnkey: it builds an `anywidget.AnyWidget`
+whose frontend ships inside the wheel — display it and every hosted model mirrors live, with
+`transports-change` / `transports-reject` DOM events and a wasm-free `el.transports.edit` for
+proposals. See [Pyodide](pyodide.md) for details.
+
+```python
+w = transports.widget(server)   # pip install anywidget
+w                               # display; then mutate models + transports.sync(server)
+```
+
+For a custom frontend, `serve_anywidget` wires any anywidget-style `send` / `on_msg` object — you
+supply the `_esm`. The frontend sends `{"ready": true}` before snapshots are delivered.
 
 ```python
 conn = transports.serve_anywidget(server, widget)

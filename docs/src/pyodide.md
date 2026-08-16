@@ -45,8 +45,9 @@ await client.connect("wss://example.com/ws")  # the browser's WebSocket under Py
 ```
 
 Snapshots and patches update the mirror as they arrive; register `client.on_change` /
-`client.on_reject` to react. Reconnect-with-resume (`Client.run`) is not wired to the browser path
-yet.
+`client.on_reject` to react. `Client.run` works the same way — reconnecting with `?since=` resume
+whenever the socket drops, with both `authority` modes (a client-authoritative mirror pushes its
+state back over the browser socket after the server re-snapshots).
 
 ## Run the browser test
 
