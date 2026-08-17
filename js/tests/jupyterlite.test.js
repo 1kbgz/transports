@@ -14,7 +14,7 @@ test("JupyterLite pyodide kernel installs the wheel and hosts a session", async 
 
   const url = new URL("/dist/lite/repl/index.html", "http://127.0.0.1:3000");
   url.searchParams.set("kernel", "python");
-  url.searchParams.append("code", "%pip install -q transports");
+  url.searchParams.append("code", "%pip install -q transports anywidget");
   url.searchParams.append(
     "code",
     [
@@ -24,12 +24,16 @@ test("JupyterLite pyodide kernel installs the wheel and hosts a session", async 
       "    name: str = 'lamp'",
       "session = transports.Session()",
       "mid = session.host(Device())",
-      "session.value(mid)",
-      "print('lite-ok', transports.__version__, session.snapshot(mid)['rev'])",
+      "server = transports.Server(session)",
+      // the widget factory reads its frontend module out of the installed wheel — this is the call
+      // that fails when the wheel ships without transports/extension
+      "w = transports.widget(server)",
+      "assert 'msg:custom' in w._esm",
+      "print('lite-ok', transports.__version__, session.snapshot(mid)['rev'], 'widget-ok')",
     ].join("\n"),
   );
   await page.goto(url.toString());
-  await expect(page.getByText(`lite-ok ${version} 0`)).toBeVisible({
+  await expect(page.getByText(`lite-ok ${version} 0 widget-ok`)).toBeVisible({
     timeout: 240_000,
   });
 });

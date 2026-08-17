@@ -76,7 +76,9 @@ jobs:
         if: matrix.target == 'native'
 
       - name: Install Pyodide browser dependencies
-        run: make develop-js
+        # develop-rs supplies wasm-bindgen-cli + the wasm32-unknown-unknown target: the pyodide wheel
+        # build skips hatch-js, so the JS extension assets are built up front (see make test-pyodide)
+        run: make develop-rs develop-js
         if: matrix.target == 'pyodide'
 
       - name: Lint
