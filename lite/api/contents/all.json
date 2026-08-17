@@ -1,0 +1,29 @@
+{
+  "content": [
+    {
+      "content": null,
+      "created": "2026-08-17T13:19:00.514895Z",
+      "format": null,
+      "hash": null,
+      "hash_algorithm": null,
+      "last_modified": "2026-08-17T13:16:38.065382Z",
+      "mimetype": null,
+      "name": "transports-demo.ipynb",
+      "path": "transports-demo.ipynb",
+      "size": 2015,
+      "type": "notebook",
+      "writable": true
+    }
+  ],
+  "created": "2026-08-17T13:19:00.514895Z",
+  "format": "json",
+  "hash": null,
+  "hash_algorithm": null,
+  "last_modified": "2026-08-17T13:19:00.514895Z",
+  "mimetype": null,
+  "name": "",
+  "path": "",
+  "size": null,
+  "type": "directory",
+  "writable": true
+}

@@ -238,13 +238,13 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for transports.client</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Mirror a remote `Session` from connection messages.</span>
+<span></span><span class="sd">"""Mirror a remote `Session` from connection messages.</span>
 
 <span class="sd">`Client.recv(text)` applies snapshot/patch messages to a local mirror using the core `apply`, so the</span>
-<span class="sd">client tracks each remote model&#39;s value without hosting it. `connect(url)` runs a real WebSocket</span>
+<span class="sd">client tracks each remote model's value without hosting it. `connect(url)` runs a real WebSocket</span>
 <span class="sd">client loop for live use; the rest of the class is sync and transport-agnostic (testable without a</span>
 <span class="sd">network).</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -261,11 +261,11 @@
 <div class="viewcode-block" id="Client">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Client</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.</span>
+<span class="w">    </span><span class="sd">"""Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.</span>
 
 <span class="sd">    Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live</span>
 <span class="sd">    connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`</span>
-<span class="sd">    (`&quot;json&quot;`, `&quot;msgpack&quot;`, or `&quot;cbor&quot;`) frames outbound edits and decodes inbound frames.&quot;&quot;&quot;</span>
+<span class="sd">    (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound edits and decodes inbound frames."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
@@ -278,10 +278,10 @@
 <div class="viewcode-block" id="Client.on_change">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_change">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_change</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback fired after each accepted snapshot or patch — the same change dict</span>
+<span class="w">        </span><span class="sd">"""Register a callback fired after each accepted snapshot or patch — the same change dict</span>
 <span class="sd">        `recv` returns — so `connect`/`run`/`connect_sse` consumers get path-level changes without</span>
 <span class="sd">        managing the socket themselves. Not fired for ignored frames (stale revision, unknown message</span>
-<span class="sd">        type). Returns an unsubscribe function.&quot;&quot;&quot;</span>
+<span class="sd">        type). Returns an unsubscribe function."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
@@ -289,9 +289,9 @@
 <div class="viewcode-block" id="Client.on_reject">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_reject">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_reject</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback fired when the server refuses a proposed edit — with the decoded</span>
-<span class="sd">        ``reject`` message (``{&quot;t&quot;: &quot;reject&quot;, &quot;id&quot;, &quot;rev&quot;, &quot;error&quot;}``). The mirror itself reverts via</span>
-<span class="sd">        the authoritative snapshot the server sends alongside. Returns an unsubscribe function.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Register a callback fired when the server refuses a proposed edit — with the decoded</span>
+<span class="sd">        ``reject`` message (``{"t": "reject", "id", "rev", "error"}``). The mirror itself reverts via</span>
+<span class="sd">        the authoritative snapshot the server sends alongside. Returns an unsubscribe function."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
@@ -304,35 +304,35 @@
 <div class="viewcode-block" id="Client.recv">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.recv">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.</span>
+<span class="w">        </span><span class="sd">"""Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.</span>
 
 <span class="sd">        Returns the accepted change so reactive consumers can update only its paths —</span>
-<span class="sd">        ``{&quot;t&quot;: &quot;snapshot&quot;, &quot;id&quot;, &quot;rev&quot;}`` for a snapshot, the decoded patch message for a patch — or</span>
+<span class="sd">        ``{"t": "snapshot", "id", "rev"}`` for a snapshot, the decoded patch message for a patch — or</span>
 <span class="sd">        ``None`` for a patch whose revision was already applied, a ``reject`` (dispatched to</span>
 <span class="sd">        `on_reject`), and an unrecognized message type, which is ignored so a newer server can add</span>
 <span class="sd">        message types without breaking older clients. Invalid frames raise without changing the</span>
-<span class="sd">        mirror or its accepted revision.&quot;&quot;&quot;</span>
+<span class="sd">        mirror or its accepted revision."""</span>
         <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span>
-        <span class="n">t</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;snapshot&quot;</span><span class="p">:</span>
-            <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted</span><span class="p">({</span><span class="s2">&quot;t&quot;</span><span class="p">:</span> <span class="s2">&quot;snapshot&quot;</span><span class="p">,</span> <span class="s2">&quot;id&quot;</span><span class="p">:</span> <span class="n">mid</span><span class="p">,</span> <span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]})</span>
-        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span>
-            <span class="n">mid</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">]</span>
-            <span class="n">rev</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">][</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>
-            <span class="c1"># rev is the model&#39;s sequence number; ignore a patch already reflected in the mirror (e.g. a</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"snapshot"</span><span class="p">:</span>
+            <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"value"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">]</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted</span><span class="p">({</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"snapshot"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">mid</span><span class="p">,</span> <span class="s2">"rev"</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">]})</span>
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"patch"</span><span class="p">:</span>
+            <span class="n">mid</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+            <span class="n">rev</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">][</span><span class="s2">"rev"</span><span class="p">]</span>
+            <span class="c1"># rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a</span>
             <span class="c1"># patch the opening snapshot already captured, which the server then also broadcasts).</span>
             <span class="k">if</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span> <span class="ow">and</span> <span class="n">rev</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]:</span>
                 <span class="k">return</span> <span class="kc">None</span>
             <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;patch received before snapshot for model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])))</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"patch received before snapshot for model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])))</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">rev</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">&quot;reject&quot;</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"reject"</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">):</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -343,14 +343,14 @@
 <div class="viewcode-block" id="Client.value">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.value">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current mirrored core `Value` of a model.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The current mirrored core `Value` of a model."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="Client.model">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.model">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="bp">cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">M</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">M</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Materialize the mirrored model as an instance of `cls`.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Materialize the mirrored model as an instance of `cls`."""</span>
         <span class="k">return</span> <span class="n">from_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">],</span> <span class="bp">cls</span><span class="p">)</span></div>
 
 
@@ -363,34 +363,34 @@
 <div class="viewcode-block" id="Client.edit">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.edit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).</span>
+<span class="w">        </span><span class="sd">"""Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).</span>
 
 <span class="sd">        Models are server-authoritative: the edit is a proposal, and the local mirror updates only</span>
 <span class="sd">        when the server echoes the authoritative patch back (via `recv`), not optimistically. This</span>
 <span class="sd">        keeps `rev` owned by the server and avoids client/server `rev` divergence.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">new_value</span><span class="p">)))</span>
         <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_connect_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already</span>
-<span class="sd">        mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model.&quot;&quot;&quot;</span>
-        <span class="n">sep</span> <span class="o">=</span> <span class="s2">&quot;&amp;&quot;</span> <span class="k">if</span> <span class="s2">&quot;?&quot;</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">&quot;?&quot;</span>
-        <span class="n">params</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">&quot;</span>
+<span class="w">        </span><span class="sd">"""``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already</span>
+<span class="sd">        mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""</span>
+        <span class="n">sep</span> <span class="o">=</span> <span class="s2">"&amp;"</span> <span class="k">if</span> <span class="s2">"?"</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">"?"</span>
+        <span class="n">params</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">"</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span>
-            <span class="n">params</span> <span class="o">+=</span> <span class="s2">&quot;&amp;since=&quot;</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">))</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="n">params</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="n">params</span> <span class="o">+=</span> <span class="s2">"&amp;since="</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">))</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="n">params</span><span class="si">}</span><span class="s2">"</span>
 
 <div class="viewcode-block" id="Client.connect">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect to a transports server and mirror it until the connection closes (one connection).</span>
+<span class="w">        </span><span class="sd">"""Connect to a transports server and mirror it until the connection closes (one connection).</span>
 
-<span class="sd">        Under Pyodide (``sys.platform == &quot;emscripten&quot;``) the browser gives Python no raw sockets, so</span>
-<span class="sd">        this rides the browser&#39;s native ``WebSocket`` through the ``js`` FFI instead of the</span>
-<span class="sd">        ``websockets`` library — same API, same wire.&quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
+<span class="sd">        Under Pyodide (``sys.platform == "emscripten"``) the browser gives Python no raw sockets, so</span>
+<span class="sd">        this rides the browser's native ``WebSocket`` through the ``js`` FFI instead of the</span>
+<span class="sd">        ``websockets`` library — same API, same wire."""</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"emscripten"</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
             <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
@@ -400,13 +400,13 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
 
-    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;`run` over the browser&#39;s native `WebSocket` (the Pyodide path): reconnect forever with</span>
-<span class="sd">        ``?since=`` resume, same ``authority`` semantics as the native loop.&quot;&quot;&quot;</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"server"</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""`run` over the browser's native `WebSocket` (the Pyodide path): reconnect forever with</span>
+<span class="sd">        ``?since=`` resume, same ``authority`` semantics as the native loop."""</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;client&quot;</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">"client"</span> <span class="k">else</span> <span class="kc">None</span>
             <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
 
             <span class="k">def</span><span class="w"> </span><span class="nf">_rectify</span><span class="p">(</span><span class="n">ws</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">pre</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="n">pre</span><span class="p">,</span> <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="n">pushed</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -417,14 +417,14 @@
                         <span class="bp">self</span><span class="o">.</span><span class="n">_send_browser</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">pre</span><span class="p">[</span><span class="n">mid</span><span class="p">]))</span>
                         <span class="n">pushed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
 
-            <span class="c1"># construction/FFI errors fall through to the retry, like the native loop&#39;s dropped socket</span>
+            <span class="c1"># construction/FFI errors fall through to the retry, like the native loop's dropped socket</span>
             <span class="k">with</span> <span class="n">contextlib</span><span class="o">.</span><span class="n">suppress</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
                 <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_browser</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">on_frame</span><span class="o">=</span><span class="n">_rectify</span><span class="p">)</span>
             <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry</span><span class="p">)</span>
 
     <span class="nd">@staticmethod</span>
     <span class="k">def</span><span class="w"> </span><span class="nf">_send_browser</span><span class="p">(</span><span class="n">ws</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Send a frame over a browser `WebSocket`: text as-is, binary converted for the FFI.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Send a frame over a browser `WebSocket`: text as-is, binary converted for the FFI."""</span>
         <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
             <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
@@ -433,11 +433,11 @@
             <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">to_js</span><span class="p">(</span><span class="n">frame</span><span class="p">))</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">on_frame</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">Any</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror over the browser&#39;s native `WebSocket` (the Pyodide path) until it closes.</span>
+<span class="w">        </span><span class="sd">"""Mirror over the browser's native `WebSocket` (the Pyodide path) until it closes.</span>
 
 <span class="sd">        ``on_frame(ws)`` fires after each applied frame — `_run_browser` uses it to rectify under</span>
 <span class="sd">        client authority. Split out (and importing ``js`` / ``pyodide.ffi`` lazily) so the wiring is</span>
-<span class="sd">        testable with fake modules injected into ``sys.modules`` off-browser.&quot;&quot;&quot;</span>
+<span class="sd">        testable with fake modules injected into ``sys.modules`` off-browser."""</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
         <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_proxy</span>
@@ -445,7 +445,7 @@
         <span class="kn">from</span><span class="w"> </span><span class="nn">js</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocket</span>  <span class="c1"># the browser global via the Pyodide FFI</span>
 
         <span class="n">ws</span> <span class="o">=</span> <span class="n">WebSocket</span><span class="o">.</span><span class="n">new</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span>
-        <span class="n">ws</span><span class="o">.</span><span class="n">binaryType</span> <span class="o">=</span> <span class="s2">&quot;arraybuffer&quot;</span>
+        <span class="n">ws</span><span class="o">.</span><span class="n">binaryType</span> <span class="o">=</span> <span class="s2">"arraybuffer"</span>
         <span class="n">closed</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Future</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">get_running_loop</span><span class="p">()</span><span class="o">.</span><span class="n">create_future</span><span class="p">()</span>
 
         <span class="k">def</span><span class="w"> </span><span class="nf">_on_message</span><span class="p">(</span><span class="n">event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -460,7 +460,7 @@
                 <span class="n">closed</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 
         <span class="n">proxies</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">)]</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">&quot;message&quot;</span><span class="p">,</span> <span class="s2">&quot;close&quot;</span><span class="p">,</span> <span class="s2">&quot;error&quot;</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">"message"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
             <span class="n">ws</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">proxy</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">await</span> <span class="n">closed</span>
@@ -470,32 +470,32 @@
 
 <div class="viewcode-block" id="Client.run">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.run">[docs]</a>
-    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Connect and mirror, **reconnecting** whenever the connection drops — so the client survives a</span>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"server"</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Connect and mirror, **reconnecting** whenever the connection drops — so the client survives a</span>
 <span class="sd">        server restart or a network blip. ``authority`` decides reconciliation on each (re)connect:</span>
 
-<span class="sd">        - ``&quot;server&quot;`` (default): the server is canonical; the client adopts its state (resuming from</span>
-<span class="sd">          ``?since=`` when it can, else a fresh snapshot). This is the &quot;refetch on refresh&quot; behavior.</span>
-<span class="sd">        - ``&quot;client&quot;``: the client is canonical; after the server&#39;s snapshot it **pushes its last-known</span>
+<span class="sd">        - ``"server"`` (default): the server is canonical; the client adopts its state (resuming from</span>
+<span class="sd">          ``?since=`` when it can, else a fresh snapshot). This is the "refetch on refresh" behavior.</span>
+<span class="sd">        - ``"client"``: the client is canonical; after the server's snapshot it **pushes its last-known</span>
 <span class="sd">          state back** as an edit, so a server that came back stale or empty is rectified from the client.</span>
 <span class="sd">          With a CRDT model the push merges (newer stamps win); otherwise it overwrites.</span>
 
 <span class="sd">        Runs until cancelled. The choice of *where the authoritative state lives* is yours — pair this</span>
 <span class="sd">        with the server-side durability hooks (`Hub.on_shared_write`) as your use case needs. Under</span>
-<span class="sd">        Pyodide this rides the browser&#39;s native ``WebSocket`` (like `connect`), same semantics.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        Pyodide this rides the browser's native ``WebSocket`` (like `connect`), same semantics.</span>
+<span class="sd">        """</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
-        <span class="k">if</span> <span class="n">authority</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;server&quot;</span><span class="p">,</span> <span class="s2">&quot;client&quot;</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;authority must be &#39;server&#39; or &#39;client&#39;, not </span><span class="si">{</span><span class="n">authority</span><span class="si">!r}</span><span class="s2">&quot;</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
+        <span class="k">if</span> <span class="n">authority</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">"server"</span><span class="p">,</span> <span class="s2">"client"</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"authority must be 'server' or 'client', not </span><span class="si">{</span><span class="n">authority</span><span class="si">!r}</span><span class="s2">"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"emscripten"</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_run_browser</span><span class="p">(</span><span class="n">url</span><span class="p">,</span> <span class="n">authority</span><span class="o">=</span><span class="n">authority</span><span class="p">,</span> <span class="n">retry</span><span class="o">=</span><span class="n">retry</span><span class="p">)</span>
             <span class="k">return</span>
 
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
 
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
-            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">&quot;client&quot;</span> <span class="k">else</span> <span class="kc">None</span>
+            <span class="n">pre</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span> <span class="k">if</span> <span class="n">authority</span> <span class="o">==</span> <span class="s2">"client"</span> <span class="k">else</span> <span class="kc">None</span>
             <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
@@ -514,25 +514,25 @@
 <div class="viewcode-block" id="Client.connect_sse">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.connect_sse">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">connect_sse</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</span>
+<span class="w">        </span><span class="sd">"""Mirror a transports server over Server-Sent Events (receive-only) until the stream closes.</span>
 
 <span class="sd">        SSE is a one-way server→client channel, so this only receives snapshots and patches; use</span>
 <span class="sd">        `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides</span>
-<span class="sd">        the browser&#39;s native ``EventSource`` (no raw sockets for `httpx`).</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;emscripten&quot;</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
+<span class="sd">        the browser's native ``EventSource`` (no raw sockets for `httpx`).</span>
+<span class="sd">        """</span>
+        <span class="k">if</span> <span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">"emscripten"</span><span class="p">:</span>  <span class="c1"># pragma: no cover - exercised by the in-Pyodide suite</span>
             <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_sse_browser</span><span class="p">(</span><span class="n">url</span><span class="p">)</span>
             <span class="k">return</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">httpx</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">httpx_sse</span><span class="w"> </span><span class="kn">import</span> <span class="n">aconnect_sse</span>
 
-        <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">http</span><span class="p">,</span> <span class="n">aconnect_sse</span><span class="p">(</span><span class="n">http</span><span class="p">,</span> <span class="s2">&quot;GET&quot;</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
+        <span class="k">async</span> <span class="k">with</span> <span class="n">httpx</span><span class="o">.</span><span class="n">AsyncClient</span><span class="p">()</span> <span class="k">as</span> <span class="n">http</span><span class="p">,</span> <span class="n">aconnect_sse</span><span class="p">(</span><span class="n">http</span><span class="p">,</span> <span class="s2">"GET"</span><span class="p">,</span> <span class="n">url</span><span class="p">)</span> <span class="k">as</span> <span class="n">source</span><span class="p">:</span>
             <span class="k">async</span> <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">source</span><span class="o">.</span><span class="n">aiter_sse</span><span class="p">():</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">event</span><span class="o">.</span><span class="n">data</span><span class="p">)</span></div>
 
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_connect_sse_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Mirror over the browser&#39;s native `EventSource` (the Pyodide path) until it errors/closes.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Mirror over the browser's native `EventSource` (the Pyodide path) until it errors/closes."""</span>
         <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 
         <span class="kn">from</span><span class="w"> </span><span class="nn">pyodide.ffi</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_proxy</span>
@@ -550,8 +550,8 @@
                 <span class="n">closed</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 
         <span class="n">on_message</span><span class="p">,</span> <span class="n">on_error</span> <span class="o">=</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_error</span><span class="p">)</span>
-        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">,</span> <span class="n">on_message</span><span class="p">)</span>
-        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">&quot;error&quot;</span><span class="p">,</span> <span class="n">on_error</span><span class="p">)</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">"message"</span><span class="p">,</span> <span class="n">on_message</span><span class="p">)</span>
+        <span class="n">source</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="s2">"error"</span><span class="p">,</span> <span class="n">on_error</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">await</span> <span class="n">closed</span>
         <span class="k">finally</span><span class="p">:</span>

@@ -271,7 +271,7 @@ change, and send one client proposal back to the server.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
+<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"lamp"</span><span class="p">)</span>
 <span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
@@ -281,7 +281,7 @@ change, and send one client proposal back to the server.</p>
 <p>Mutate the model and drain the session:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
-<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]})]</span>
+<span class="c1"># [(1, {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'on'}], 'value': {'Bool': True}}}]})]</span>
 </pre></div>
 </div>
 <p>Notice that only <code class="docutils literal notranslate"><span class="pre">on</span></code> is present in the patch.</p>
@@ -293,24 +293,24 @@ but no network is needed for the tutorial.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
 <span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
 
-<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">&quot;browser&quot;</span><span class="p">):</span>
+<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="s2">"browser"</span><span class="p">):</span>
     <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;lamp&#39; on=True</span>
+<span class="c1"># name='lamp' on=True</span>
 </pre></div>
 </div>
 </section>
 <section id="send-another-server-side-change">
 <h2>Send another server-side change<a class="headerlink" href="#send-another-server-side-change" title="Link to this heading">¶</a></h2>
 <p>Mutate the hosted model again, flush the server, and feed the outbound frame to the client.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;desk lamp&quot;</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">lamp</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">"desk lamp"</span>
 
-<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()[</span><span class="s2">&quot;browser&quot;</span><span class="p">]:</span>
+<span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()[</span><span class="s2">"browser"</span><span class="p">]:</span>
     <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;desk lamp&#39; on=True</span>
+<span class="c1"># name='desk lamp' on=True</span>
 </pre></div>
 </div>
 </section>
@@ -318,17 +318,17 @@ but no network is needed for the tutorial.</p>
 <h2>Send a client proposal<a class="headerlink" href="#send-a-client-proposal" title="Link to this heading">¶</a></h2>
 <p>A client edit is a proposal. The server applies it, assigns the revision, and echoes the
 accepted patch back.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">next_value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;desk lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">next_value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"desk lamp"</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">False</span><span class="p">))</span>
 <span class="n">proposal</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">next_value</span><span class="p">)</span>
 
-<span class="k">for</span> <span class="n">_conn</span><span class="p">,</span> <span class="n">frames</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="s2">&quot;browser&quot;</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+<span class="k">for</span> <span class="n">_conn</span><span class="p">,</span> <span class="n">frames</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="s2">"browser"</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
     <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">frames</span><span class="p">:</span>
         <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">lamp</span><span class="o">.</span><span class="n">on</span><span class="p">)</span>
 <span class="c1"># False</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">client</span><span class="o">.</span><span class="n">model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">Device</span><span class="p">))</span>
-<span class="c1"># name=&#39;desk lamp&#39; on=False</span>
+<span class="c1"># name='desk lamp' on=False</span>
 </pre></div>
 </div>
 <p>You have now hosted a model, mirrored it, streamed a patch, and sent a client edit through the same

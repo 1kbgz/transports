@@ -238,7 +238,7 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for transports.sse</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Serve a `Session`/`Hub` over Server-Sent Events (receive-only).</span>
+<span></span><span class="sd">"""Serve a `Session`/`Hub` over Server-Sent Events (receive-only).</span>
 
 <span class="sd">SSE is a one-way server→client stream (the browser `EventSource`), well suited to receive-mostly UIs</span>
 <span class="sd">like dashboards. A client receives the opening snapshots and then a live stream of patches; it does</span>
@@ -253,11 +253,11 @@
 <span class="sd">import transports</span>
 
 <span class="sd">app = Starlette(</span>
-<span class="sd">    routes=[Route(&quot;/sse&quot;, transports.sse_endpoint(server))],</span>
+<span class="sd">    routes=[Route("/sse", transports.sse_endpoint(server))],</span>
 <span class="sd">    on_startup=[lambda: asyncio.create_task(transports.autosync(server))],</span>
 <span class="sd">)</span>
 <span class="sd">```</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
@@ -267,7 +267,7 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_SSEConn</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A connection handle that buffers outbound messages for an SSE stream to drain.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""A connection handle that buffers outbound messages for an SSE stream to drain."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="p">:</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span> <span class="o">=</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">Queue</span><span class="p">()</span>
@@ -280,11 +280,11 @@
 
 
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">_SSEConn</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Async generator of wire messages for one SSE connection: the opening snapshots, then patches.</span>
+<span class="w">    </span><span class="sd">"""Async generator of wire messages for one SSE connection: the opening snapshots, then patches.</span>
 
-<span class="sd">    Patches arrive on the connection&#39;s queue via `autosync` (which calls `send_text`). Closes the</span>
+<span class="sd">    Patches arrive on the connection's queue via `autosync` (which calls `send_text`). Closes the</span>
 <span class="sd">    connection when the consumer stops iterating.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">):</span>  <span class="c1"># snapshots first</span>
         <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
@@ -297,11 +297,11 @@
 <div class="viewcode-block" id="sse_endpoint">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.sse_endpoint">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a Starlette endpoint that streams a `Server`/`Hub` to a client over SSE.</span>
+<span class="w">    </span><span class="sd">"""Build a Starlette endpoint that streams a `Server`/`Hub` to a client over SSE.</span>
 
-<span class="sd">    Wire it into an app as a normal route (``Route(&quot;/sse&quot;, sse_endpoint(server))``) and run</span>
+<span class="sd">    Wire it into an app as a normal route (``Route("/sse", sse_endpoint(server))``) and run</span>
 <span class="sd">    `autosync(server)` as a background task to stream server-side model changes to connected clients.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="kn">from</span><span class="w"> </span><span class="nn">sse_starlette</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSourceResponse</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>

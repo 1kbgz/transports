@@ -251,7 +251,7 @@ today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom message
 <section id="serve-a-session-over-websocket">
 <h2>Serve a session over WebSocket<a class="headerlink" href="#serve-a-session-over-websocket" title="Link to this heading">¶</a></h2>
 <p>Install the WebSocket dependencies:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w"> </span>uvicorn
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[connections]"</span><span class="w"> </span>uvicorn
 </pre></div>
 </div>
 <p>Create a Starlette app:</p>
@@ -280,7 +280,7 @@ today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom message
     <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">ticker</span><span class="p">())</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
-    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">"/ws"</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
     <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
@@ -295,14 +295,14 @@ resulting patches to all open connections.</p>
 <section id="mirror-the-server-in-a-browser">
 <h2>Mirror the server in a browser<a class="headerlink" href="#mirror-the-server-in-a-browser" title="Link to this heading">¶</a></h2>
 <p>Initialize the wasm package, connect, and render whenever a message arrives.</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="nx">init</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">fromValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
 <span class="k">await</span><span class="w"> </span><span class="nx">init</span><span class="p">();</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">);</span>
 
-<span class="nx">ws</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s2">&quot;message&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="nx">ws</span><span class="p">.</span><span class="nx">addEventListener</span><span class="p">(</span><span class="s2">"message"</span><span class="p">,</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
 <span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">id</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">undefined</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
 <span class="w">  </span><span class="nx">render</span><span class="p">(</span><span class="nx">fromValue</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">value</span><span class="p">(</span><span class="nx">id</span><span class="p">)));</span>
@@ -310,7 +310,7 @@ resulting patches to all open connections.</p>
 </pre></div>
 </div>
 <p>To send an edit, create the next core <code class="docutils literal notranslate"><span class="pre">Value</span></code> and send the encoded proposal frame:</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
 <span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">})));</span>
@@ -322,7 +322,7 @@ resulting patches to all open connections.</p>
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code> runs a receive loop until the WebSocket closes.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>For Python clients that also send edits, manage the WebSocket loop directly and send the frame
@@ -332,19 +332,19 @@ returned by <code class="docutils literal notranslate"><span class="pre">client.
 <h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>
 <p>Pass <code class="docutils literal notranslate"><span class="pre">codec=&quot;msgpack&quot;</span></code> on the client. The client appends <code class="docutils literal notranslate"><span class="pre">?codec=msgpack</span></code>; the server sends binary
 frames to that connection and can still serve JSON clients at the same time.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">&quot;msgpack&quot;</span><span class="p">)</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"msgpack"</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">&quot;msgpack&quot;</span><span class="p">);</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">&quot;ws://127.0.0.1:8000/ws&quot;</span><span class="p">);</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"msgpack"</span><span class="p">);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">);</span>
 </pre></div>
 </div>
 </section>
 <section id="stream-receive-only-updates-over-sse">
 <h2>Stream receive-only updates over SSE<a class="headerlink" href="#stream-receive-only-updates-over-sse" title="Link to this heading">¶</a></h2>
 <p>Use SSE for dashboards and other receive-only clients.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[sse]&quot;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[sse]"</span>
 </pre></div>
 </div>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
@@ -355,19 +355,19 @@ frames to that connection and can still serve JSON clients at the same time.</p>
     <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autosync</span><span class="p">(</span><span class="n">server</span><span class="p">))</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
-    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">Route</span><span class="p">(</span><span class="s2">&quot;/sse&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">Route</span><span class="p">(</span><span class="s2">"/sse"</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">sse_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">))],</span>
     <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>
 </div>
 <p>Python client:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_sse</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8000/sse&quot;</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_sse</span><span class="p">(</span><span class="s2">"http://127.0.0.1:8000/sse"</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Browser client:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connectSSE</span><span class="p">(</span><span class="s2">&quot;http://127.0.0.1:8000/sse&quot;</span><span class="p">);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">events</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connectSSE</span><span class="p">(</span><span class="s2">"http://127.0.0.1:8000/sse"</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>SSE is JSON/text and server-to-client only. Use WebSocket when clients need to send edits.</p>
@@ -375,13 +375,13 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <section id="use-a-jupyter-comm">
 <h2>Use a Jupyter comm<a class="headerlink" href="#use-a-jupyter-comm" title="Link to this heading">¶</a></h2>
 <p>Install the comm dependency:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[jupyter]&quot;</span>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[jupyter]"</span>
 </pre></div>
 </div>
 <p>Wire a kernel comm to a <code class="docutils literal notranslate"><span class="pre">Server</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">comm</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_comm</span>
 
-<span class="n">comm</span> <span class="o">=</span> <span class="n">create_comm</span><span class="p">(</span><span class="n">target_name</span><span class="o">=</span><span class="s2">&quot;transports&quot;</span><span class="p">)</span>
+<span class="n">comm</span> <span class="o">=</span> <span class="n">create_comm</span><span class="p">(</span><span class="n">target_name</span><span class="o">=</span><span class="s2">"transports"</span><span class="p">)</span>
 <span class="n">transports</span><span class="o">.</span><span class="n">serve_comm</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">comm</span><span class="p">)</span>
 
 <span class="c1"># after mutating hosted models</span>
@@ -411,7 +411,7 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <p>Frontend messages use the same client protocol:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
 
-<span class="nx">model</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">&quot;msg:custom&quot;</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="nx">model</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">"msg:custom"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
 <span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">)</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">);</span>
 <span class="p">});</span>
 
@@ -425,8 +425,8 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <p>A <code class="docutils literal notranslate"><span class="pre">Hub</span></code> satisfies the same connection contract as <code class="docutils literal notranslate"><span class="pre">Server</span></code>, so the same adapters serve it:
 <code class="docutils literal notranslate"><span class="pre">transports.ws_endpoint(hub)</span></code> for WebSocket, <code class="docutils literal notranslate"><span class="pre">transports.sse_endpoint(hub)</span></code> for SSE, and the same
 <code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> / <code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> helpers for Jupyter (with <code class="docutils literal notranslate"><span class="pre">autosync(hub)</span></code> or <code class="docutils literal notranslate"><span class="pre">sync(hub)</span></code>).</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">&quot;tenant&quot;</span><span class="p">])</span>
-<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))])</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">"tenant"</span><span class="p">])</span>
+<span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">"/ws/</span><span class="si">{tenant}</span><span class="s2">"</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))])</span>
 </pre></div>
 </div>
 </section>

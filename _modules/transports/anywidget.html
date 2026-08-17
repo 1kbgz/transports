@@ -238,12 +238,12 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for transports.anywidget</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Serve a `Server`/`Hub` over an anywidget (ipywidgets `DOMWidget`) — the widget *is* the connection.</span>
+<span></span><span class="sd">"""Serve a `Server`/`Hub` over an anywidget (ipywidgets `DOMWidget`) — the widget *is* the connection.</span>
 
-<span class="sd">Like `serve_comm`, but for an anywidget&#39;s custom-message channel rather than a raw Jupyter comm: the</span>
-<span class="sd">wire rides ``widget.send({&quot;wire&quot;: &lt;wire&gt;})`` outbound and the widget&#39;s ``on_msg`` inbound. The frontend</span>
-<span class="sd">signals ``{&quot;ready&quot;: true}`` once its view exists; only then are the opening snapshots sent (a view that</span>
-<span class="sd">isn&#39;t listening yet would miss them). The same `Client.recv`/`edit` run unchanged on the frontend.</span>
+<span class="sd">Like `serve_comm`, but for an anywidget's custom-message channel rather than a raw Jupyter comm: the</span>
+<span class="sd">wire rides ``widget.send({"wire": &lt;wire&gt;})`` outbound and the widget's ``on_msg`` inbound. The frontend</span>
+<span class="sd">signals ``{"ready": true}`` once its view exists; only then are the opening snapshots sent (a view that</span>
+<span class="sd">isn't listening yet would miss them). The same `Client.recv`/`edit` run unchanged on the frontend.</span>
 
 <span class="sd">This never imports `anywidget`/`ipywidgets`: it duck-types the widget (``send`` / ``on_msg``), so it is</span>
 <span class="sd">testable with a fake widget and keeps the Jupyter dependency on the caller.</span>
@@ -258,7 +258,7 @@
 <span class="sd"># ... mutate model(s) ...</span>
 <span class="sd">transports.sync(server)                         # push host-side changes to every connection</span>
 <span class="sd">```</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
@@ -267,19 +267,19 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">_WidgetConn</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;An anywidget as a transports connection handle: a wire becomes ``widget.send({&quot;wire&quot;: wire})``.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""An anywidget as a transports connection handle: a wire becomes ``widget.send({"wire": wire})``."""</span>
 
-    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">&quot;widget&quot;</span><span class="p">,)</span>
+    <span class="vm">__slots__</span> <span class="o">=</span> <span class="p">(</span><span class="s2">"widget"</span><span class="p">,)</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">widget</span> <span class="o">=</span> <span class="n">widget</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">wire</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">widget</span><span class="o">.</span><span class="n">send</span><span class="p">({</span><span class="s2">&quot;wire&quot;</span><span class="p">:</span> <span class="n">wire</span><span class="p">})</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">widget</span><span class="o">.</span><span class="n">send</span><span class="p">({</span><span class="s2">"wire"</span><span class="p">:</span> <span class="n">wire</span><span class="p">})</span>
 
 
 <span class="k">def</span><span class="w"> </span><span class="nf">widget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Any</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;A turnkey anywidget serving ``server``: display it and every hosted model mirrors live.</span>
+<span class="w">    </span><span class="sd">"""A turnkey anywidget serving ``server``: display it and every hosted model mirrors live.</span>
 
 <span class="sd">    Builds an ``anywidget.AnyWidget`` whose frontend (shipped inside the wheel at</span>
 <span class="sd">    ``transports/extension/cdn/widget.js``) opens the wire, renders a live view of each mirrored</span>
@@ -288,13 +288,13 @@
 <span class="sd">    frontend never fetches wasm. Push kernel-side changes with ``transports.sync(server)``.</span>
 
 <span class="sd">    Lazy-imports ``anywidget`` (``pip install anywidget``); works under Jupyter and JupyterLite.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="kn">import</span><span class="w"> </span><span class="nn">pathlib</span>
 
     <span class="kn">import</span><span class="w"> </span><span class="nn">anywidget</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">_anywidget</span>
 
     <span class="k">class</span><span class="w"> </span><span class="nc">TransportsWidget</span><span class="p">(</span><span class="n">_anywidget</span><span class="o">.</span><span class="n">AnyWidget</span><span class="p">):</span>
-        <span class="n">_esm</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">&quot;extension&quot;</span> <span class="o">/</span> <span class="s2">&quot;cdn&quot;</span> <span class="o">/</span> <span class="s2">&quot;widget.js&quot;</span>
+        <span class="n">_esm</span> <span class="o">=</span> <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="vm">__file__</span><span class="p">)</span><span class="o">.</span><span class="n">parent</span> <span class="o">/</span> <span class="s2">"extension"</span> <span class="o">/</span> <span class="s2">"cdn"</span> <span class="o">/</span> <span class="s2">"widget.js"</span>
 
     <span class="n">instance</span> <span class="o">=</span> <span class="n">TransportsWidget</span><span class="p">()</span>
     <span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">instance</span><span class="p">)</span>
@@ -303,27 +303,27 @@
 
 <div class="viewcode-block" id="serve_anywidget">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.serve_anywidget">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;json&quot;</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_WidgetConn</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"json"</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">_WidgetConn</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.</span>
 
-<span class="sd">    The widget&#39;s custom messages drive the protocol: ``{&quot;ready&quot;: true}`` triggers the opening snapshots,</span>
-<span class="sd">    and any ``{&quot;wire&quot;: &lt;wire&gt;}`` is relayed to ``server.recv`` (a client&#39;s edits), with results sent back</span>
+<span class="sd">    The widget's custom messages drive the protocol: ``{"ready": true}`` triggers the opening snapshots,</span>
+<span class="sd">    and any ``{"wire": &lt;wire&gt;}`` is relayed to ``server.recv`` (a client's edits), with results sent back</span>
 <span class="sd">    over the relevant widgets.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">if</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span> <span class="o">!=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">:</span>
-        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;the anywidget transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported&quot;</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"the anywidget transport carries JSON-able data only; codec </span><span class="si">{</span><span class="n">codec</span><span class="si">!r}</span><span class="s2"> is not supported"</span><span class="p">)</span>
     <span class="n">conn</span> <span class="o">=</span> <span class="n">_WidgetConn</span><span class="p">(</span><span class="n">widget</span><span class="p">)</span>
     <span class="n">opened</span> <span class="o">=</span> <span class="p">[]</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_on_msg</span><span class="p">(</span><span class="n">_widget</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">content</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">_buffers</span><span class="p">:</span> <span class="n">Any</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">content</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
             <span class="k">return</span>
-        <span class="k">if</span> <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ready&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">opened</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">content</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"ready"</span><span class="p">)</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">opened</span><span class="p">:</span>
             <span class="n">opened</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">True</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">codec</span><span class="p">):</span>
                 <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
-        <span class="k">elif</span> <span class="s2">&quot;wire&quot;</span> <span class="ow">in</span> <span class="n">content</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">content</span><span class="p">[</span><span class="s2">&quot;wire&quot;</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">elif</span> <span class="s2">"wire"</span> <span class="ow">in</span> <span class="n">content</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">content</span><span class="p">[</span><span class="s2">"wire"</span><span class="p">])</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
                     <span class="n">target</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 

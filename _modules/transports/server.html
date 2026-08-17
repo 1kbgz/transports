@@ -238,7 +238,7 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for transports.server</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Serve a reactive `Session` over connections (WebSocket, ...).</span>
+<span></span><span class="sd">"""Serve a reactive `Session` over connections (WebSocket, ...).</span>
 
 <span class="sd">`Server` holds the transport-agnostic logic — register connections, send snapshots on open, relay</span>
 <span class="sd">inbound patches, broadcast outbound patches — as plain synchronous methods that *return* the messages</span>
@@ -246,10 +246,10 @@
 <span class="sd">`autosync`), so the protocol is testable without a network.</span>
 
 <span class="sd">A connection handle is any hashable object (the Starlette `WebSocket`, a test sentinel, ...) that the</span>
-<span class="sd">I/O adapter knows how to send on. Each connection negotiates a codec (`&quot;json&quot;` or `&quot;msgpack&quot;`); the</span>
-<span class="sd">server encodes every outbound message in *that connection&#39;s* codec, so JSON and MessagePack clients</span>
+<span class="sd">I/O adapter knows how to send on. Each connection negotiates a codec (`"json"` or `"msgpack"`); the</span>
+<span class="sd">server encodes every outbound message in *that connection's* codec, so JSON and MessagePack clients</span>
 <span class="sd">can share one server. A wire message is a `str` (JSON text frame) or `bytes` (MessagePack binary).</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">asyncio</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -262,9 +262,9 @@
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Broadcaster</span><span class="p">(</span><span class="n">Protocol</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;The structural contract the I/O adapters drive — satisfied by both `Server` and `Hub`.&quot;&quot;&quot;</span>
+<span class="w">    </span><span class="sd">"""The structural contract the I/O adapters drive — satisfied by both `Server` and `Hub`."""</span>
 
-    <span class="c1">#: the codec a connection gets when it doesn&#39;t request one (the I/O adapters read this)</span>
+    <span class="c1">#: the codec a connection gets when it doesn't request one (the I/O adapters read this)</span>
     <span class="n">default_codec</span><span class="p">:</span> <span class="nb">str</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="o">...</span><span class="p">,</span> <span class="n">since</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="o">...</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Wire</span><span class="p">]:</span> <span class="o">...</span>
@@ -279,11 +279,11 @@
 <div class="viewcode-block" id="Server">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server">[docs]</a>
 <span class="k">class</span><span class="w"> </span><span class="nc">Server</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and</span>
-<span class="sd">    relays a client&#39;s patches to the other clients (a hub). Transport-agnostic — its methods return</span>
+<span class="w">    </span><span class="sd">"""Serves a `Session` to connected clients: sends a snapshot on connect, broadcasts patches, and</span>
+<span class="sd">    relays a client's patches to the other clients (a hub). Transport-agnostic — its methods return</span>
 <span class="sd">    the messages to send; an adapter such as `ws_endpoint` performs the I/O.</span>
 
-<span class="sd">    Each connection has its own negotiated codec, so outbound messages are encoded per connection.&quot;&quot;&quot;</span>
+<span class="sd">    Each connection has its own negotiated codec, so outbound messages are encoded per connection."""</span>
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">session</span><span class="p">:</span> <span class="n">Session</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">default_codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_session</span> <span class="o">=</span> <span class="n">session</span>
@@ -296,12 +296,12 @@
 <div class="viewcode-block" id="Server.open">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.open">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">open</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span> <span class="n">since</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="n">Wire</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a connection; return the messages that bring it up to date.</span>
+<span class="w">        </span><span class="sd">"""Register a connection; return the messages that bring it up to date.</span>
 
 <span class="sd">        Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only</span>
 <span class="sd">        the patches each model emitted after ``last_rev``, falling back to a snapshot for any model whose</span>
-<span class="sd">        replay log can&#39;t bridge the gap. So a reconnecting client replays the delta, not the whole model.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        replay log can't bridge the gap. So a reconnecting client replays the delta, not the whole model.</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span> <span class="ow">or</span> <span class="bp">self</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
         <span class="n">out</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Wire</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">ids</span><span class="p">():</span>
@@ -312,37 +312,37 @@
                     <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)))</span>
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
-                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;type_name&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])))</span>
+                <span class="n">out</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"type_name"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])))</span>
         <span class="k">return</span> <span class="n">out</span></div>
 
 
 <div class="viewcode-block" id="Server.recv">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.recv">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">recv</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="n">Wire</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.</span>
+<span class="w">        </span><span class="sd">"""Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.</span>
 
 <span class="sd">        A client patch is a *proposal*: the server applies it, bumps its own authoritative `rev`, and</span>
 <span class="sd">        echoes the resulting patch to **every** connection (including the origin), each in that</span>
-<span class="sd">        connection&#39;s codec. Models are server-authoritative — a client&#39;s mirror updates when this echo</span>
+<span class="sd">        connection's codec. Models are server-authoritative — a client's mirror updates when this echo</span>
 <span class="sd">        arrives, not optimistically.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">))</span>
-        <span class="k">if</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;t&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;patch&quot;</span><span class="p">:</span>
-            <span class="n">authoritative</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">&quot;patch&quot;</span><span class="p">])</span>
+        <span class="k">if</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"patch"</span><span class="p">:</span>
+            <span class="n">authoritative</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])</span>
             <span class="k">if</span> <span class="n">authoritative</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="c1"># Rejected (invalid edit, or a malformed patch): re-send the authoritative state to the</span>
                 <span class="c1"># proposer alone, so its optimistic UI reverts to the last good value, followed by a typed</span>
-                <span class="c1"># `reject` frame saying why (the model&#39;s validation message). The server stays up and other</span>
+                <span class="c1"># `reject` frame saying why (the model's validation message). The server stays up and other</span>
                 <span class="c1"># connections are untouched — a round-trip validation failure self-corrects.</span>
-                <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">reject_reason</span> <span class="ow">or</span> <span class="s2">&quot;rejected&quot;</span>
-                <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">])</span>
+                <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">reject_reason</span> <span class="ow">or</span> <span class="s2">"rejected"</span>
+                <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">])</span>
                 <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">reject</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">reject_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
+                    <span class="n">reject</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">reject_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="mi">0</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
                     <span class="k">return</span> <span class="p">{</span><span class="n">conn</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">reject</span><span class="p">)]}</span>
-                <span class="n">revert</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;type_name&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">])</span>
-                <span class="n">reject</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">reject_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">error</span><span class="p">)</span>
+                <span class="n">revert</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"type_name"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"value"</span><span class="p">])</span>
+                <span class="n">reject</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">reject_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">snap</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">],</span> <span class="n">error</span><span class="p">)</span>
                 <span class="k">return</span> <span class="p">{</span><span class="n">conn</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">revert</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">reject</span><span class="p">)]}</span>
-            <span class="n">relay</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">&quot;id&quot;</span><span class="p">],</span> <span class="n">authoritative</span><span class="p">)</span>
+            <span class="n">relay</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">],</span> <span class="n">authoritative</span><span class="p">)</span>
             <span class="k">return</span> <span class="p">{</span><span class="n">c</span><span class="p">:</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_encode_for</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="n">relay</span><span class="p">)]</span> <span class="k">for</span> <span class="n">c</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">}</span>
         <span class="k">return</span> <span class="p">{}</span></div>
 
@@ -350,7 +350,7 @@
 <div class="viewcode-block" id="Server.flush">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Server.flush">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="n">Wire</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Drain the session and return the patch messages to broadcast, encoded per connection.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Drain the session and return the patch messages to broadcast, encoded per connection."""</span>
         <span class="n">msgs</span> <span class="o">=</span> <span class="p">[</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">drain</span><span class="p">()]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">msgs</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{}</span>
@@ -375,18 +375,18 @@
 <div class="viewcode-block" id="ws_endpoint">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.ws_endpoint">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">ws_endpoint</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">):</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Build a Starlette WebSocket endpoint that serves `server` (a `Server` or `Hub`).</span>
+<span class="w">    </span><span class="sd">"""Build a Starlette WebSocket endpoint that serves `server` (a `Server` or `Hub`).</span>
 
-<span class="sd">    The connection&#39;s codec is read from a ``?codec=`` query param, falling back to the broadcaster&#39;s</span>
-<span class="sd">    `default_codec`. Wire it into an app, e.g. ``WebSocketRoute(&quot;/ws&quot;, ws_endpoint(server))``, and run</span>
+<span class="sd">    The connection's codec is read from a ``?codec=`` query param, falling back to the broadcaster's</span>
+<span class="sd">    `default_codec`. Wire it into an app, e.g. ``WebSocketRoute("/ws", ws_endpoint(server))``, and run</span>
 <span class="sd">    `autosync(server)` as a background task to stream server-side model changes to clients.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">websocket</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="kn">from</span><span class="w"> </span><span class="nn">starlette.websockets</span><span class="w"> </span><span class="kn">import</span> <span class="n">WebSocketDisconnect</span>
 
-        <span class="n">codec</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;codec&quot;</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
-        <span class="n">since_param</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;since&quot;</span><span class="p">)</span>  <span class="c1"># resume token: {mid: last_rev} JSON</span>
+        <span class="n">codec</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"codec"</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
+        <span class="n">since_param</span> <span class="o">=</span> <span class="n">websocket</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"since"</span><span class="p">)</span>  <span class="c1"># resume token: {mid: last_rev} JSON</span>
         <span class="n">since</span> <span class="o">=</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">k</span><span class="p">):</span> <span class="nb">int</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">since_param</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span> <span class="k">if</span> <span class="n">since_param</span> <span class="k">else</span> <span class="kc">None</span>
         <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">accept</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">codec</span><span class="p">,</span> <span class="n">since</span><span class="p">):</span>
@@ -394,11 +394,11 @@
         <span class="k">try</span><span class="p">:</span>
             <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
                 <span class="n">frame</span> <span class="o">=</span> <span class="k">await</span> <span class="n">websocket</span><span class="o">.</span><span class="n">receive</span><span class="p">()</span>
-                <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;websocket.disconnect&quot;</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"type"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"websocket.disconnect"</span><span class="p">:</span>
                     <span class="k">break</span>
-                <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text&quot;</span><span class="p">)</span>
+                <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"text"</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-                    <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;bytes&quot;</span><span class="p">)</span>
+                    <span class="n">data</span> <span class="o">=</span> <span class="n">frame</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"bytes"</span><span class="p">)</span>
                 <span class="k">if</span> <span class="n">data</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">continue</span>
                 <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">websocket</span><span class="p">,</span> <span class="n">data</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -416,12 +416,12 @@
 <div class="viewcode-block" id="autosync">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.autosync">[docs]</a>
 <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">autosync</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Background task: periodically flush and broadcast patches to all connections.</span>
+<span class="w">    </span><span class="sd">"""Background task: periodically flush and broadcast patches to all connections.</span>
 
 <span class="sd">    Run exactly one of these per `Server`/`Hub` (not per connection), so a single drain feeds every</span>
 <span class="sd">    client. The async counterpart of `sync` — use this for socket backends (WebSocket/SSE) driven by an</span>
 <span class="sd">    event loop, and `sync` for the synchronous ones (Jupyter comm/anywidget).</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
         <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">interval</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
@@ -436,12 +436,12 @@
 <div class="viewcode-block" id="sync">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.sync">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">sync</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">    </span><span class="sd">&quot;&quot;&quot;Drain host-side changes and deliver the patches over every connection, synchronously.</span>
+<span class="w">    </span><span class="sd">"""Drain host-side changes and deliver the patches over every connection, synchronously.</span>
 
 <span class="sd">    The manual counterpart of `autosync`, for backends driven by a synchronous loop (a Jupyter comm or</span>
 <span class="sd">    anywidget): call it after mutating hosted models — e.g. at the end of a cell, or from a kernel</span>
 <span class="sd">    timer. Each connection handle exposes `send(wire)`.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
+<span class="sd">    """</span>
     <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
         <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
             <span class="n">conn</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>

@@ -257,7 +257,7 @@
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
-<span class="n">model</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
+<span class="n">model</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"lamp"</span><span class="p">)</span>
 <span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
 <span class="n">restored</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Device</span><span class="p">)</span>
 
@@ -282,7 +282,7 @@
     <span class="n">sensor</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
 
-<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
+<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">"temp"</span><span class="p">)</span>
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
 <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">reading</span><span class="p">)</span>
 
@@ -303,7 +303,7 @@ struct and call <code class="docutils literal notranslate"><span class="pre">Ses
     <span class="n">sensor</span><span class="p">:</span> <span class="nb">str</span>
     <span class="n">value</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
 
-<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">&quot;temp&quot;</span><span class="p">)</span>
+<span class="n">reading</span> <span class="o">=</span> <span class="n">Reading</span><span class="p">(</span><span class="n">sensor</span><span class="o">=</span><span class="s2">"temp"</span><span class="p">)</span>
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
 <span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">reading</span><span class="p">)</span>
 
@@ -312,7 +312,7 @@ struct and call <code class="docutils literal notranslate"><span class="pre">Ses
 <span class="c1"># []</span>
 
 <span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">mid</span><span class="p">))</span>
-<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [...]})]</span>
+<span class="c1"># [(1, {'rev': 1, 'ops': [...]})]</span>
 </pre></div>
 </div>
 </section>
@@ -320,8 +320,8 @@ struct and call <code class="docutils literal notranslate"><span class="pre">Ses
 <h2>Convert values manually<a class="headerlink" href="#convert-values-manually" title="Link to this heading">¶</a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">to_value</span></code> when a lower-level API expects the core wire value. Use <code class="docutils literal notranslate"><span class="pre">from_value</span></code> to materialize a
 mirrored value as a Python model.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-<span class="c1"># {&#39;Map&#39;: {&#39;name&#39;: {&#39;Str&#39;: &#39;lamp&#39;}, &#39;on&#39;: {&#39;Bool&#39;: True}}}</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"lamp"</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<span class="c1"># {'Map': {'name': {'Str': 'lamp'}, 'on': {'Bool': True}}}</span>
 
 <span class="n">model</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">from_value</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">Device</span><span class="p">)</span>
 </pre></div>
@@ -343,17 +343,17 @@ mirrored value as a Python model.</p>
 </section>
 <section id="bridge-plain-javascript-objects">
 <h2>Bridge plain JavaScript objects<a class="headerlink" href="#bridge-plain-javascript-objects" title="Link to this heading">¶</a></h2>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;1kbgz/transports&quot;</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
-<span class="kd">const</span><span class="w"> </span><span class="nx">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
-<span class="c1">// { Map: { name: { Str: &quot;lamp&quot; }, on: { Bool: true } } }</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">value</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">"lamp"</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
+<span class="c1">// { Map: { name: { Str: "lamp" }, on: { Bool: true } } }</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="nx">object</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">(</span><span class="nx">value</span><span class="p">);</span>
-<span class="c1">// { name: &quot;lamp&quot;, on: true }</span>
+<span class="c1">// { name: "lamp", on: true }</span>
 </pre></div>
 </div>
 <p>Use the JavaScript bridge before calling <code class="docutils literal notranslate"><span class="pre">Client.edit</span></code>, because edits compare core <code class="docutils literal notranslate"><span class="pre">Value</span></code> objects:</p>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="w"> </span><span class="p">})));</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">name</span><span class="o">:</span><span class="w"> </span><span class="s2">"lamp"</span><span class="p">,</span><span class="w"> </span><span class="nx">on</span><span class="o">:</span><span class="w"> </span><span class="kt">false</span><span class="w"> </span><span class="p">})));</span>
 </pre></div>
 </div>
 </section>

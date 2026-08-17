@@ -254,7 +254,7 @@ models, and choose a merge strategy for shared writes.</p>
 <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
-<span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">&quot;tenant&quot;</span><span class="p">])</span>
+<span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">"tenant"</span><span class="p">])</span>
 </pre></div>
 </div>
 </section>
@@ -266,10 +266,10 @@ has an isolated store.</p>
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Document</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
     <span class="n">title</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">body</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">body</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">""</span>
 
-<span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="s2">&quot;alice&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Alice notes&quot;</span><span class="p">))</span>
-<span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="s2">&quot;bob&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Bob notes&quot;</span><span class="p">))</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="s2">"alice"</span><span class="p">)</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Alice notes"</span><span class="p">))</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="s2">"bob"</span><span class="p">)</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Bob notes"</span><span class="p">))</span>
 </pre></div>
 </div>
 <p>A connection for <code class="docutils literal notranslate"><span class="pre">alice</span></code> receives only Alice’s private snapshots. A private edit is echoed only to
@@ -280,14 +280,14 @@ other Alice connections.</p>
 <p>Register a shared model and subscribe tenants with <code class="docutils literal notranslate"><span class="pre">READ</span></code> access.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">READ</span>
 
-<span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Roadmap&quot;</span><span class="p">))</span>
-<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">READ</span><span class="p">)</span>
-<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;bob&quot;</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">READ</span><span class="p">)</span>
+<span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Roadmap"</span><span class="p">))</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"alice"</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">READ</span><span class="p">)</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"bob"</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">READ</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>Write to the shared model from the host side with <code class="docutils literal notranslate"><span class="pre">set_shared</span></code>. Subscribers receive the patch on the
 next <code class="docutils literal notranslate"><span class="pre">sync</span></code> or <code class="docutils literal notranslate"><span class="pre">autosync</span></code> tick.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span><span class="o">.</span><span class="n">set_shared</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Roadmap&quot;</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="s2">&quot;Updated&quot;</span><span class="p">))</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span><span class="o">.</span><span class="n">set_shared</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Roadmap"</span><span class="p">,</span> <span class="n">body</span><span class="o">=</span><span class="s2">"Updated"</span><span class="p">))</span>
 </pre></div>
 </div>
 </section>
@@ -296,8 +296,8 @@ next <code class="docutils literal notranslate"><span class="pre">sync</span></c
 <p>Subscribe writers with <code class="docutils literal notranslate"><span class="pre">WRITE</span></code> access.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">WRITE</span>
 
-<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;alice&quot;</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">WRITE</span><span class="p">)</span>
-<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">&quot;bob&quot;</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">WRITE</span><span class="p">)</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"alice"</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">WRITE</span><span class="p">)</span>
+<span class="n">hub</span><span class="o">.</span><span class="n">subscribe</span><span class="p">(</span><span class="s2">"bob"</span><span class="p">,</span> <span class="n">sid</span><span class="p">,</span> <span class="n">WRITE</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>A write from one subscriber is merged into the authoritative shared value and echoed to every
@@ -307,7 +307,7 @@ subscriber, including the origin.</p>
 <h2>Choose a merge strategy<a class="headerlink" href="#choose-a-merge-strategy" title="Link to this heading">¶</a></h2>
 <p>Use <code class="docutils literal notranslate"><span class="pre">LastWriteWins</span></code> for arrival-order writes. Use <code class="docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code> when top-level map fields should
 converge independent of arrival order.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Shared&quot;</span><span class="p">),</span> <span class="n">merge</span><span class="o">=</span><span class="n">transports</span><span class="o">.</span><span class="n">LwwMapCrdt</span><span class="p">)</span>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Shared"</span><span class="p">),</span> <span class="n">merge</span><span class="o">=</span><span class="n">transports</span><span class="o">.</span><span class="n">LwwMapCrdt</span><span class="p">)</span>
 </pre></div>
 </div>
 <p>For custom reconciliation, implement <code class="docutils literal notranslate"><span class="pre">merge(current,</span> <span class="pre">patch,</span> <span class="pre">origin)</span> <span class="pre">-&gt;</span> <span class="pre">value</span></code> on a <code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code>
@@ -316,7 +316,7 @@ subclass and pass the class to <code class="docutils literal notranslate"><span 
     <span class="k">def</span><span class="w"> </span><span class="nf">merge</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">current</span><span class="p">,</span> <span class="n">patch</span><span class="p">,</span> <span class="n">origin</span><span class="p">):</span>
         <span class="o">...</span>
 
-<span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">&quot;Shared&quot;</span><span class="p">),</span> <span class="n">merge</span><span class="o">=</span><span class="n">MyMerge</span><span class="p">)</span>
+<span class="n">sid</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">share</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="s2">"Shared"</span><span class="p">),</span> <span class="n">merge</span><span class="o">=</span><span class="n">MyMerge</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -330,7 +330,7 @@ subclass and pass the class to <code class="docutils literal notranslate"><span 
     <span class="n">asyncio</span><span class="o">.</span><span class="n">create_task</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">autosync</span><span class="p">(</span><span class="n">hub</span><span class="p">))</span>
 
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span>
-    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">&quot;/ws/</span><span class="si">{tenant}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))],</span>
+    <span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">"/ws/</span><span class="si">{tenant}</span><span class="s2">"</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))],</span>
     <span class="n">on_startup</span><span class="o">=</span><span class="p">[</span><span class="n">startup</span><span class="p">],</span>
 <span class="p">)</span>
 </pre></div>

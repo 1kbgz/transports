@@ -296,7 +296,7 @@ binary frame.</p>
 </table>
 </div>
 <p>Example:</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">},</span><span class="w"> </span><span class="nt">&quot;on&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Map"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Str"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lamp"</span><span class="p">},</span><span class="w"> </span><span class="nt">"on"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Bool"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
 </pre></div>
 </div>
 </section>
@@ -325,7 +325,7 @@ binary frame.</p>
 <section id="patch">
 <h2>Patch<a class="headerlink" href="#patch" title="Link to this heading">¶</a></h2>
 <p>A patch contains the model revision reached by applying the patch and an ordered list of operations.</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;rev&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;ops&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"ops"</span><span class="p">:</span><span class="w"> </span><span class="p">[]}</span>
 </pre></div>
 </div>
 </section>
@@ -334,28 +334,28 @@ binary frame.</p>
 <section id="set">
 <h3>Set<a class="headerlink" href="#set" title="Link to this heading">¶</a></h3>
 <p>Sets or replaces the value at <code class="docutils literal notranslate"><span class="pre">path</span></code>. An empty path replaces the whole model.</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Set&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;Key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;on&quot;</span><span class="p">}],</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Set"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"on"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Bool"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
 </pre></div>
 </div>
 </section>
 <section id="remove">
 <h3>Remove<a class="headerlink" href="#remove" title="Link to this heading">¶</a></h3>
 <p>Removes a map entry. The last path segment is a <code class="docutils literal notranslate"><span class="pre">Key</span></code>.</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Remove&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;Key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;name&quot;</span><span class="p">}]}}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Remove"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"name"</span><span class="p">}]}}</span>
 </pre></div>
 </div>
 </section>
 <section id="insert">
 <h3>Insert<a class="headerlink" href="#insert" title="Link to this heading">¶</a></h3>
 <p>Inserts a value into the list at <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;Insert&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;Key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;items&quot;</span><span class="p">}],</span><span class="w"> </span><span class="nt">&quot;index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;first&quot;</span><span class="p">}}}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Insert"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"items"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"index"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Str"</span><span class="p">:</span><span class="w"> </span><span class="s2">"first"</span><span class="p">}}}</span>
 </pre></div>
 </div>
 </section>
 <section id="removeat">
 <h3>RemoveAt<a class="headerlink" href="#removeat" title="Link to this heading">¶</a></h3>
 <p>Removes an element from the list at <code class="docutils literal notranslate"><span class="pre">path</span></code>.</p>
-<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">&quot;RemoveAt&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;Key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;items&quot;</span><span class="p">}],</span><span class="w"> </span><span class="nt">&quot;index&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}}</span>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"RemoveAt"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"items"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"index"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}}</span>
 </pre></div>
 </div>
 <p>Malformed paths, wrong container types, and out-of-bounds list indexes are rejected by the core apply
@@ -369,11 +369,11 @@ path.</p>
 <h3>Snapshot<a class="headerlink" href="#snapshot" title="Link to this heading">¶</a></h3>
 <p>A snapshot initializes a client mirror for one model.</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;t&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;snapshot&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;type&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Device&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;rev&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Map&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Str&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;lamp&quot;</span><span class="p">},</span><span class="w"> </span><span class="nt">&quot;on&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}}}</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"snapshot"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Device"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Map"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Str"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lamp"</span><span class="p">},</span><span class="w"> </span><span class="nt">"on"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Bool"</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="p">}}}</span>
 <span class="p">}</span>
 </pre></div>
 </div>
@@ -382,12 +382,12 @@ path.</p>
 <h3>Patch<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
 <p>A patch advances an existing mirror.</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;t&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;patch&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;patch&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;rev&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;ops&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
-<span class="w">      </span><span class="p">{</span><span class="nt">&quot;Set&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">&quot;Key&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;on&quot;</span><span class="p">}],</span><span class="w"> </span><span class="nt">&quot;value&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">&quot;Bool&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"patch"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"patch"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"ops"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">      </span><span class="p">{</span><span class="nt">"Set"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"on"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Bool"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
 <span class="w">    </span><span class="p">]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
@@ -412,10 +412,10 @@ cannot write — by sending the proposer (and only the proposer) the authoritati
 typed reject saying why. <code class="docutils literal notranslate"><span class="pre">rev</span></code> is the server’s current revision for the model, and <code class="docutils literal notranslate"><span class="pre">error</span></code> carries
 the model’s validation message where available (e.g. pydantic’s).</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;t&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;reject&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;id&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;rev&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;error&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;1 validation error for Device\nbrightness\n  Input should be a valid integer ...&quot;</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"reject"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 validation error for Device\nbrightness\n  Input should be a valid integer ..."</span>
 <span class="p">}</span>
 </pre></div>
 </div>

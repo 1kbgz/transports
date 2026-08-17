@@ -265,20 +265,20 @@ JavaScript (wasm), so both sides use the same <code class="docutils literal notr
     <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
 
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
-<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;lamp&quot;</span><span class="p">)</span>
+<span class="n">lamp</span> <span class="o">=</span> <span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"lamp"</span><span class="p">)</span>
 <span class="n">model_id</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">lamp</span><span class="p">)</span>
 
 <span class="n">lamp</span><span class="o">.</span><span class="n">on</span> <span class="o">=</span> <span class="kc">True</span>
 <span class="nb">print</span><span class="p">(</span><span class="n">session</span><span class="o">.</span><span class="n">drain</span><span class="p">())</span>
-<span class="c1"># [(1, {&#39;rev&#39;: 1, &#39;ops&#39;: [{&#39;Set&#39;: {&#39;path&#39;: [{&#39;Key&#39;: &#39;on&#39;}], &#39;value&#39;: {&#39;Bool&#39;: True}}}]})]</span>
+<span class="c1"># [(1, {'rev': 1, 'ops': [{'Set': {'path': [{'Key': 'on'}], 'value': {'Bool': True}}}]})]</span>
 </pre></div>
 </div>
 <section id="install">
 <h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[connections]&quot;</span><span class="w">   </span><span class="c1"># WebSocket server/client adapters</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[sse]&quot;</span><span class="w">           </span><span class="c1"># Server-Sent Events adapter</span>
-pip<span class="w"> </span>install<span class="w"> </span><span class="s2">&quot;transports[jupyter]&quot;</span><span class="w">       </span><span class="c1"># Jupyter comm adapter</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[connections]"</span><span class="w">   </span><span class="c1"># WebSocket server/client adapters</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[sse]"</span><span class="w">           </span><span class="c1"># Server-Sent Events adapter</span>
+pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[jupyter]"</span><span class="w">       </span><span class="c1"># Jupyter comm adapter</span>
 </pre></div>
 </div>
 </section>

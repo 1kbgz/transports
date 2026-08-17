@@ -238,17 +238,17 @@
         </div>
         <article role="main" id="furo-main-content">
           <h1>Source code for transports.session</h1><div class="highlight"><pre>
-<span></span><span class="sd">&quot;&quot;&quot;Reactive session: host pydantic models, observe mutations with bigbrother, emit core patches.</span>
+<span></span><span class="sd">"""Reactive session: host pydantic models, observe mutations with bigbrother, emit core patches.</span>
 
-<span class="sd">Mutations are observed recursively via `bigbrother.watch(model, cb, deepstate=True)`. bigbrother&#39;s</span>
+<span class="sd">Mutations are observed recursively via `bigbrother.watch(model, cb, deepstate=True)`. bigbrother's</span>
 <span class="sd">callback fires *before* the underlying mutation is applied, so the callback only marks the model</span>
-<span class="sd">dirty; `flush()` (also invoked by `drain()`/`snapshot()`) recomputes each dirty model&#39;s `Value`,</span>
-<span class="sd">diffs it against the core&#39;s held value, and emits the minimal `Patch`. Because emission is deferred</span>
+<span class="sd">dirty; `flush()` (also invoked by `drain()`/`snapshot()`) recomputes each dirty model's `Value`,</span>
+<span class="sd">diffs it against the core's held value, and emits the minimal `Patch`. Because emission is deferred</span>
 <span class="sd">to a flush, several writes between flushes coalesce into a single patch.</span>
 
 <span class="sd">This is the single-owner reactive nucleus; the multi-tenant session (in the Rust core) will</span>
 <span class="sd">back it with fan-out, backpressure, and authorization.</span>
-<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
@@ -273,14 +273,14 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_log</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># per-model replay log of (rev, patch), bounded</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_log_cap</span> <span class="o">=</span> <span class="mi">512</span>  <span class="c1"># patches retained per model for resume; older are evicted (resume → snapshot)</span>
-        <span class="c1">#: why the last `submit` was rejected (None after a successful submit) — the model&#39;s validation</span>
+        <span class="c1">#: why the last `submit` was rejected (None after a successful submit) — the model's validation</span>
         <span class="c1">#: message where available, so callers can put it on the wire (the `reject` frame)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Session.host">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.host">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">host</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">model</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Host a model: register its schema, store its value in the core, and watch it. Returns id.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Host a model: register its schema, store its value in the core, and watch it. Returns id."""</span>
         <span class="n">type_name</span> <span class="o">=</span> <span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_schemas</span><span class="p">[</span><span class="n">type_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">schema_of</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">model</span><span class="p">))</span>
         <span class="n">mid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)))</span>
@@ -296,28 +296,28 @@
 <div class="viewcode-block" id="Session.ids">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.ids">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">ids</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">int</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The ids of all hosted models.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""The ids of all hosted models."""</span>
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">keys</span><span class="p">())</span></div>
 
 
 <div class="viewcode-block" id="Session.on_patch">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.on_patch">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">fn</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Register a callback invoked as `fn(model_id, patch)` for each emitted patch.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Register a callback invoked as `fn(model_id, patch)` for each emitted patch."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_on_patch</span> <span class="o">=</span> <span class="n">fn</span></div>
 
 
 <div class="viewcode-block" id="Session.flush">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.flush">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">flush</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Diff every dirty model against the core and emit the minimal patches. Returns them.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Diff every dirty model against the core and emit the minimal patches. Returns them."""</span>
         <span class="n">emitted</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">sorted</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="p">):</span>
             <span class="n">patch_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">mutate</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">])))</span>
             <span class="k">if</span> <span class="n">patch_json</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
                 <span class="k">continue</span>
             <span class="n">patch</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">patch_json</span><span class="p">)</span>
-            <span class="k">if</span> <span class="n">patch</span><span class="p">[</span><span class="s2">&quot;ops&quot;</span><span class="p">]:</span>
+            <span class="k">if</span> <span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">))</span>
                 <span class="n">emitted</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">))</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span>
@@ -330,12 +330,12 @@
 <div class="viewcode-block" id="Session.update">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.update">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">update</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Force a diff+emit for one hosted model and flush.</span>
+<span class="w">        </span><span class="sd">"""Force a diff+emit for one hosted model and flush.</span>
 
 <span class="sd">        Automatic emission needs bigbrother to observe the model; models without a ``__dict__``</span>
-<span class="sd">        (``msgspec.Struct`` and other ``__slots__`` types) can&#39;t be watched, so mutate them and then</span>
+<span class="sd">        (``msgspec.Struct`` and other ``__slots__`` types) can't be watched, so mutate them and then</span>
 <span class="sd">        call ``update(id)`` explicitly.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span></div>
 
@@ -343,7 +343,7 @@
 <div class="viewcode-block" id="Session.drain">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.drain">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">drain</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">]]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Flush, then return and clear the accumulated outbox.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Flush, then return and clear the accumulated outbox."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
         <span class="n">out</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">outbox</span><span class="p">,</span> <span class="p">[]</span>
         <span class="k">return</span> <span class="n">out</span></div>
@@ -352,7 +352,7 @@
 <div class="viewcode-block" id="Session.snapshot">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.snapshot">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">snapshot</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;`{&quot;type_name&quot;:.., &quot;rev&quot;:.., &quot;value&quot;:..}` for a hosted model (flushes pending changes).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""`{"type_name":.., "rev":.., "value":..}` for a hosted model (flushes pending changes)."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
@@ -363,91 +363,91 @@
 <div class="viewcode-block" id="Session.value">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.value">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">value</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The current core `Value` of a hosted model.&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span></div>
+<span class="w">        </span><span class="sd">"""The current core `Value` of a hosted model."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)[</span><span class="s2">"value"</span><span class="p">]</span></div>
 
 
 <div class="viewcode-block" id="Session.apply_patch">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.apply_patch">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">apply_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply an authoritative remote patch to a hosted/mirrored model (adopts the patch&#39;s `rev`).</span>
+<span class="w">        </span><span class="sd">"""Apply an authoritative remote patch to a hosted/mirrored model (adopts the patch's `rev`).</span>
 
-<span class="sd">        Also refreshes the hosted Python object so the caller&#39;s own reference stays in sync — the</span>
-<span class="sd">        update is made under observation suppression so it doesn&#39;t echo back as a new patch.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        Also refreshes the hosted Python object so the caller's own reference stays in sync — the</span>
+<span class="sd">        update is made under observation suppression so it doesn't echo back as a new patch.</span>
+<span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Session.submit">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.submit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">submit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Apply a client-proposed patch *as the server*: the server owns `rev`.</span>
+<span class="w">        </span><span class="sd">"""Apply a client-proposed patch *as the server*: the server owns `rev`.</span>
 
-<span class="sd">        The proposal&#39;s ops are applied to the hosted value, the server&#39;s `rev` is bumped (not the</span>
-<span class="sd">        client&#39;s guess), the hosted Python object is refreshed, and the authoritative patch (with the</span>
+<span class="sd">        The proposal's ops are applied to the hosted value, the server's `rev` is bumped (not the</span>
+<span class="sd">        client's guess), the hosted Python object is refreshed, and the authoritative patch (with the</span>
 <span class="sd">        server `rev`) is returned to broadcast to every connection. `None` if the id is unknown or the</span>
 <span class="sd">        proposal is rejected — then `reject_reason` says why.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
+<span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="kc">None</span>
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;unknown model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"unknown model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">"</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="n">parsed</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">"value"</span><span class="p">]</span>
         <span class="c1"># Validate AND canonicalize the proposal through the hosted model (on a copy, so a bad edit never</span>
         <span class="c1"># touches the store): pydantic/msgspec reject an invalid value, and a *coercible* one is normalized</span>
-        <span class="c1"># to its canonical typed form — e.g. a number control sends the string &quot;80&quot;, and the stored value</span>
+        <span class="c1"># to its canonical typed form — e.g. a number control sends the string "80", and the stored value</span>
         <span class="c1"># becomes the int 80, so the core value, the Python model, and every client agree. The authoritative</span>
-        <span class="c1"># patch is the diff to that canonical value (not the client&#39;s raw ops), keeping all three in sync.</span>
-        <span class="n">canonical</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canonical</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[]))</span>
+        <span class="c1"># patch is the diff to that canonical value (not the client's raw ops), keeping all three in sync.</span>
+        <span class="n">canonical</span><span class="p">,</span> <span class="n">error</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_canonical</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">cur</span><span class="p">,</span> <span class="n">patch</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"ops"</span><span class="p">,</span> <span class="p">[]))</span>
         <span class="k">if</span> <span class="n">canonical</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="c1"># invalid / malformed — rejected (the caller re-sends state so the proposer reverts)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="n">error</span> <span class="ow">or</span> <span class="s2">&quot;invalid edit&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="n">error</span> <span class="ow">or</span> <span class="s2">"invalid edit"</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="n">ops</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">cur</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">canonical</span><span class="p">)))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;ops&quot;</span><span class="p">,</span> <span class="p">[])</span>
-        <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">ops</span><span class="p">}</span>
+        <span class="n">ops</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_diff</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">cur</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">canonical</span><span class="p">)))</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"ops"</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="n">authoritative</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rev"</span><span class="p">:</span> <span class="n">parsed</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="s2">"ops"</span><span class="p">:</span> <span class="n">ops</span><span class="p">}</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="s2">&quot;malformed patch&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="s2">"malformed patch"</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_record</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">authoritative</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">authoritative</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_record</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Append a patch to the model&#39;s bounded replay log (for resume).&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Append a patch to the model's bounded replay log (for resume)."""</span>
         <span class="n">log</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">[])</span>
-        <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">patch</span><span class="p">[</span><span class="s2">&quot;rev&quot;</span><span class="p">],</span> <span class="n">patch</span><span class="p">))</span>
+        <span class="n">log</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="n">patch</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">],</span> <span class="n">patch</span><span class="p">))</span>
         <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">log</span><span class="p">)</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_cap</span><span class="p">:</span>
             <span class="k">del</span> <span class="n">log</span><span class="p">[:</span> <span class="nb">len</span><span class="p">(</span><span class="n">log</span><span class="p">)</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log_cap</span><span class="p">]</span>
 
 <div class="viewcode-block" id="Session.since">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Session.since">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">since</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">since_rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Patches to advance a mirror from `since_rev` to current, or `None` if the log can&#39;t bridge the</span>
-<span class="sd">        gap (the next needed patch was evicted) — then the caller should send a fresh snapshot instead.&quot;&quot;&quot;</span>
-        <span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)[</span><span class="s2">&quot;rev&quot;</span><span class="p">]</span>  <span class="c1"># flush pending changes (recording them) before reading the log</span>
+<span class="w">        </span><span class="sd">"""Patches to advance a mirror from `since_rev` to current, or `None` if the log can't bridge the</span>
+<span class="sd">        gap (the next needed patch was evicted) — then the caller should send a fresh snapshot instead."""</span>
+        <span class="n">cur</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)[</span><span class="s2">"rev"</span><span class="p">]</span>  <span class="c1"># flush pending changes (recording them) before reading the log</span>
         <span class="k">if</span> <span class="n">since_rev</span> <span class="o">&gt;=</span> <span class="n">cur</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[]</span>  <span class="c1"># already current</span>
         <span class="n">log</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_log</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">[])</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="nb">any</span><span class="p">(</span><span class="n">rev</span> <span class="o">==</span> <span class="n">since_rev</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">for</span> <span class="n">rev</span><span class="p">,</span> <span class="n">_</span> <span class="ow">in</span> <span class="n">log</span><span class="p">):</span>
-            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># the next needed patch was evicted — gap, can&#39;t replay</span>
+            <span class="k">return</span> <span class="kc">None</span>  <span class="c1"># the next needed patch was evicted — gap, can't replay</span>
         <span class="k">return</span> <span class="p">[</span><span class="n">patch</span> <span class="k">for</span> <span class="n">rev</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="n">log</span> <span class="k">if</span> <span class="n">rev</span> <span class="o">&gt;</span> <span class="n">since_rev</span><span class="p">]</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_canonical</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">current_value</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;The proposal applied to ``current_value`` and normalized through the hosted model — its canonical</span>
+<span class="w">        </span><span class="sd">"""The proposal applied to ``current_value`` and normalized through the hosted model — its canonical</span>
 <span class="sd">        typed `Value` — as ``(value, None)``, or ``(None, error)`` if the core rejects the patch or the</span>
 <span class="sd">        model rejects the value.</span>
 
 <span class="sd">        Computed on a *copy* via the pure ``apply`` — so a rejected proposal never touches the store — then</span>
 <span class="sd">        round-tripped through the model bridge: pydantic / msgspec validate (rejecting bad input) and coerce</span>
-<span class="sd">        (so ``&quot;80&quot;`` for an int field comes back as ``80``). A model with no typed object hosted here (a plain</span>
-<span class="sd">        mirror) returns the candidate unchanged; dataclasses accept per their own semantics.&quot;&quot;&quot;</span>
+<span class="sd">        (so ``"80"`` for an int field comes back as ``80``). A model with no typed object hosted here (a plain</span>
+<span class="sd">        mirror) returns the candidate unchanged; dataclasses accept per their own semantics."""</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="n">candidate</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">current_value</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">&quot;rev&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;ops&quot;</span><span class="p">:</span> <span class="n">ops</span><span class="p">})))</span>
+            <span class="n">candidate</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">current_value</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">"rev"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"ops"</span><span class="p">:</span> <span class="n">ops</span><span class="p">})))</span>
         <span class="k">except</span> <span class="ne">ValueError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
-            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;malformed patch: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>  <span class="c1"># the core rejected it (bad path/type/index)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="sa">f</span><span class="s2">"malformed patch: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">"</span>  <span class="c1"># the core rejected it (bad path/type/index)</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">candidate</span><span class="p">,</span> <span class="kc">None</span>  <span class="c1"># untyped mirror — nothing to canonicalize against</span>
@@ -466,16 +466,16 @@
             <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_model</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
             <span class="k">return</span> <span class="kc">False</span>  <span class="c1"># never crash the host: a model that rejects the value (caught pre-commit by</span>
-            <span class="c1"># `_validates`, but belt-and-suspenders for any caller that didn&#39;t pre-validate)</span>
+            <span class="c1"># `_validates`, but belt-and-suspenders for any caller that didn't pre-validate)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_refresh_model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<span class="w">        </span><span class="sd">&quot;&quot;&quot;Rewrite the hosted Python object from the core value, without re-triggering observation.&quot;&quot;&quot;</span>
+<span class="w">        </span><span class="sd">"""Rewrite the hosted Python object from the core value, without re-triggering observation."""</span>
         <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">obj</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span>
-        <span class="n">fresh</span> <span class="o">=</span> <span class="n">from_value</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)[</span><span class="s2">&quot;value&quot;</span><span class="p">],</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
+        <span class="n">fresh</span> <span class="o">=</span> <span class="n">from_value</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snap</span><span class="p">)[</span><span class="s2">"value"</span><span class="p">],</span> <span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_annotations</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)):</span>

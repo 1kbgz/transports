@@ -264,7 +264,7 @@ sockets. Run the cells in order.</p>
 
 
 <span class="k">class</span><span class="w"> </span><span class="nc">Device</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;lamp&quot;</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"lamp"</span>
     <span class="n">brightness</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">60</span>
 
 
@@ -282,7 +282,7 @@ sockets. Run the cells in order.</p>
 <div class="cell_input docutils container">
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># mutate the model and push the (incremental) patch to the widget above</span>
 <span class="n">device</span><span class="o">.</span><span class="n">brightness</span> <span class="o">=</span> <span class="mi">90</span>
-<span class="n">device</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">&quot;beacon&quot;</span>
+<span class="n">device</span><span class="o">.</span><span class="n">name</span> <span class="o">=</span> <span class="s2">"beacon"</span>
 <span class="n">transports</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>

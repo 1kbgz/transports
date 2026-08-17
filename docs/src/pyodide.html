@@ -277,8 +277,8 @@ the browser’s native <code class="docutils literal notranslate"><span class="p
 libraries need raw sockets, which the browser does not give Python. The API is unchanged:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
-<span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">&quot;msgpack&quot;</span><span class="p">)</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">&quot;wss://example.com/ws&quot;</span><span class="p">)</span>  <span class="c1"># the browser&#39;s WebSocket under Pyodide</span>
+<span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"msgpack"</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"wss://example.com/ws"</span><span class="p">)</span>  <span class="c1"># the browser's WebSocket under Pyodide</span>
 </pre></div>
 </div>
 <p>Snapshots and patches update the mirror as they arrive; register <code class="docutils literal notranslate"><span class="pre">client.on_change</span></code> /
@@ -318,14 +318,63 @@ value the model rejects surfaces inline through the <code class="docutils litera
 <section id="run-it-all-in-jupyterlite">
 <h2>Run it all in JupyterLite<a class="headerlink" href="#run-it-all-in-jupyterlite" title="Link to this heading">¶</a></h2>
 <p>Both ends WebAssembly: the Pyodide kernel hosts the <code class="docutils literal notranslate"><span class="pre">Session</span></code>, the widget frontend mirrors it —
-no server, no sockets.</p>
+no server, no sockets. A hosted build publishes with these docs at
+<a class="reference external" href="https://1kbgz.github.io/transports/lite/">/transports/lite/</a> — open <code class="docutils literal notranslate"><span class="pre">lab/index.html</span></code> →
+<code class="docutils literal notranslate"><span class="pre">transports-demo.ipynb</span></code>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>jupyterlite<span class="w">        </span><span class="c1"># builds the site into dist/lite (wheel + demo notebook included)</span>
-make<span class="w"> </span>test-jupyterlite<span class="w">   </span><span class="c1"># or: drive the site&#39;s REPL in Chromium end-to-end</span>
+make<span class="w"> </span>test-jupyterlite<span class="w">   </span><span class="c1"># or: drive the site's REPL in Chromium end-to-end</span>
 </pre></div>
 </div>
-<p>Serve <code class="docutils literal notranslate"><span class="pre">dist/lite</span></code> from any static host and open <code class="docutils literal notranslate"><span class="pre">lab/index.html</span></code> → <code class="docutils literal notranslate"><span class="pre">transports-demo.ipynb</span></code>. The
-transports wheel installs from the site’s own wheel index (<code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code>); <code class="docutils literal notranslate"><span class="pre">anywidget</span></code>
-comes from PyPI.</p>
+<p>Serve <code class="docutils literal notranslate"><span class="pre">dist/lite</span></code> from any static host. The transports wheel installs from the site’s own wheel
+index (<code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code> — or from PyPI, which carries the Pyodide wheel since v0.7.0);
+<code class="docutils literal notranslate"><span class="pre">anywidget</span></code> comes from PyPI.</p>
+</section>
+<section id="host-in-a-sharedworker-one-host-many-tabs">
+<h2>Host in a SharedWorker (one host, many tabs)<a class="headerlink" href="#host-in-a-sharedworker-one-host-many-tabs" title="Link to this heading">¶</a></h2>
+<p>A page-local host dies with its tab. For one authoritative in-browser host serving every tab of an
+origin, run Pyodide inside a <strong>SharedWorker</strong>: each tab’s <code class="docutils literal notranslate"><span class="pre">MessagePort</span></code> is just another connection
+handle, exactly like a comm or a widget — the worker posts wire strings out and relays inbound
+proposals to <code class="docutils literal notranslate"><span class="pre">server.recv</span></code>.</p>
+<p>In the worker (<code class="docutils literal notranslate"><span class="pre">host-worker.js</span></code>), load Pyodide, install transports, and wire ports to the server:</p>
+<div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">ports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[];</span>
+<span class="nx">self</span><span class="p">.</span><span class="nx">onconnect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">port</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">e</span><span class="p">.</span><span class="nx">ports</span><span class="p">[</span><span class="mf">0</span><span class="p">];</span>
+<span class="w">  </span><span class="nx">ports</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">port</span><span class="p">);</span>
+<span class="w">  </span><span class="nx">port</span><span class="p">.</span><span class="nx">onmessage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">msg</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">pyodide</span><span class="p">.</span><span class="nx">globals</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">"on_wire"</span><span class="p">)(</span><span class="nx">port</span><span class="p">,</span><span class="w"> </span><span class="nx">msg</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+<span class="w">  </span><span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kd">const</span><span class="w"> </span><span class="nx">wire</span><span class="w"> </span><span class="k">of</span><span class="w"> </span><span class="nx">pyodide</span><span class="p">.</span><span class="nx">globals</span><span class="p">.</span><span class="nx">get</span><span class="p">(</span><span class="s2">"open_conn"</span><span class="p">)(</span><span class="nx">port</span><span class="p">))</span><span class="w"> </span><span class="nx">port</span><span class="p">.</span><span class="nx">postMessage</span><span class="p">(</span><span class="nx">wire</span><span class="p">);</span>
+<span class="p">};</span>
+</pre></div>
+</div>
+<p>Kernel-side, the port is the conn handle (the FFI proxies are hashable), so the plain <code class="docutils literal notranslate"><span class="pre">Server</span></code>/<code class="docutils literal notranslate"><span class="pre">Hub</span></code>
+API applies:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
+
+<span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+<span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">model</span><span class="p">)</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">open_conn</span><span class="p">(</span><span class="n">port</span><span class="p">):</span>
+    <span class="k">return</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">port</span><span class="p">)</span>                <span class="c1"># opening snapshots for the new tab</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">on_wire</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">wire</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">target</span><span class="p">,</span> <span class="n">msgs</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">port</span><span class="p">,</span> <span class="n">wire</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">for</span> <span class="n">msg</span> <span class="ow">in</span> <span class="n">msgs</span><span class="p">:</span>
+            <span class="n">target</span><span class="o">.</span><span class="n">postMessage</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>         <span class="c1"># echo authoritative patches to every tab</span>
+</pre></div>
+</div>
+<p>After mutating models in the worker, fan out with <code class="docutils literal notranslate"><span class="pre">for</span> <span class="pre">conn,</span> <span class="pre">msgs</span> <span class="pre">in</span> <span class="pre">server.flush().items():</span> <span class="pre">...</span></code>
+(or run <code class="docutils literal notranslate"><span class="pre">autosync</span></code> as a task on the worker’s event loop). Each tab connects with the JS client:</p>
+<div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">worker</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">SharedWorker</span><span class="p">(</span><span class="s2">"host-worker.js"</span><span class="p">);</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
+<span class="nx">worker</span><span class="p">.</span><span class="nx">port</span><span class="p">.</span><span class="nx">onmessage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">e</span><span class="p">.</span><span class="nx">data</span><span class="p">);</span>
+<span class="nx">worker</span><span class="p">.</span><span class="nx">port</span><span class="p">.</span><span class="nx">start</span><span class="p">();</span>
+<span class="c1">// propose an edit: worker.port.postMessage(client.edit(id, value))</span>
+</pre></div>
+</div>
+<p>The same shape works in a <strong>service worker</strong> for background persistence across navigations, and the
+worker can simultaneously hold an upstream <code class="docutils literal notranslate"><span class="pre">Client.run(url)</span></code> to a real server — making the tab mesh
+an edge cache of the authoritative model. Concurrency across many writers is the usual story: put
+shared state behind a <code class="docutils literal notranslate"><span class="pre">Hub</span></code> with a CRDT <code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code>.</p>
 </section>
 <section id="deploy-the-example">
 <h2>Deploy the example<a class="headerlink" href="#deploy-the-example" title="Link to this heading">¶</a></h2>
@@ -397,6 +446,7 @@ directly from PyPI.</p>
 <li><a class="reference internal" href="#run-the-browser-test">Run the browser test</a></li>
 <li><a class="reference internal" href="#use-the-jupyter-widget">Use the Jupyter widget</a></li>
 <li><a class="reference internal" href="#run-it-all-in-jupyterlite">Run it all in JupyterLite</a></li>
+<li><a class="reference internal" href="#host-in-a-sharedworker-one-host-many-tabs">Host in a SharedWorker (one host, many tabs)</a></li>
 <li><a class="reference internal" href="#deploy-the-example">Deploy the example</a></li>
 </ul>
 </li>
