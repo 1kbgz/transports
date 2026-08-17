@@ -135,7 +135,10 @@ coverage-rs:  ## run rust tests and collect test coverage
 
 .PHONY: test test-pyodide test-pyodide-browser coverage tests
 test: test-py test-js test-rs  ## run all tests
-test-pyodide:  ## build and test the Python package in Pyodide
+transports/extension/cdn/widget.js:  ## the in-wheel JS assets — cibuildwheel sets SKIP_HATCH_JS, so they must exist before the wheel builds
+	cd js; pnpm build
+
+test-pyodide: transports/extension/cdn/widget.js  ## build and test the Python package in Pyodide
 	rustup target add wasm32-unknown-emscripten
 	rm -rf dist/pyodide
 	uvx --from cibuildwheel==4.2.0 cibuildwheel --only cp314-pyodide_wasm32 --output-dir dist/pyodide .

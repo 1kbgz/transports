@@ -156,7 +156,9 @@ environment = {SKIP_HATCH_JS="1"}
 # client-durability) and the Starlette TestClient tests (threads, which emscripten doesn't have)
 test-command = """python -m pytest {project}/transports/tests -x -k "not starlette" --ignore={project}/transports/tests/test_backplane.py --ignore={project}/transports/tests/test_relay.py --ignore={project}/transports/tests/test_election.py --ignore={project}/transports/tests/test_client_durability.py"""
 test-extras = []
-test-requires = ["pytest"]
+# anywidget makes the widget-factory test run in-Pyodide — it reads the frontend module out of the
+# installed wheel, so a wheel missing transports/extension fails here instead of in JupyterLite
+test-requires = ["pytest", "anywidget"]
 xbuild-tools = ["cargo", "rustc", "rustup"]
 
 [tool.coverage.run]
