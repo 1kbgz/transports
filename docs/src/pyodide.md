@@ -97,6 +97,11 @@ Serve `dist/lite` from any static host. The transports wheel installs from the s
 index (`%pip install transports` — or from PyPI, which carries the Pyodide wheel since v0.7.0);
 `anywidget` comes from PyPI.
 
+**If a previously visited site misbehaves after a redeploy** (e.g. `FileNotFoundError` from an old
+wheel, or `RuntimeError: WebAssembly stack switching not supported`): JupyterLite caches hard — a
+service worker plus browser storage can keep serving the previous build's kernel and packages. Hard
+refresh (Cmd/Ctrl+Shift+R), or clear the site's data (service worker + IndexedDB) and reload.
+
 ## Host in a SharedWorker (one host, many tabs)
 
 A page-local host dies with its tab. For one authoritative in-browser host serving every tab of an
