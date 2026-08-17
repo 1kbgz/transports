@@ -248,6 +248,27 @@ test("Client.onChange fires for accepted changes only", async () => {
   expect(seen.length).toBe(2); // unsubscribed
 });
 
+test("Client.send requires a connection; propose sends the edit frame", async () => {
+  const c = new Client();
+  expect(() => c.send("x")).toThrow(/not connected/);
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 0,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  const sent = [];
+  c.send = (f) => sent.push(f); // stub the active-connection channel
+  c.propose(1, { Map: { on: { Bool: true } } });
+  expect(sent.length).toBe(1);
+  const msg = JSON.parse(sent[0]);
+  expect(msg.t).toBe("patch");
+  expect(msg.patch.ops[0].Set.value).toEqual({ Bool: true });
+});
+
 test("Client.onReject surfaces a server rejection; the mirror is untouched", async () => {
   const c = new Client();
   const rejections = [];

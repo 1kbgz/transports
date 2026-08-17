@@ -282,6 +282,36 @@ def test_browser_websocket_path_mirrors_frames():
                 sys.modules[name] = mod
 
 
+def test_client_send_awaits_native_senders_and_raises_when_unconnected():
+    """`send` raises without an active connection and awaits an async (native websockets) sender;
+    `propose` is `send(edit(...))`."""
+    import asyncio
+
+    async def run():
+        client = Client()
+        try:
+            await client.send("x")
+            raise AssertionError("expected RuntimeError")
+        except RuntimeError:
+            pass
+
+        snap = to_value(Device(name="lamp"))
+        client.recv(protocol.snapshot_msg(1, "Device", 0, snap))
+        sent = []
+
+        async def sender(frame):  # the native path's ws.send coroutine
+            sent.append(frame)
+
+        client._sender = sender
+        await client.propose(1, to_value(Device(name="beacon")))
+        assert len(sent) == 1
+        msg = json.loads(sent[0])
+        assert msg["t"] == "patch"
+        assert msg["patch"]["ops"][0]["Set"]["value"] == {"Str": "beacon"}
+
+    asyncio.run(run())
+
+
 def test_browser_run_reconnects_with_resume_and_client_authority():
     """`Client._run_browser` (the Pyodide `run`) reconnects with `?since=` resume and, under client
     authority, pushes the pre-drop state back once the server has (re)snapshotted."""
@@ -357,7 +387,21 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
                 second.listeners["message"](FakeEvent(wire))
             # client authority: once the server (re)snapshots, the pre-drop state is pushed back
             assert second.sent and json.loads(second.sent[0])["t"] == "patch"
+
+            # the managed connection exposes an outbound channel: propose without owning the socket
+            await client.propose(mid, {"Map": {"name": {"Str": "manual"}}})
+            assert json.loads(second.sent[-1])["patch"]["ops"][0]["Set"]["value"] == {"Str": "manual"}
+
             task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            try:
+                await client.send("x")  # the drop cleared the channel
+                raise AssertionError("expected RuntimeError")
+            except RuntimeError:
+                pass
 
             # binary frames go through pyodide.ffi.to_js on the way out
             Client._send_browser(second, b"\x01")

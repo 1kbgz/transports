@@ -148,8 +148,30 @@ export class Client {
   private revs = new Map<number, number>();
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
   private rejectListeners: Array<(reject: RejectMsg) => void> = [];
+  // outbound channel of the active managed connection (set by connect()/run(), cleared on close)
+  private sender: ((frame: string | Uint8Array) => void) | null = null;
 
   constructor(private codec: string = "json") {}
+
+  /** Send a frame over the active managed connection (`connect()`/`run()`).
+   *
+   * Pairs with `edit`: propose without owning the socket — e.g. spaday's `connectStore(store,
+   * client, (f) => client.send(f), codec)`. Throws when no connection is active (never connected,
+   * dropped, or receive-only `connectSSE`).
+   */
+  send(frame: string | Uint8Array): void {
+    if (!this.sender)
+      throw new Error(
+        "not connected: send requires an active connect()/run() WebSocket",
+      );
+    this.sender(frame);
+  }
+
+  /** Propose an edit over the active connection: `send(edit(id, value))`. Server-authoritative —
+   * the mirror updates when the authoritative patch echoes back (or `onReject` fires). */
+  propose(id: number, value: unknown): void {
+    this.send(this.edit(id, value));
+  }
 
   /** Register a listener fired when the server refuses a proposed edit, with the decoded `reject`
    * frame (model id, the server's current rev, and the validation error). The mirror itself reverts
@@ -278,6 +300,12 @@ export class Client {
       this.recv(
         typeof data === "string" ? data : new Uint8Array(data as ArrayBuffer),
       );
+    });
+    const sender = (frame: string | Uint8Array) =>
+      ws.send(frame as string | Uint8Array<ArrayBuffer>);
+    this.sender = sender;
+    ws.addEventListener("close", () => {
+      if (this.sender === sender) this.sender = null; // don't clobber a newer reconnect's channel
     });
     return ws;
   }

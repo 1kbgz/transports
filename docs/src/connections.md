@@ -72,16 +72,21 @@ ws.addEventListener("message", () => {
 });
 ```
 
-To send an edit, create the next core `Value` and send the encoded proposal frame:
+To send an edit, propose it over the active connection — `connect()`/`run()` own the socket, so no
+socket handling is needed:
 
 ```ts
 import { toValue } from "1kbgz/transports";
 
 const [id] = client.ids();
-ws.send(client.edit(id, toValue({ tick: 10 })));
+client.propose(id, toValue({ tick: 10 })); // send(edit(id, value)) over the managed connection
 ```
 
-The local mirror updates when the server echoes the authoritative patch.
+The local mirror updates when the server echoes the authoritative patch (or `onReject` fires with
+why it was refused). `client.send(frame)` sends any pre-built frame the same way — it is what an
+adapter hands its send callback, e.g. spaday's `connectStore(store, client, (f) => client.send(f),
+codec)`. Both throw when no managed connection is active; with a hand-rolled socket, send
+`client.edit(id, value)` yourself as before.
 
 ## Mirror the server in Python
 
@@ -92,8 +97,9 @@ client = transports.Client()
 await client.connect("ws://127.0.0.1:8000/ws")
 ```
 
-For Python clients that also send edits, manage the WebSocket loop directly and send the frame
-returned by `client.edit(id, value)`.
+Edits work the same as in JS: `await client.propose(mid, value)` (or `await client.send(frame)`)
+rides the active `connect()`/`run()` connection — native or Pyodide — and raises when there is
+none; with a hand-rolled socket, send `client.edit(mid, value)` yourself.
 
 ## Use MessagePack on a connection
 

@@ -7,6 +7,7 @@ network).
 """
 
 import contextlib
+import inspect
 import json
 import sys
 import urllib.parse
@@ -32,6 +33,26 @@ class Client:
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
+        #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
+        self._sender: Callable[[str | bytes], Any] | None = None
+
+    async def send(self, frame: str | bytes) -> None:
+        """Send a frame over the active managed connection (`connect` / `run`).
+
+        Pairs with `edit`: propose without owning the socket. Raises `RuntimeError` when no
+        connection is active (never connected, dropped, or receive-only `connect_sse`)."""
+        if self._sender is None:
+            raise RuntimeError("not connected: send requires an active connect()/run() connection")
+        result = self._sender(frame)
+        if inspect.isawaitable(result):
+            await result
+
+    async def propose(self, mid: int, new_value: Any) -> None:
+        """Propose an edit over the active connection: ``send(edit(mid, new_value))``.
+
+        Server-authoritative — the mirror updates when the authoritative patch echoes back (or
+        `on_reject` fires with why it was refused)."""
+        await self.send(self.edit(mid, new_value))
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired after each accepted snapshot or patch — the same change dict
@@ -131,8 +152,12 @@ class Client:
         import websockets
 
         async with websockets.connect(self._connect_url(url)) as ws:
-            async for frame in ws:
-                self.recv(frame)
+            self._sender = ws.send
+            try:
+                async for frame in ws:
+                    self.recv(frame)
+            finally:
+                self._sender = None
 
     async def _run_browser(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
         """`run` over the browser's native `WebSocket` (the Pyodide path): reconnect forever with
@@ -196,9 +221,11 @@ class Client:
         proxies = [create_proxy(_on_message), create_proxy(_on_close), create_proxy(_on_close)]
         for name, proxy in zip(("message", "close", "error"), proxies):
             ws.addEventListener(name, proxy)
+        self._sender = lambda frame: self._send_browser(ws, frame)
         try:
             await closed
         finally:
+            self._sender = None
             for proxy in proxies:
                 proxy.destroy()
 
@@ -231,13 +258,17 @@ class Client:
             pushed: set = set()
             try:
                 async with websockets.connect(self._connect_url(url)) as ws:
-                    async for frame in ws:
-                        self.recv(frame)
-                        if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
-                            for mid in list(self._values):
-                                if mid not in pushed and mid in pre:
-                                    await ws.send(self.edit(mid, pre[mid]))
-                                    pushed.add(mid)
+                    self._sender = ws.send
+                    try:
+                        async for frame in ws:
+                            self.recv(frame)
+                            if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
+                                for mid in list(self._values):
+                                    if mid not in pushed and mid in pre:
+                                        await ws.send(self.edit(mid, pre[mid]))
+                                        pushed.add(mid)
+                    finally:
+                        self._sender = None
             except (websockets.ConnectionClosed, OSError):
                 pass  # dropped — fall through to retry
             await asyncio.sleep(retry)
