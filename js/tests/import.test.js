@@ -248,9 +248,10 @@ test("Client.onChange fires for accepted changes only", async () => {
   expect(seen.length).toBe(2); // unsubscribed
 });
 
-test("Client.send requires a connection; propose sends the edit frame", async () => {
+test("Client.send drops when unconnected; propose sends the edit frame", async () => {
   const c = new Client();
-  expect(() => c.send("x")).toThrow(/not connected/);
+  expect(c.connected).toBe(false);
+  expect(c.send("x")).toBe(false); // dropped, not thrown: safe as a fire-and-forget callback
   c.recv(
     JSON.stringify({
       t: "snapshot",
@@ -261,8 +262,8 @@ test("Client.send requires a connection; propose sends the edit frame", async ()
     }),
   );
   const sent = [];
-  c.send = (f) => sent.push(f); // stub the active-connection channel
-  c.propose(1, { Map: { on: { Bool: true } } });
+  c.send = (f) => sent.push(f) > 0; // stub the active-connection channel
+  expect(c.propose(1, { Map: { on: { Bool: true } } })).toBe(true);
   expect(sent.length).toBe(1);
   const msg = JSON.parse(sent[0]);
   expect(msg.t).toBe("patch");

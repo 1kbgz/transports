@@ -153,24 +153,30 @@ export class Client {
 
   constructor(private codec: string = "json") {}
 
+  /** Whether a managed connection (`connect()`/`run()`) is open right now. */
+  get connected(): boolean {
+    return this.sender !== null;
+  }
+
   /** Send a frame over the active managed connection (`connect()`/`run()`).
    *
-   * Pairs with `edit`: propose without owning the socket — e.g. spaday's `connectStore(store,
-   * client, (f) => client.send(f), codec)`. Throws when no connection is active (never connected,
-   * dropped, or receive-only `connectSSE`).
+   * Returns `true` when handed to an open connection, `false` when none is active (never connected,
+   * in a reconnect gap, or receive-only `connectSSE`) — the frame is dropped, matching a browser
+   * WebSocket's send on a closed socket. That makes it a drop-in fire-and-forget callback for an
+   * adapter — e.g. spaday's `connectStore(store, client, (f) => client.send(f), codec)` — check
+   * `connected` (or the return) when delivery matters.
    */
-  send(frame: string | Uint8Array): void {
-    if (!this.sender)
-      throw new Error(
-        "not connected: send requires an active connect()/run() WebSocket",
-      );
+  send(frame: string | Uint8Array): boolean {
+    if (!this.sender) return false;
     this.sender(frame);
+    return true;
   }
 
   /** Propose an edit over the active connection: `send(edit(id, value))`. Server-authoritative —
-   * the mirror updates when the authoritative patch echoes back (or `onReject` fires). */
-  propose(id: number, value: unknown): void {
-    this.send(this.edit(id, value));
+   * the mirror updates when the authoritative patch echoes back (or `onReject` fires). Returns
+   * `false` (dropped) when not connected. */
+  propose(id: number, value: unknown): boolean {
+    return this.send(this.edit(id, value));
   }
 
   /** Register a listener fired when the server refuses a proposed edit, with the decoded `reject`
@@ -303,7 +309,9 @@ export class Client {
     });
     const sender = (frame: string | Uint8Array) =>
       ws.send(frame as string | Uint8Array<ArrayBuffer>);
-    this.sender = sender;
+    ws.addEventListener("open", () => {
+      this.sender = sender; // arm only once open: send during CONNECTING throws in the DOM
+    });
     ws.addEventListener("close", () => {
       if (this.sender === sender) this.sender = null; // don't clobber a newer reconnect's channel
     });

@@ -85,8 +85,10 @@ client.propose(id, toValue({ tick: 10 })); // send(edit(id, value)) over the man
 The local mirror updates when the server echoes the authoritative patch (or `onReject` fires with
 why it was refused). `client.send(frame)` sends any pre-built frame the same way — it is what an
 adapter hands its send callback, e.g. spaday's `connectStore(store, client, (f) => client.send(f),
-codec)`. Both throw when no managed connection is active; with a hand-rolled socket, send
-`client.edit(id, value)` yourself as before.
+codec)`. Both return `false` and drop the frame when no managed connection is open (matching a
+browser WebSocket's send on a closed socket, so they are safe fire-and-forget callbacks even across
+`run()` reconnect gaps); check `client.connected` (or the return value) when delivery matters. With
+a hand-rolled socket, send `client.edit(id, value)` yourself as before.
 
 ## Mirror the server in Python
 
@@ -98,8 +100,9 @@ await client.connect("ws://127.0.0.1:8000/ws")
 ```
 
 Edits work the same as in JS: `await client.propose(mid, value)` (or `await client.send(frame)`)
-rides the active `connect()`/`run()` connection — native or Pyodide — and raises when there is
-none; with a hand-rolled socket, send `client.edit(mid, value)` yourself.
+rides the active `connect()`/`run()` connection — native or Pyodide — returning `False` (dropped)
+when there is none, with `client.connected` to check first; with a hand-rolled socket, send
+`client.edit(mid, value)` yourself.
 
 ## Use MessagePack on a connection
 

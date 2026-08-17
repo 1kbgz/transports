@@ -36,23 +36,31 @@ class Client:
         #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
         self._sender: Callable[[str | bytes], Any] | None = None
 
-    async def send(self, frame: str | bytes) -> None:
+    @property
+    def connected(self) -> bool:
+        """Whether a managed connection (`connect` / `run`) is open right now."""
+        return self._sender is not None
+
+    async def send(self, frame: str | bytes) -> bool:
         """Send a frame over the active managed connection (`connect` / `run`).
 
-        Pairs with `edit`: propose without owning the socket. Raises `RuntimeError` when no
-        connection is active (never connected, dropped, or receive-only `connect_sse`)."""
+        Returns ``True`` when handed to an open connection, ``False`` when none is active (never
+        connected, in a reconnect gap, or receive-only `connect_sse`) — the frame is dropped, like a
+        browser WebSocket's send on a closed socket, so an adapter can pass ``client.send`` as a
+        fire-and-forget callback; check `connected` (or the return) when it matters."""
         if self._sender is None:
-            raise RuntimeError("not connected: send requires an active connect()/run() connection")
+            return False
         result = self._sender(frame)
         if inspect.isawaitable(result):
             await result
+        return True
 
-    async def propose(self, mid: int, new_value: Any) -> None:
+    async def propose(self, mid: int, new_value: Any) -> bool:
         """Propose an edit over the active connection: ``send(edit(mid, new_value))``.
 
         Server-authoritative — the mirror updates when the authoritative patch echoes back (or
-        `on_reject` fires with why it was refused)."""
-        await self.send(self.edit(mid, new_value))
+        `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""
+        return await self.send(self.edit(mid, new_value))
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired after each accepted snapshot or patch — the same change dict
@@ -218,10 +226,13 @@ class Client:
             if not closed.done():
                 closed.set_result(None)
 
-        proxies = [create_proxy(_on_message), create_proxy(_on_close), create_proxy(_on_close)]
-        for name, proxy in zip(("message", "close", "error"), proxies):
+        def _on_open(_event: Any) -> None:
+            # arm the outbound channel only once the socket is open (send during CONNECTING throws)
+            self._sender = lambda frame: self._send_browser(ws, frame)
+
+        proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close), create_proxy(_on_close)]
+        for name, proxy in zip(("message", "open", "close", "error"), proxies):
             ws.addEventListener(name, proxy)
-        self._sender = lambda frame: self._send_browser(ws, frame)
         try:
             await closed
         finally:
