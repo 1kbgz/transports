@@ -21,6 +21,56 @@ def test_diff_apply_round_trip():
     assert json.loads(apply(old, patch)) == json.loads(new)
 
 
+def test_sequence_reorder_uses_move_and_round_trips():
+    old = json.dumps({"List": [{"Str": "a"}, {"Str": "b"}, {"Str": "c"}, {"Str": "d"}]})
+    new = json.dumps({"List": [{"Str": "d"}, {"Str": "b"}, {"Str": "a"}, {"Str": "c"}]})
+    patch = json.loads(diff(old, new))
+
+    assert patch["ops"] == [
+        {"Move": {"path": [], "from": 3, "to": 0}},
+        {"Move": {"path": [], "from": 2, "to": 1}},
+    ]
+    assert json.loads(apply(old, json.dumps(patch))) == json.loads(new)
+
+
+def test_sequence_move_uses_final_destination_index():
+    old = json.dumps({"List": [{"Int": 1}, {"Int": 2}, {"Int": 3}]})
+    patch = json.dumps({"rev": 1, "ops": [{"Move": {"path": [], "from": 0, "to": 2}}]})
+
+    assert json.loads(apply(old, patch)) == {"List": [{"Int": 2}, {"Int": 3}, {"Int": 1}]}
+
+
+def test_sequence_move_rejects_an_out_of_bounds_destination():
+    import pytest
+
+    old = json.dumps({"List": [{"Int": 1}, {"Int": 2}]})
+    patch = json.dumps({"rev": 1, "ops": [{"Move": {"path": [], "from": 0, "to": 2}}]})
+
+    with pytest.raises(ValueError, match="move destination index 2 out of bounds"):
+        apply(old, patch)
+
+
+def test_dense_sequence_reorder_uses_one_permutation():
+    old_values = list(range(32))
+    new_values = list(reversed(old_values))
+    old = json.dumps({"List": [{"Int": value} for value in old_values]})
+    new = json.dumps({"List": [{"Int": value} for value in new_values]})
+    patch = json.loads(diff(old, new))
+
+    assert patch["ops"] == [{"Reorder": {"path": [], "order": new_values}}]
+    assert json.loads(apply(old, json.dumps(patch))) == json.loads(new)
+
+
+def test_sequence_reorder_rejects_an_invalid_permutation():
+    import pytest
+
+    old = json.dumps({"List": [{"Int": 1}, {"Int": 2}]})
+    patch = json.dumps({"rev": 1, "ops": [{"Reorder": {"path": [], "order": [0, 0]}}]})
+
+    with pytest.raises(ValueError, match="reorder index 0 is duplicated"):
+        apply(old, patch)
+
+
 def test_encode_decode():
     model = _device(True)
     blob = encode(model)

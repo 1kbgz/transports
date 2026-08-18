@@ -77,8 +77,45 @@ Removes an element from the list at `path`.
 {"RemoveAt": {"path": [{"Key": "items"}], "index": 0}}
 ```
 
+### Move
+
+Moves an existing element within the list at `path`. `from` addresses the list before this operation;
+`to` is the element's final index after the move. Both indices must be less than the list length.
+Equal indices are a valid no-op.
+
+```json
+{"Move": {"path": [{"Key": "items"}], "from": 0, "to": 2}}
+```
+
+For `[{"id": "a"}, {"id": "b"}, {"id": "c"}]`, this moves `a` after `c`. Receivers can retain
+the moved element's application identity instead of interpreting the change as positional
+replacement.
+
+### Reorder
+
+Reorders a complete list in one operation. `order[new_index]` is the element's index before this
+operation. `order` must contain every index from `0` through `list.length - 1` exactly once; wrong
+lengths, out-of-bounds indices, and duplicates are rejected before the list changes.
+
+```json
+{"Reorder": {"path": [{"Key": "items"}], "order": [2, 0, 1]}}
+```
+
+For `[a, b, c]`, this produces `[c, a, b]`. Applying the permutation takes linear time and lets a
+receiver carry each item's identity directly to its new index.
+
 Malformed paths, wrong container types, and out-of-bounds list indexes are rejected by the core apply
 path.
+
+List diff recognizes exact-value matches and emits `Move` for them, including duplicate equal values.
+If a moved record also changes, transports can use an unchanged record as a move anchor and diff the
+changed record at its final position. Generic `Value` lists contain no key metadata from which
+transports could infer identity when every moved record changes, so the diff remains positional rather
+than guessing an application-specific `id` field.
+
+Move reconciliation has a linear work budget. Sparse moves remain granular; an exact dense
+permutation emits one `Reorder` instead of repeated matching and array movement. If the lists are not
+an exact permutation and reconciliation exhausts the budget, diff falls back to positional updates.
 
 ## Protocol messages
 

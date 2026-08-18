@@ -74,6 +74,22 @@ def test_nested_list_append_emits_insert():
     assert patch["ops"] == [{"Insert": {"path": [{"Key": "meta"}, {"Key": "tags"}], "index": 1, "value": {"Str": "b"}}}]
 
 
+def test_nested_list_reorder_emits_moves():
+    sess = Session()
+    d = Device(name="lamp", meta=Sub(tags=["a", "b", "c", "d"]))
+    sess.host(d)
+    d.meta.tags[:] = ["d", "b", "a", "c"]
+
+    patches = sess.drain()
+
+    assert len(patches) == 1
+    _, patch = patches[0]
+    assert patch["ops"] == [
+        {"Move": {"path": [{"Key": "meta"}, {"Key": "tags"}], "from": 3, "to": 0}},
+        {"Move": {"path": [{"Key": "meta"}, {"Key": "tags"}], "from": 2, "to": 1}},
+    ]
+
+
 def test_no_change_no_patch():
     sess = Session()
     d = Device(name="lamp", on=True)

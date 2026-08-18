@@ -153,9 +153,10 @@ mod codec_tests {
     fn test_msgpack_patch_round_trip() {
         let c = MsgpackCodec;
         let p = crate::diff(
-            &Value::map([("on", Value::from(false))]),
-            &Value::map([("on", Value::from(true))]),
+            &Value::List((0..32).map(Value::Int).collect()),
+            &Value::List((0..32).rev().map(Value::Int).collect()),
         );
+        assert!(matches!(p.ops.as_slice(), [crate::Op::Reorder { .. }]));
         assert_eq!(c.decode_patch(&c.encode_patch(&p)).unwrap(), p);
     }
 

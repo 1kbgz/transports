@@ -28,6 +28,9 @@ def test_submit_rejects_malformed_patch_without_crashing():
     bad_index = {"rev": 0, "ops": [{"RemoveAt": {"path": [], "index": 5}}]}
     assert sess.submit(mid, bad_index) is None
 
+    bad_move = {"rev": 0, "ops": [{"Move": {"path": [], "from": 0, "to": 5}}]}
+    assert sess.submit(mid, bad_move) is None
+
     # the session is still usable, and a valid proposal still goes through
     good = {"rev": 0, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 7}}}]}
     auth = sess.submit(mid, good)

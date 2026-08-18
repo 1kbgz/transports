@@ -72,7 +72,9 @@ impl Store {
     pub fn apply(&mut self, id: ModelId, patch: &Patch) -> Result<bool, String> {
         match self.models.get_mut(&id) {
             Some(held) => {
-                apply_patch(&mut held.value, patch)?;
+                let mut candidate = held.value.clone();
+                apply_patch(&mut candidate, patch)?;
+                held.value = candidate;
                 held.rev = patch.rev;
                 Ok(true)
             }
@@ -151,5 +153,31 @@ mod store_tests {
     fn test_mutate_unknown_id() {
         let mut s = Store::new();
         assert!(s.mutate(ModelId(999), Value::Null).is_none());
+    }
+
+    #[test]
+    fn test_apply_is_atomic_when_a_later_op_is_invalid() {
+        use crate::diff::{Op, PathSeg};
+
+        let original = Value::List(vec![Value::from(1i64), Value::from(2i64)]);
+        let mut store = Store::new();
+        let id = store.host("Items", original.clone());
+        let patch = Patch {
+            rev: 1,
+            ops: vec![
+                Op::Set {
+                    path: vec![PathSeg::Index(0)],
+                    value: Value::from(9i64),
+                },
+                Op::Reorder {
+                    path: vec![],
+                    order: vec![0, 0],
+                },
+            ],
+        };
+
+        assert!(store.apply(id, &patch).is_err());
+        assert_eq!(store.snapshot(id).unwrap().1, &original);
+        assert_eq!(store.snapshot(id).unwrap().2, 0);
     }
 }

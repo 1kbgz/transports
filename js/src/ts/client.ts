@@ -20,7 +20,9 @@ export type PatchOp =
   | { Set: { path: PathSeg[]; value: Value } }
   | { Remove: { path: PathSeg[] } }
   | { Insert: { path: PathSeg[]; index: number; value: Value } }
-  | { RemoveAt: { path: PathSeg[]; index: number } };
+  | { RemoveAt: { path: PathSeg[]; index: number } }
+  | { Move: { path: PathSeg[]; from: number; to: number } }
+  | { Reorder: { path: PathSeg[]; order: number[] } };
 export type ModelPatch = { rev: number; ops: PatchOp[] };
 type PatchMsg = {
   t: "patch";
@@ -59,6 +61,10 @@ function listValue(value: Value | undefined): Value[] {
   throw new Error("patch path expected a list");
 }
 
+function validIndex(index: number): boolean {
+  return Number.isSafeInteger(index) && index >= 0;
+}
+
 function updateAt(
   value: Value | undefined,
   path: PathSeg[],
@@ -80,7 +86,7 @@ function updateAt(
     };
   }
   const list = listValue(value);
-  if (segment.Index < 0 || segment.Index >= list.length)
+  if (!validIndex(segment.Index) || segment.Index >= list.length)
     throw new Error(
       `patch path index ${segment.Index} out of bounds (len ${list.length})`,
     );
@@ -106,7 +112,7 @@ function applyOp(value: Value, op: PatchOp): Value {
     const { path, index, value: inserted } = op.Insert;
     return updateAt(value, path, (container) => {
       const list = listValue(container);
-      if (index < 0 || index > list.length)
+      if (!validIndex(index) || index > list.length)
         throw new Error(
           `insert index ${index} out of bounds (len ${list.length})`,
         );
@@ -119,13 +125,57 @@ function applyOp(value: Value, op: PatchOp): Value {
     const { path, index } = op.RemoveAt;
     return updateAt(value, path, (container) => {
       const list = listValue(container);
-      if (index < 0 || index >= list.length)
+      if (!validIndex(index) || index >= list.length)
         throw new Error(
           `remove index ${index} out of bounds (len ${list.length})`,
         );
       const next = [...list];
       next.splice(index, 1);
       return { List: next };
+    });
+  }
+  if ("Move" in op) {
+    const { path, from, to } = op.Move;
+    return updateAt(value, path, (container) => {
+      const list = listValue(container);
+      if (!validIndex(from) || from >= list.length)
+        throw new Error(
+          `move source index ${from} out of bounds (len ${list.length})`,
+        );
+      if (!validIndex(to) || to >= list.length)
+        throw new Error(
+          `move destination index ${to} out of bounds (len ${list.length})`,
+        );
+      if (from === to) return container as Value;
+      const next = [...list];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return { List: next };
+    });
+  }
+  if ("Reorder" in op) {
+    const { path, order } = op.Reorder;
+    return updateAt(value, path, (container) => {
+      const list = listValue(container);
+      if (!Array.isArray(order))
+        throw new Error("reorder order must be an array");
+      if (order.length !== list.length)
+        throw new Error(
+          `reorder length ${order.length} does not match list length ${list.length}`,
+        );
+      const seen = new Set<number>();
+      for (const index of order) {
+        if (!validIndex(index) || index >= list.length)
+          throw new Error(
+            `reorder index ${index} out of bounds (len ${list.length})`,
+          );
+        if (seen.has(index))
+          throw new Error(`reorder index ${index} is duplicated`);
+        seen.add(index);
+      }
+      if (order.every((old, current) => old === current))
+        return container as Value;
+      return { List: order.map((index) => list[index]) };
     });
   }
   throw new Error("unknown patch op");

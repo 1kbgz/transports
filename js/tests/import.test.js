@@ -39,6 +39,29 @@ test("diff/apply via the wasm core", async () => {
   expect(JSON.parse(apply(a, patch))).toEqual(JSON.parse(b));
 });
 
+test("wasm core emits and applies sequence moves", async () => {
+  const a = JSON.stringify(toValue(["a", "b", "c", "d"]));
+  const b = JSON.stringify(toValue(["d", "b", "a", "c"]));
+  const patch = JSON.parse(diff(a, b));
+
+  expect(patch.ops).toEqual([
+    { Move: { path: [], from: 3, to: 0 } },
+    { Move: { path: [], from: 2, to: 1 } },
+  ]);
+  expect(JSON.parse(apply(a, JSON.stringify(patch)))).toEqual(JSON.parse(b));
+});
+
+test("wasm core emits one permutation for a dense reorder", async () => {
+  const old = Array.from({ length: 32 }, (_, index) => index);
+  const reordered = [...old].reverse();
+  const a = JSON.stringify(toValue(old));
+  const b = JSON.stringify(toValue(reordered));
+  const patch = JSON.parse(diff(a, b));
+
+  expect(patch.ops).toEqual([{ Reorder: { path: [], order: reordered } }]);
+  expect(JSON.parse(apply(a, JSON.stringify(patch)))).toEqual(JSON.parse(b));
+});
+
 test("msgpack round-trips via encodeAs/decodeAs", async () => {
   const v = JSON.stringify(toValue({ name: "lamp", on: true, count: 123456 }));
   const mp = encodeAs(v, "application/msgpack");
@@ -400,6 +423,105 @@ test("Client applies patches without rebuilding unchanged branches", async () =>
   expect(c.value(1)).not.toBe(before);
 });
 
+test("Client applies forward and backward list moves with structural sharing", async () => {
+  const c = new Client();
+  const rows = ["a", "b", "c", "d"].map((id) => ({
+    Map: { id: { Str: id } },
+  }));
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Model",
+      rev: 0,
+      value: { Map: { rows: { List: rows } } },
+    }),
+  );
+  const before = c.value(1);
+  const moved = before.Map.rows.List[0];
+
+  c.recv(
+    JSON.stringify({
+      t: "patch",
+      id: 1,
+      patch: {
+        rev: 1,
+        ops: [
+          { Move: { path: [{ Key: "rows" }], from: 0, to: 3 } },
+          { Move: { path: [{ Key: "rows" }], from: 2, to: 0 } },
+        ],
+      },
+    }),
+  );
+
+  expect(c.value(1).Map.rows.List.map((row) => row.Map.id.Str)).toEqual([
+    "d",
+    "b",
+    "c",
+    "a",
+  ]);
+  expect(c.value(1).Map.rows.List[3]).toBe(moved);
+  expect(c.value(1)).not.toBe(before);
+});
+
+test("Client applies and validates a complete reorder atomically", async () => {
+  const c = new Client();
+  const rows = ["a", "b", "c", "d"].map((id) => ({
+    Map: { id: { Str: id } },
+  }));
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Model",
+      rev: 0,
+      value: { List: rows },
+    }),
+  );
+  const before = c.value(1);
+
+  for (const order of [
+    [0, 1, 2],
+    [0, 1, 2, 4],
+    [0, 1, 1, 3],
+  ]) {
+    expect(() =>
+      c.recv(
+        JSON.stringify({
+          t: "patch",
+          id: 1,
+          patch: {
+            rev: 1,
+            ops: [
+              { Set: { path: [{ Index: 0 }], value: { Str: "changed" } } },
+              { Reorder: { path: [], order } },
+            ],
+          },
+        }),
+      ),
+    ).toThrow(/reorder/);
+    expect(c.value(1)).toBe(before);
+  }
+
+  c.recv(
+    JSON.stringify({
+      t: "patch",
+      id: 1,
+      patch: {
+        rev: 1,
+        ops: [{ Reorder: { path: [], order: [3, 1, 0, 2] } }],
+      },
+    }),
+  );
+  expect(c.value(1).List.map((row) => row.Map.id.Str)).toEqual([
+    "d",
+    "b",
+    "a",
+    "c",
+  ]);
+  expect(c.value(1).List[2]).toBe(before.List[0]);
+});
+
 test("Client rejects a malformed patch atomically", async () => {
   const c = new Client();
   const value = { Map: { rows: { List: [{ Int: 1 }] } } };
@@ -435,6 +557,40 @@ test("Client rejects a malformed patch atomically", async () => {
     ),
   ).toThrow(/out of bounds/);
   expect(c.value(1)).toBe(before);
+  expect(() =>
+    c.recv(
+      JSON.stringify({
+        t: "patch",
+        id: 1,
+        patch: {
+          rev: 1,
+          ops: [
+            {
+              Set: {
+                path: [{ Key: "rows" }, { Index: 0 }],
+                value: { Int: 2 },
+              },
+            },
+            { Move: { path: [{ Key: "rows" }], from: 0, to: 9 } },
+          ],
+        },
+      }),
+    ),
+  ).toThrow(/move destination index 9 out of bounds/);
+  expect(c.value(1)).toBe(before);
+  for (const op of [
+    { Insert: { path: [{ Key: "rows" }], index: 0.5, value: { Int: 2 } } },
+    { RemoveAt: { path: [{ Key: "rows" }], index: 0.5 } },
+    { Move: { path: [{ Key: "rows" }], from: 0, to: 0.5 } },
+    { Reorder: { path: [{ Key: "rows" }], order: [0.5] } },
+  ]) {
+    expect(() =>
+      c.recv(
+        JSON.stringify({ t: "patch", id: 1, patch: { rev: 1, ops: [op] } }),
+      ),
+    ).toThrow(/index/);
+    expect(c.value(1)).toBe(before);
+  }
   expect(
     c.recv(
       JSON.stringify({
