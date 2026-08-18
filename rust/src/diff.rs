@@ -8,9 +8,11 @@
 //! apply(old.clone(), diff(old, new)) == new
 //! ```
 //!
-//! exercised by a deterministic fuzz below. Maps diff by key; lists diff positionally (keyed-by-id
-//! list reconciliation for `Submodel` lists is a later refinement). A type change at a path
-//! replaces the value there wholesale.
+//! exercised by a deterministic fuzz below. Maps diff by key; lists preserve exact-value matches
+//! across moves, then diff unmatched values positionally. A type change at a path replaces the
+//! value there wholesale.
+
+use std::collections::{BTreeMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -41,6 +43,12 @@ pub enum Op {
     },
     /// Remove the element at `index` from the list at `path`.
     RemoveAt { path: Path, index: usize },
+    /// Move an existing list element. `from` addresses the list before this op and `to` is the
+    /// element's final index after the move.
+    Move { path: Path, from: usize, to: usize },
+    /// Reorder a complete list in one operation. `order[new_index]` is the element's index before
+    /// this op, and `order` must be a permutation of every list index.
+    Reorder { path: Path, order: Vec<usize> },
 }
 
 /// An ordered set of ops plus the revision they advance the model to.
@@ -83,6 +91,68 @@ fn child_path(path: &Path, seg: PathSeg) -> Path {
     p
 }
 
+fn diff_list_positionally(path: &Path, old: &[Value], new: &[Value], ops: &mut Vec<Op>) {
+    let shared = old.len().min(new.len());
+    for i in 0..shared {
+        diff_value(&child_path(path, PathSeg::Index(i)), &old[i], &new[i], ops);
+    }
+    if new.len() > old.len() {
+        for (i, value) in new.iter().enumerate().skip(old.len()) {
+            ops.push(Op::Insert {
+                path: path.to_vec(),
+                index: i,
+                value: value.clone(),
+            });
+        }
+    } else {
+        for i in (new.len()..old.len()).rev() {
+            ops.push(Op::RemoveAt {
+                path: path.to_vec(),
+                index: i,
+            });
+        }
+    }
+}
+
+fn exact_permutation(old: &[Value], new: &[Value]) -> Option<Vec<usize>> {
+    if old.len() != new.len() {
+        return None;
+    }
+    let mut positions: BTreeMap<String, VecDeque<usize>> = BTreeMap::new();
+    for (index, value) in old.iter().enumerate() {
+        positions
+            .entry(serde_json::to_string(value).ok()?)
+            .or_default()
+            .push_back(index);
+    }
+    let mut order = Vec::with_capacity(new.len());
+    for value in new {
+        let encoded = serde_json::to_string(value).ok()?;
+        let index = positions.get_mut(&encoded)?.pop_front()?;
+        if old[index] != *value {
+            return None;
+        }
+        order.push(index);
+    }
+    Some(order)
+}
+
+fn permutation_move_count(order: &[usize]) -> usize {
+    // Minimum arbitrary moves = sequence length minus its longest increasing subsequence.
+    let mut tails = Vec::new();
+    for &index in order {
+        let position = tails
+            .binary_search(&index)
+            .unwrap_or_else(|position| position);
+        if position == tails.len() {
+            tails.push(index);
+        } else {
+            tails[position] = index;
+        }
+    }
+    order.len() - tails.len()
+}
+
 #[allow(clippy::needless_range_loop)] // indices here are op positions
 fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
     match (old, new) {
@@ -105,25 +175,137 @@ fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
             }
         }
         (Value::List(ol), Value::List(nl)) => {
-            let n = ol.len().min(nl.len());
-            for i in 0..n {
-                diff_value(&child_path(path, PathSeg::Index(i)), &ol[i], &nl[i], ops);
+            // Reconcile exact-value matches first so a reorder becomes moves rather than positional
+            // replacement. Unmatched values still recurse positionally: generic Value lists carry
+            // no application key metadata, so guessing that a changed record is the same item would
+            // be incorrect.
+            // Matching plus Vec moves can be quadratic for a dense permutation. Bound staged
+            // reconciliation to a linear multiple of sequence length; if it is exhausted, use the
+            // exact permutation when available and otherwise retain linear positional diff behavior.
+            let work_limit = ol.len().max(nl.len()).saturating_mul(8).max(64);
+            let exact_order = exact_permutation(ol, nl);
+            if let Some(order) = &exact_order {
+                let move_work = permutation_move_count(order).saturating_mul(ol.len());
+                if move_work > work_limit {
+                    ops.push(Op::Reorder {
+                        path: path.to_vec(),
+                        order: order.clone(),
+                    });
+                    return;
+                }
             }
-            if nl.len() > ol.len() {
-                for i in ol.len()..nl.len() {
-                    ops.push(Op::Insert {
+            let mut work = 0usize;
+            let mut exhausted = false;
+            let mut list_ops = Vec::new();
+            let mut working = ol.clone();
+            let mut i = 0;
+            while i < nl.len() {
+                let target = &nl[i];
+                if i >= working.len() {
+                    list_ops.push(Op::Insert {
                         path: path.to_vec(),
                         index: i,
-                        value: nl[i].clone(),
+                        value: target.clone(),
                     });
+                    working.insert(i, target.clone());
+                    i += 1;
+                    continue;
+                }
+
+                if working[i] == *target {
+                    i += 1;
+                    continue;
+                }
+
+                let remaining = working.len() - i - 1;
+                work = work.saturating_add(remaining);
+                if work > work_limit {
+                    exhausted = true;
+                    break;
+                }
+                if let Some(offset) = working[i + 1..].iter().position(|value| value == target) {
+                    let from = i + 1 + offset;
+                    work = work.saturating_add(working.len());
+                    if work > work_limit {
+                        exhausted = true;
+                        break;
+                    }
+                    list_ops.push(Op::Move {
+                        path: path.to_vec(),
+                        from,
+                        to: i,
+                    });
+                    let moved = working.remove(from);
+                    working.insert(i, moved);
+                    i += 1;
+                    continue;
+                }
+
+                let remaining = nl.len() - i - 1;
+                work = work.saturating_add(remaining);
+                if work > work_limit {
+                    exhausted = true;
+                    break;
+                }
+                if let Some(offset) = nl[i + 1..].iter().position(|value| value == &working[i]) {
+                    let to = i + 1 + offset;
+                    work = work.saturating_add(working.len());
+                    if work > work_limit {
+                        exhausted = true;
+                        break;
+                    }
+                    if working.len() < nl.len() {
+                        // The list is growing and the current value has a later destination, so this
+                        // target is an insertion.
+                        list_ops.push(Op::Insert {
+                            path: path.to_vec(),
+                            index: i,
+                            value: target.clone(),
+                        });
+                        working.insert(i, target.clone());
+                        i += 1;
+                        continue;
+                    } else if working[i + 1] != working[i] {
+                        // Preserve the unchanged current value as an anchor even when the target at
+                        // this position changed. Re-evaluate this index after moving the anchor.
+                        list_ops.push(Op::Move {
+                            path: path.to_vec(),
+                            from: i,
+                            to,
+                        });
+                        let moved = working.remove(i);
+                        working.insert(to, moved);
+                        continue;
+                    }
+                }
+
+                diff_value(
+                    &child_path(path, PathSeg::Index(i)),
+                    &working[i],
+                    target,
+                    &mut list_ops,
+                );
+                working[i] = target.clone();
+                i += 1;
+            }
+
+            if exhausted {
+                if let Some(order) = exact_order {
+                    ops.push(Op::Reorder {
+                        path: path.to_vec(),
+                        order,
+                    });
+                } else {
+                    diff_list_positionally(path, ol, nl, ops);
                 }
             } else {
-                for i in (nl.len()..ol.len()).rev() {
-                    ops.push(Op::RemoveAt {
+                for i in (nl.len()..working.len()).rev() {
+                    list_ops.push(Op::RemoveAt {
                         path: path.to_vec(),
                         index: i,
                     });
                 }
+                ops.extend(list_ops);
             }
         }
         _ => {
@@ -204,6 +386,59 @@ fn apply_op(root: &mut Value, op: &Op) -> Result<(), String> {
             }
             list.remove(*index);
         }
+        Op::Move { path, from, to } => {
+            let list = value_at_mut(root, path)?.try_as_list_mut()?;
+            if *from >= list.len() {
+                return Err(format!(
+                    "move source index {from} out of bounds (len {})",
+                    list.len()
+                ));
+            }
+            if *to >= list.len() {
+                return Err(format!(
+                    "move destination index {to} out of bounds (len {})",
+                    list.len()
+                ));
+            }
+            if from != to {
+                let moved = list.remove(*from);
+                list.insert(*to, moved);
+            }
+        }
+        Op::Reorder { path, order } => {
+            let list = value_at_mut(root, path)?.try_as_list_mut()?;
+            if order.len() != list.len() {
+                return Err(format!(
+                    "reorder length {} does not match list length {}",
+                    order.len(),
+                    list.len()
+                ));
+            }
+            let mut seen = vec![false; list.len()];
+            for &index in order {
+                if index >= list.len() {
+                    return Err(format!(
+                        "reorder index {index} out of bounds (len {})",
+                        list.len()
+                    ));
+                }
+                if seen[index] {
+                    return Err(format!("reorder index {index} is duplicated"));
+                }
+                seen[index] = true;
+            }
+            if order.iter().enumerate().all(|(new, &old)| new == old) {
+                return Ok(());
+            }
+            let mut old = std::mem::take(list)
+                .into_iter()
+                .map(Some)
+                .collect::<Vec<_>>();
+            *list = order
+                .iter()
+                .map(|&index| old[index].take().expect("permutation was validated"))
+                .collect();
+        }
     }
     Ok(())
 }
@@ -262,6 +497,226 @@ mod diff_tests {
             &Value::map([("xs", l(vec![1, 2]))]),
             &Value::map([("xs", l(vec![9, 2]))]),
         );
+    }
+
+    #[test]
+    fn test_apply_move_forward_backward_and_noop() {
+        let mut value = Value::List(vec![1i64.into(), 2i64.into(), 3i64.into()]);
+        apply(
+            &mut value,
+            &Patch {
+                rev: 1,
+                ops: vec![Op::Move {
+                    path: vec![],
+                    from: 0,
+                    to: 2,
+                }],
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            value,
+            Value::List(vec![2i64.into(), 3i64.into(), 1i64.into()])
+        );
+
+        apply(
+            &mut value,
+            &Patch {
+                rev: 2,
+                ops: vec![
+                    Op::Move {
+                        path: vec![],
+                        from: 2,
+                        to: 0,
+                    },
+                    Op::Move {
+                        path: vec![],
+                        from: 1,
+                        to: 1,
+                    },
+                ],
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            value,
+            Value::List(vec![1i64.into(), 2i64.into(), 3i64.into()])
+        );
+    }
+
+    #[test]
+    fn test_diff_emits_moves_for_arbitrary_reorder_and_duplicates() {
+        let values = |items: &[&str]| {
+            Value::List(items.iter().copied().map(Value::from).collect::<Vec<_>>())
+        };
+        let old = values(&["a", "b", "c", "d"]);
+        let new = values(&["d", "b", "a", "c"]);
+        let patch = round_trip(&old, &new);
+        assert_eq!(
+            patch.ops,
+            vec![
+                Op::Move {
+                    path: vec![],
+                    from: 3,
+                    to: 0,
+                },
+                Op::Move {
+                    path: vec![],
+                    from: 2,
+                    to: 1,
+                },
+            ]
+        );
+
+        let old = values(&["a", "a", "b"]);
+        let new = values(&["a", "b", "a"]);
+        let patch = round_trip(&old, &new);
+        assert_eq!(
+            patch.ops,
+            vec![Op::Move {
+                path: vec![],
+                from: 2,
+                to: 1,
+            }]
+        );
+    }
+
+    #[test]
+    fn test_reorder_composes_with_insert_remove_and_update() {
+        let row = |id: i64, label: &str| {
+            Value::map([("id", Value::from(id)), ("label", Value::from(label))])
+        };
+        let mut value = Value::List(vec![row(1, "old"), row(2, "same"), row(3, "same")]);
+        let patch = Patch {
+            rev: 1,
+            ops: vec![
+                Op::Reorder {
+                    path: vec![],
+                    order: vec![1, 2, 0],
+                },
+                Op::Insert {
+                    path: vec![],
+                    index: 1,
+                    value: row(4, "inserted"),
+                },
+                Op::Set {
+                    path: vec![PathSeg::Index(2), PathSeg::Key("label".into())],
+                    value: "updated".into(),
+                },
+                Op::RemoveAt {
+                    path: vec![],
+                    index: 3,
+                },
+            ],
+        };
+        apply(&mut value, &patch).unwrap();
+        assert_eq!(
+            value,
+            Value::List(vec![row(2, "same"), row(4, "inserted"), row(3, "updated")])
+        );
+    }
+
+    #[test]
+    fn test_changed_moved_record_uses_an_unchanged_anchor() {
+        let row = |id: i64, label: &str| {
+            Value::map([("id", Value::from(id)), ("label", Value::from(label))])
+        };
+        let old = Value::List(vec![row(1, "a"), row(2, "old")]);
+        let new = Value::List(vec![row(2, "new"), row(1, "a")]);
+        let patch = round_trip(&old, &new);
+
+        assert_eq!(
+            patch.ops,
+            vec![
+                Op::Move {
+                    path: vec![],
+                    from: 0,
+                    to: 1,
+                },
+                Op::Set {
+                    path: vec![PathSeg::Index(0), PathSeg::Key("label".into())],
+                    value: "new".into(),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn test_dense_large_reorder_uses_one_permutation() {
+        let old = Value::List((0..256).map(Value::Int).collect());
+        let new = Value::List((0..256).rev().map(Value::Int).collect());
+        let patch = round_trip(&old, &new);
+        assert!(matches!(
+            patch.ops.as_slice(),
+            [Op::Reorder { order, .. }] if order.len() == 256
+        ));
+
+        let mut rotated = (0..256).map(Value::Int).collect::<Vec<_>>();
+        rotated.rotate_right(1);
+        let patch = round_trip(&old, &Value::List(rotated));
+        assert!(matches!(
+            patch.ops.as_slice(),
+            [Op::Move {
+                from: 255,
+                to: 0,
+                ..
+            }]
+        ));
+
+        let mut rotated = (0..256).map(Value::Int).collect::<Vec<_>>();
+        rotated.rotate_left(1);
+        let patch = round_trip(&old, &Value::List(rotated));
+        assert!(matches!(patch.ops.as_slice(), [Op::Reorder { .. }]));
+    }
+
+    #[test]
+    fn test_reorder_rejects_invalid_permutations_without_mutation() {
+        let original = Value::List(vec![1i64.into(), 2i64.into(), 3i64.into()]);
+        for (order, message) in [
+            (vec![0, 1], "reorder length 2 does not match list length 3"),
+            (vec![0, 1, 3], "reorder index 3 out of bounds"),
+            (vec![0, 1, 1], "reorder index 1 is duplicated"),
+        ] {
+            let mut value = original.clone();
+            let error = apply(
+                &mut value,
+                &Patch {
+                    rev: 1,
+                    ops: vec![Op::Reorder {
+                        path: vec![],
+                        order,
+                    }],
+                },
+            )
+            .unwrap_err();
+            assert!(error.contains(message));
+            assert_eq!(value, original);
+        }
+    }
+
+    #[test]
+    fn test_move_rejects_invalid_indices_without_mutation() {
+        let original = Value::List(vec![1i64.into(), 2i64.into()]);
+        for (from, to, message) in [
+            (2, 0, "move source index 2 out of bounds"),
+            (0, 2, "move destination index 2 out of bounds"),
+        ] {
+            let mut value = original.clone();
+            let error = apply(
+                &mut value,
+                &Patch {
+                    rev: 1,
+                    ops: vec![Op::Move {
+                        path: vec![],
+                        from,
+                        to,
+                    }],
+                },
+            )
+            .unwrap_err();
+            assert!(error.contains(message));
+            assert_eq!(value, original);
+        }
     }
 
     #[test]
