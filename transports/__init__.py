@@ -24,7 +24,7 @@ from .transports import (  # compiled Rust extension (rust/python)
     msgpack_to_json,
 )
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 __all__ = [
     "READ",
