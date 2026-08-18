@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="API Reference" href="api.html"><link rel="prev" title="How to run transports in a browser with Pyodide" href="pyodide.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Wire protocol reference - transports v0.7.0</title>
+        <title>Wire protocol reference - transports v0.8.0</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -167,7 +167,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></div></a>
+      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.0</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -188,7 +188,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.7.0</code></span>
+  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.0</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -358,8 +358,39 @@ binary frame.</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"RemoveAt"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"items"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"index"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">}}</span>
 </pre></div>
 </div>
+</section>
+<section id="move">
+<h3>Move<a class="headerlink" href="#move" title="Link to this heading">¶</a></h3>
+<p>Moves an existing element within the list at <code class="docutils literal notranslate"><span class="pre">path</span></code>. <code class="docutils literal notranslate"><span class="pre">from</span></code> addresses the list before this operation;
+<code class="docutils literal notranslate"><span class="pre">to</span></code> is the element’s final index after the move. Both indices must be less than the list length.
+Equal indices are a valid no-op.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Move"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"items"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"from"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"to"</span><span class="p">:</span><span class="w"> </span><span class="mi">2</span><span class="p">}}</span>
+</pre></div>
+</div>
+<p>For <code class="docutils literal notranslate"><span class="pre">[{&quot;id&quot;:</span> <span class="pre">&quot;a&quot;},</span> <span class="pre">{&quot;id&quot;:</span> <span class="pre">&quot;b&quot;},</span> <span class="pre">{&quot;id&quot;:</span> <span class="pre">&quot;c&quot;}]</span></code>, this moves <code class="docutils literal notranslate"><span class="pre">a</span></code> after <code class="docutils literal notranslate"><span class="pre">c</span></code>. Receivers can retain
+the moved element’s application identity instead of interpreting the change as positional
+replacement.</p>
+</section>
+<section id="reorder">
+<h3>Reorder<a class="headerlink" href="#reorder" title="Link to this heading">¶</a></h3>
+<p>Reorders a complete list in one operation. <code class="docutils literal notranslate"><span class="pre">order[new_index]</span></code> is the element’s index before this
+operation. <code class="docutils literal notranslate"><span class="pre">order</span></code> must contain every index from <code class="docutils literal notranslate"><span class="pre">0</span></code> through <code class="docutils literal notranslate"><span class="pre">list.length</span> <span class="pre">-</span> <span class="pre">1</span></code> exactly once; wrong
+lengths, out-of-bounds indices, and duplicates are rejected before the list changes.</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Reorder"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[{</span><span class="nt">"Key"</span><span class="p">:</span><span class="w"> </span><span class="s2">"items"</span><span class="p">}],</span><span class="w"> </span><span class="nt">"order"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="mi">1</span><span class="p">]}}</span>
+</pre></div>
+</div>
+<p>For <code class="docutils literal notranslate"><span class="pre">[a,</span> <span class="pre">b,</span> <span class="pre">c]</span></code>, this produces <code class="docutils literal notranslate"><span class="pre">[c,</span> <span class="pre">a,</span> <span class="pre">b]</span></code>. Applying the permutation takes linear time and lets a
+receiver carry each item’s identity directly to its new index.</p>
 <p>Malformed paths, wrong container types, and out-of-bounds list indexes are rejected by the core apply
 path.</p>
+<p>List diff recognizes exact-value matches and emits <code class="docutils literal notranslate"><span class="pre">Move</span></code> for them, including duplicate equal values.
+If a moved record also changes, transports can use an unchanged record as a move anchor and diff the
+changed record at its final position. Generic <code class="docutils literal notranslate"><span class="pre">Value</span></code> lists contain no key metadata from which
+transports could infer identity when every moved record changes, so the diff remains positional rather
+than guessing an application-specific <code class="docutils literal notranslate"><span class="pre">id</span></code> field.</p>
+<p>Move reconciliation has a linear work budget. Sparse moves remain granular; an exact dense
+permutation emits one <code class="docutils literal notranslate"><span class="pre">Reorder</span></code> instead of repeated matching and array movement. If the lists are not
+an exact permutation and reconciliation exhausts the budget, diff falls back to positional updates.</p>
 </section>
 </section>
 <section id="protocol-messages">
@@ -548,6 +579,8 @@ implementations in every Python or JavaScript process that uses the content type
 <li><a class="reference internal" href="#remove">Remove</a></li>
 <li><a class="reference internal" href="#insert">Insert</a></li>
 <li><a class="reference internal" href="#removeat">RemoveAt</a></li>
+<li><a class="reference internal" href="#move">Move</a></li>
+<li><a class="reference internal" href="#reorder">Reorder</a></li>
 </ul>
 </li>
 <li><a class="reference internal" href="#protocol-messages">Protocol messages</a><ul>
@@ -570,7 +603,7 @@ implementations in every Python or JavaScript process that uses the content type
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=fe7df9b0"></script>
+</div><script src="../../_static/documentation_options.js?v=486e5634"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

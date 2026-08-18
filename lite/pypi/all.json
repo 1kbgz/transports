@@ -5,19 +5,19 @@
         {
           "comment_text": "",
           "digests": {
-            "md5": "8e6c8db0a65ff1c09a77bd2033dc7b06",
-            "sha256": "6c0263c4bbc4b6451f018bae4f312170bf927976f9b2f5cde17140840b121722"
+            "md5": "f7d0926d4ab633fbf14e519f3619202d",
+            "sha256": "26ebc2acd830d7b5876fe4aa68d2cde0ded923e80735d50e61b50d88d61492e7"
           },
           "downloads": -1,
           "filename": "transports-0.7.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
           "has_sig": false,
-          "md5_digest": "8e6c8db0a65ff1c09a77bd2033dc7b06",
+          "md5_digest": "f7d0926d4ab633fbf14e519f3619202d",
           "packagetype": "bdist_wheel",
           "python_version": "py3",
           "requires_python": ">=3.10",
-          "size": 502366,
-          "upload_time": "2026-08-17T23:52:14.789269Z",
-          "upload_time_iso_8601": "2026-08-17T23:52:14.789269Z",
+          "size": 537594,
+          "upload_time": "2026-08-18T16:46:52.229825Z",
+          "upload_time_iso_8601": "2026-08-18T16:46:52.229825Z",
           "url": "./transports-0.7.0-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
           "yanked": false,
           "yanked_reason": null
