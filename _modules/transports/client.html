@@ -247,6 +247,7 @@
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">urllib.parse</span>
@@ -274,6 +275,40 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="c1">#: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">connected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Whether a managed connection (`connect` / `run`) is open right now."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Client.send">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.send">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">send</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Send a frame over the active managed connection (`connect` / `run`).</span>
+
+<span class="sd">        Returns ``True`` when handed to an open connection, ``False`` when none is active (never</span>
+<span class="sd">        connected, in a reconnect gap, or receive-only `connect_sse`) — the frame is dropped, like a</span>
+<span class="sd">        browser WebSocket's send on a closed socket, so an adapter can pass ``client.send`` as a</span>
+<span class="sd">        fire-and-forget callback; check `connected` (or the return) when it matters."""</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">inspect</span><span class="o">.</span><span class="n">isawaitable</span><span class="p">(</span><span class="n">result</span><span class="p">):</span>
+            <span class="k">await</span> <span class="n">result</span>
+        <span class="k">return</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="Client.propose">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.propose">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">propose</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Propose an edit over the active connection: ``send(edit(mid, new_value))``.</span>
+
+<span class="sd">        Server-authoritative — the mirror updates when the authoritative patch echoes back (or</span>
+<span class="sd">        `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">new_value</span><span class="p">))</span></div>
+
 
 <div class="viewcode-block" id="Client.on_change">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_change">[docs]</a>
@@ -396,8 +431,12 @@
         <span class="kn">import</span><span class="w"> </span><span class="nn">websockets</span>
 
         <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
-            <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+            <span class="k">finally</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="kc">None</span></div>
 
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_run_browser</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">authority</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">"server"</span><span class="p">,</span> <span class="n">retry</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
@@ -459,12 +498,17 @@
             <span class="k">if</span> <span class="ow">not</span> <span class="n">closed</span><span class="o">.</span><span class="n">done</span><span class="p">():</span>
                 <span class="n">closed</span><span class="o">.</span><span class="n">set_result</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
 
-        <span class="n">proxies</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">)]</span>
-        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">"message"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">_on_open</span><span class="p">(</span><span class="n">_event</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="c1"># arm the outbound channel only once the socket is open (send during CONNECTING throws)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">frame</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_browser</span><span class="p">(</span><span class="n">ws</span><span class="p">,</span> <span class="n">frame</span><span class="p">)</span>
+
+        <span class="n">proxies</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_open</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">)]</span>
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">"message"</span><span class="p">,</span> <span class="s2">"open"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
             <span class="n">ws</span><span class="o">.</span><span class="n">addEventListener</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">proxy</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
             <span class="k">await</span> <span class="n">closed</span>
         <span class="k">finally</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">for</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="n">proxies</span><span class="p">:</span>
                 <span class="n">proxy</span><span class="o">.</span><span class="n">destroy</span><span class="p">()</span>
 
@@ -499,13 +543,17 @@
             <span class="n">pushed</span><span class="p">:</span> <span class="nb">set</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
-                    <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
-                        <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
-                        <span class="k">if</span> <span class="n">pre</span><span class="p">:</span>  <span class="c1"># rectify: once the server has (re)snapshotted a model, push our copy back</span>
-                            <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">):</span>
-                                <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pushed</span> <span class="ow">and</span> <span class="n">mid</span> <span class="ow">in</span> <span class="n">pre</span><span class="p">:</span>
-                                    <span class="k">await</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">pre</span><span class="p">[</span><span class="n">mid</span><span class="p">]))</span>
-                                    <span class="n">pushed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
+                            <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+                            <span class="k">if</span> <span class="n">pre</span><span class="p">:</span>  <span class="c1"># rectify: once the server has (re)snapshotted a model, push our copy back</span>
+                                <span class="k">for</span> <span class="n">mid</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">):</span>
+                                    <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">pushed</span> <span class="ow">and</span> <span class="n">mid</span> <span class="ow">in</span> <span class="n">pre</span><span class="p">:</span>
+                                        <span class="k">await</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">pre</span><span class="p">[</span><span class="n">mid</span><span class="p">]))</span>
+                                        <span class="n">pushed</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+                    <span class="k">finally</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="kc">None</span>
             <span class="k">except</span> <span class="p">(</span><span class="n">websockets</span><span class="o">.</span><span class="n">ConnectionClosed</span><span class="p">,</span> <span class="ne">OSError</span><span class="p">):</span>
                 <span class="k">pass</span>  <span class="c1"># dropped — fall through to retry</span>
             <span class="k">await</span> <span class="n">asyncio</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry</span><span class="p">)</span></div>

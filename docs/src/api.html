@@ -421,6 +421,30 @@ arrives, not optimistically.</p>
 <p>Read values with <cite>value(id)</cite> or materialize them with <cite>model(id, cls)</cite>. Drive it with a live
 connection via <cite>connect(url)</cite>, or feed it messages directly with <cite>recv(data)</cite>. The <cite>codec</cite>
 (<cite>“json”</cite>, <cite>“msgpack”</cite>, or <cite>“cbor”</cite>) frames outbound edits and decodes inbound frames.</p>
+<dl class="py property">
+<dt class="sig sig-object py" id="transports.Client.connected">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connected</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#transports.Client.connected" title="Link to this definition">¶</a></dt>
+<dd><p>Whether a managed connection (<cite>connect</cite> / <cite>run</cite>) is open right now.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.send">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">send</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.send"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.send" title="Link to this definition">¶</a></dt>
+<dd><p>Send a frame over the active managed connection (<cite>connect</cite> / <cite>run</cite>).</p>
+<p>Returns <code class="docutils literal notranslate"><span class="pre">True</span></code> when handed to an open connection, <code class="docutils literal notranslate"><span class="pre">False</span></code> when none is active (never
+connected, in a reconnect gap, or receive-only <cite>connect_sse</cite>) — the frame is dropped, like a
+browser WebSocket’s send on a closed socket, so an adapter can pass <code class="docutils literal notranslate"><span class="pre">client.send</span></code> as a
+fire-and-forget callback; check <cite>connected</cite> (or the return) when it matters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.propose">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">propose</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.propose"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.propose" title="Link to this definition">¶</a></dt>
+<dd><p>Propose an edit over the active connection: <code class="docutils literal notranslate"><span class="pre">send(edit(mid,</span> <span class="pre">new_value))</span></code>.</p>
+<p>Server-authoritative — the mirror updates when the authoritative patch echoes back (or
+<cite>on_reject</cite> fires with why it was refused). Returns <code class="docutils literal notranslate"><span class="pre">False</span></code> (dropped) when not connected.</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_change">
 <span class="sig-name descname"><span class="pre">on_change</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_change"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_change" title="Link to this definition">¶</a></dt>
@@ -1000,6 +1024,9 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 </ul>
 </li>
 <li><a class="reference internal" href="#transports.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
+<li><a class="reference internal" href="#transports.Client.connected"><code class="docutils literal notranslate"><span class="pre">Client.connected</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.send"><code class="docutils literal notranslate"><span class="pre">Client.send()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.propose"><code class="docutils literal notranslate"><span class="pre">Client.propose()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.on_change"><code class="docutils literal notranslate"><span class="pre">Client.on_change()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.on_reject"><code class="docutils literal notranslate"><span class="pre">Client.on_reject()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>

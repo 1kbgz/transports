@@ -309,14 +309,20 @@ resulting patches to all open connections.</p>
 <span class="p">});</span>
 </pre></div>
 </div>
-<p>To send an edit, create the next core <code class="docutils literal notranslate"><span class="pre">Value</span></code> and send the encoded proposal frame:</p>
+<p>To send an edit, propose it over the active connection — <code class="docutils literal notranslate"><span class="pre">connect()</span></code>/<code class="docutils literal notranslate"><span class="pre">run()</span></code> own the socket, so no
+socket handling is needed:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
-<span class="nx">ws</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">client</span><span class="p">.</span><span class="nx">edit</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">})));</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">propose</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}));</span><span class="w"> </span><span class="c1">// send(edit(id, value)) over the managed connection</span>
 </pre></div>
 </div>
-<p>The local mirror updates when the server echoes the authoritative patch.</p>
+<p>The local mirror updates when the server echoes the authoritative patch (or <code class="docutils literal notranslate"><span class="pre">onReject</span></code> fires with
+why it was refused). <code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way — it is what an
+adapter hands its send callback, e.g. spaday’s <code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame when no managed connection is open (matching a
+browser WebSocket’s send on a closed socket, so they are safe fire-and-forget callbacks even across
+<code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect gaps); check <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> (or the return value) when delivery matters. With
+a hand-rolled socket, send <code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code> yourself as before.</p>
 </section>
 <section id="mirror-the-server-in-python">
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
@@ -325,8 +331,10 @@ resulting patches to all open connections.</p>
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>For Python clients that also send edits, manage the WebSocket loop directly and send the frame
-returned by <code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code>.</p>
+<p>Edits work the same as in JS: <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose(mid,</span> <span class="pre">value)</span></code> (or <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.send(frame)</span></code>)
+rides the active <code class="docutils literal notranslate"><span class="pre">connect()</span></code>/<code class="docutils literal notranslate"><span class="pre">run()</span></code> connection — native or Pyodide — returning <code class="docutils literal notranslate"><span class="pre">False</span></code> (dropped)
+when there is none, with <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> to check first; with a hand-rolled socket, send
+<code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> yourself.</p>
 </section>
 <section id="use-messagepack-on-a-connection">
 <h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>
