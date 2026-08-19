@@ -282,6 +282,35 @@ def test_browser_websocket_path_mirrors_frames():
                 sys.modules[name] = mod
 
 
+def test_client_send_awaits_native_senders_and_drops_when_unconnected():
+    """`send` returns False (frame dropped, like a closed browser socket) without an active
+    connection — so an adapter can use it fire-and-forget — and awaits an async (native websockets)
+    sender; `propose` is `send(edit(...))`."""
+    import asyncio
+
+    async def run():
+        client = Client()
+        assert client.connected is False
+        assert await client.send("x") is False  # dropped, not raised: safe as a naked callback
+
+        snap = to_value(Device(name="lamp"))
+        client.recv(protocol.snapshot_msg(1, "Device", 0, snap))
+        sent = []
+
+        async def sender(frame):  # the native path's ws.send coroutine
+            sent.append(frame)
+
+        client._sender = sender
+        assert client.connected is True
+        assert await client.propose(1, to_value(Device(name="beacon"))) is True
+        assert len(sent) == 1
+        msg = json.loads(sent[0])
+        assert msg["t"] == "patch"
+        assert msg["patch"]["ops"][0]["Set"]["value"] == {"Str": "beacon"}
+
+    asyncio.run(run())
+
+
 def test_browser_run_reconnects_with_resume_and_client_authority():
     """`Client._run_browser` (the Pyodide `run`) reconnects with `?since=` resume and, under client
     authority, pushes the pre-drop state back once the server has (re)snapshotted."""
@@ -340,6 +369,9 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
             task = asyncio.ensure_future(client._run_browser("ws://host/ws", authority="client", retry=0.01))
             await asyncio.sleep(0)
             first = FakeSocket.instances[-1]
+            assert client.connected is False  # the channel arms only on the socket's open event
+            first.listeners["open"](FakeEvent(None))
+            assert client.connected is True
             for wire in server.open("c1"):
                 first.listeners["message"](FakeEvent(wire))
             assert client.model(mid, Device).name == "lamp"
@@ -353,11 +385,23 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
             assert second is not first
             assert "since=" in second.url  # resume: the server replays only the delta
 
+            second.listeners["open"](FakeEvent(None))
             for wire in server.open("c2"):
                 second.listeners["message"](FakeEvent(wire))
             # client authority: once the server (re)snapshots, the pre-drop state is pushed back
             assert second.sent and json.loads(second.sent[0])["t"] == "patch"
+
+            # the managed connection exposes an outbound channel: propose without owning the socket
+            assert await client.propose(mid, {"Map": {"name": {"Str": "manual"}}}) is True
+            assert json.loads(second.sent[-1])["patch"]["ops"][0]["Set"]["value"] == {"Str": "manual"}
+
             task.cancel()
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
+            assert client.connected is False  # the drop cleared the channel
+            assert await client.send("x") is False  # dropped, matching a closed browser socket
 
             # binary frames go through pyodide.ffi.to_js on the way out
             Client._send_browser(second, b"\x01")
