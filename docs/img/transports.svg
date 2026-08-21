@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1254 1254" role="img" aria-label="transports" shape-rendering="geometricPrecision">
+  <title>transports</title>
+
+  <g fill="none" stroke-linecap="butt">
+    <path d="M1064.2 889.7 A510 510 0 0 1 157.5 427.7" stroke="#0C4253" stroke-width="78"/>
+    <path d="M189.8 364.3 A510 510 0 0 1 1096.5 826.3" stroke="#0C4253" stroke-width="78"/>
+
+    <path d="M937.2 863.3 A390 390 0 0 1 266.9 477.1" stroke="#AECEC3" stroke-width="72"/>
+    <path d="M298.4 416.9 A390 390 0 0 1 973.6 805.9" stroke="#AECEC3" stroke-width="72"/>
+
+    <path d="M838.5 760.2 A250 250 0 0 1 381.2 581.4" stroke="#0C4253" stroke-width="68"/>
+    <path d="M392.8 539.4 A250 250 0 0 1 858.5 721.5" stroke="#0C4253" stroke-width="68"/>
+  </g>
+
+  <path d="M202 419 C329 410 352 622 536 628 C570 629 598 627 627 627 C754 627 810 678 866 766 C916 844 969 840 1043 841" fill="none" stroke="#0C4253" stroke-width="76" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M202 419 C329 410 352 622 536 628 C570 629 598 627 627 627 C754 627 810 678 866 766 C916 844 969 840 1043 841" fill="none" stroke="#FC6B47" stroke-width="50" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <g fill="#F2F3EF" stroke="#0C4253" stroke-width="16">
+    <circle cx="202" cy="419" r="88"/>
+    <circle cx="627" cy="627" r="94"/>
+    <circle cx="1043" cy="841" r="88"/>
+  </g>
+
+  <g fill="#0C4253">
+    <circle cx="202" cy="419" r="45"/>
+    <circle cx="627" cy="627" r="48"/>
+    <circle cx="1043" cy="841" r="45"/>
+  </g>
+</svg>
