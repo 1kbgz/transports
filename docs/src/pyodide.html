@@ -327,7 +327,10 @@ make<span class="w"> </span>test-jupyterlite<span class="w">   </span><span clas
 </div>
 <p>Serve <code class="docutils literal notranslate"><span class="pre">dist/lite</span></code> from any static host. The transports wheel installs from the site’s own wheel
 index (<code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code> — or from PyPI, which carries the Pyodide wheel since v0.7.0);
-<code class="docutils literal notranslate"><span class="pre">anywidget</span></code> comes from PyPI.</p>
+<code class="docutils literal notranslate"><span class="pre">anywidget</span></code> comes from PyPI. Widget <strong>frontend</strong> extensions cannot be <code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span></code>ed at runtime —
+the site build bundles them (<code class="docutils literal notranslate"><span class="pre">jupyterlab_widgets</span></code> for the ipywidgets manager plus <code class="docutils literal notranslate"><span class="pre">anywidget</span></code>; see
+the <code class="docutils literal notranslate"><span class="pre">jupyterlite</span></code> Make target). A Lite site built without them shows the widget’s text repr instead
+of the live view.</p>
 <p><strong>If a previously visited site misbehaves after a redeploy</strong> (e.g. <code class="docutils literal notranslate"><span class="pre">FileNotFoundError</span></code> from an old
 wheel, or <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">WebAssembly</span> <span class="pre">stack</span> <span class="pre">switching</span> <span class="pre">not</span> <span class="pre">supported</span></code>): JupyterLite caches hard — a
 service worker plus browser storage can keep serving the previous build’s kernel and packages. Hard

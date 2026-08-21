@@ -95,7 +95,10 @@ make test-jupyterlite   # or: drive the site's REPL in Chromium end-to-end
 
 Serve `dist/lite` from any static host. The transports wheel installs from the site's own wheel
 index (`%pip install transports` — or from PyPI, which carries the Pyodide wheel since v0.7.0);
-`anywidget` comes from PyPI.
+`anywidget` comes from PyPI. Widget **frontend** extensions cannot be `%pip install`ed at runtime —
+the site build bundles them (`jupyterlab_widgets` for the ipywidgets manager plus `anywidget`; see
+the `jupyterlite` Make target). A Lite site built without them shows the widget's text repr instead
+of the live view.
 
 **If a previously visited site misbehaves after a redeploy** (e.g. `FileNotFoundError` from an old
 wheel, or `RuntimeError: WebAssembly stack switching not supported`): JupyterLite caches hard — a
