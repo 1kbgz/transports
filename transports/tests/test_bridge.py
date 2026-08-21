@@ -1,4 +1,8 @@
-from pydantic import BaseModel
+import inspect
+from typing import Annotated, Literal
+
+import pytest
+from pydantic import BaseModel, Field, SerializeAsAny, model_validator
 
 from transports import Session, from_value, schema_of, to_value
 
@@ -96,6 +100,82 @@ def test_no_change_no_patch():
     sess.host(d)
     d.on = True  # same value
     assert sess.drain() == []
+
+
+class Circle(BaseModel):
+    kind: Literal["circle"] = "circle"
+    radius: int = 1
+
+
+class Square(BaseModel):
+    kind: Literal["square"] = "square"
+    side: int = 1
+
+
+class Drawing(BaseModel):
+    shape: Annotated[Circle | Square, Field(discriminator="kind")]
+
+
+def test_discriminated_union_round_trip_preserves_subclass():
+    # inlining nested models as Maps keeps the discriminator in the dump, so
+    # from_value re-dispatches to the concrete subclass
+    d = Drawing(shape=Square(side=3))
+    m = from_value(to_value(d), Drawing)
+    assert isinstance(m.shape, Square)
+    assert m == d
+
+
+class Node(BaseModel):
+    """ccflow-style polymorphism: a `type_` field in the dump drives subclass dispatch on validate."""
+
+    type_: str = ""
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _load_subclass(cls, value, handler):
+        if cls is Node and isinstance(value, dict):
+            target = _NODE_TYPES.get(value.get("type_"))
+            if target is not None:
+                return target.model_validate(value)
+        return handler(value)
+
+
+class TaskNode(Node):
+    type_: str = "task"
+    steps: list = []
+
+
+_NODE_TYPES = {"task": TaskNode}
+
+
+class Flow(BaseModel):
+    # SerializeAsAny makes the dump duck-typed on any pydantic 2.x (ccflow's BaseModel applies it
+    # to every field via its metaclass); on 2.13+ the bridge dumps polymorphically by default
+    root: SerializeAsAny[Node] = Node()
+
+
+def test_type_field_dispatch_round_trip_preserves_subclass():
+    f = Flow(root=TaskNode(steps=["a", "b"]))
+    m = from_value(to_value(f), Flow)
+    assert isinstance(m.root, TaskNode)
+    assert m.root.steps == ["a", "b"]
+    assert m == f
+
+
+@pytest.mark.skipif(
+    "polymorphic_serialization" not in inspect.signature(BaseModel.model_dump).parameters,
+    reason="pydantic < 2.13 dumps base-annotated fields by their annotation",
+)
+def test_plain_base_annotated_field_round_trips_subclass():
+    # the bridge dumps polymorphically by default on pydantic 2.13+, so a subclass instance in a
+    # base-annotated field keeps its fields with no SerializeAsAny or config on the model
+    class PlainFlow(BaseModel):
+        root: Node = Node()
+
+    f = PlainFlow(root=TaskNode(steps=["a"]))
+    m = from_value(to_value(f), PlainFlow)
+    assert isinstance(m.root, TaskNode)
+    assert m.root.steps == ["a"]
 
 
 def test_mirror_across_sessions():
