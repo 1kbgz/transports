@@ -152,7 +152,7 @@ jupyterlite:  ## build the JupyterLite demo site into dist/lite (needs the Pyodi
 	rm -rf examples/lite/pypi examples/lite/.cache
 	mkdir -p examples/lite/pypi
 	cp dist/pyodide/*.whl examples/lite/pypi/
-	uvx --with jupyterlite-pyodide-kernel==0.8.3 --with jupyter-server --from jupyterlite-core==0.8.2 jupyter lite build --lite-dir examples/lite --output-dir $(CURDIR)/dist/lite
+	uvx --with jupyterlite-pyodide-kernel==0.8.3 --with jupyter-server --with jupyterlab-widgets==3.0.15 --with anywidget --from jupyterlite-core==0.8.2 jupyter lite build --lite-dir examples/lite --output-dir $(CURDIR)/dist/lite
 test-jupyterlite: jupyterlite  ## drive the JupyterLite demo in a browser
 	cd js; pnpm exec playwright test tests/jupyterlite.test.js
 coverage: coverage-py coverage-js coverage-rs  ## run all tests and collect test coverage
