@@ -32,9 +32,15 @@ test("JupyterLite pyodide kernel installs the wheel and hosts a session", async 
       "print('lite-ok', transports.__version__, session.snapshot(mid)['rev'], 'widget-ok')",
     ].join("\n"),
   );
+  // displaying the widget must render its live model view, not the text/plain repr — this is what
+  // breaks when the lite build lacks the ipywidgets frontend (jupyterlab_widgets)
+  url.searchParams.append("code", "w");
   await page.goto(url.toString());
   await expect(page.getByText(`lite-ok ${version} 0 widget-ok`)).toBeVisible({
     timeout: 240_000,
+  });
+  await expect(page.getByText('"name": "lamp"')).toBeVisible({
+    timeout: 60_000,
   });
 });
 
