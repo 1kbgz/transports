@@ -14,6 +14,7 @@ Nested models are inlined as `Map`s; `Submodel`-by-id references are a later ref
 """
 
 import dataclasses
+import inspect
 from types import UnionType
 from typing import Any, TypeVar, Union, cast, get_args, get_origin, get_type_hints
 
@@ -21,6 +22,12 @@ import msgspec
 from pydantic import BaseModel
 
 M = TypeVar("M")
+
+# pydantic 2.13+: dump polymorphically so a subclass instance in a base-annotated field keeps its
+# fields on the wire — the mirror sees the hosted instance, not its annotation
+_DUMP_KWARGS: dict = {"mode": "json"}
+if "polymorphic_serialization" in inspect.signature(BaseModel.model_dump).parameters:
+    _DUMP_KWARGS["polymorphic_serialization"] = True
 
 
 def _value_of(v: Any) -> Any:
@@ -57,7 +64,7 @@ def _py_of(value: Any) -> Any:
 def to_value(model: Any) -> Any:
     """A pydantic / dataclass / msgspec model as the core `Value` (a tagged `Map`)."""
     if isinstance(model, BaseModel):
-        plain = model.model_dump(mode="json")
+        plain = model.model_dump(**_DUMP_KWARGS)
     else:
         # dataclasses and msgspec.Structs both encode through msgspec (JSON-native: datetimes,
         # enums, etc. are normalized).
