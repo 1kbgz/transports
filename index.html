@@ -246,9 +246,13 @@
         <article role="main" id="furo-main-content">
           <div class="toctree-wrapper compound">
 </div>
-<section class="tex2jax_ignore mathjax_ignore" id="transports">
-<h1>transports<a class="headerlink" href="#transports" title="Link to this heading">¶</a></h1>
-<p>Move typed models across any wire as incremental patches.</p>
+<a href="https://github.com/1kbgz/transports">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/1kbgz/transports/raw/main/docs/img/logo-dark.png?raw=true">
+    <img alt="transports logo, concentric circles with a line connecting them with points" src="https://github.com/1kbgz/transports/raw/main/docs/img/logo-light.png?raw=true" width="800">
+  </picture>
+</a>
+Move typed models across any wire as incremental patches.
 <p>Define a model once as a <a class="reference external" href="https://docs.pydantic.dev">pydantic</a> model, stdlib <code class="docutils literal notranslate"><span class="pre">dataclass</span></code>, or
 <a class="reference external" href="https://jcristharif.com/msgspec/">msgspec</a> struct. Host it in Python, mutate it normally, and send
 only the patch needed to update a remote mirror. The same Rust core drives Python (PyO3) and
@@ -274,7 +278,7 @@ JavaScript (wasm), so both sides use the same <code class="docutils literal notr
 </pre></div>
 </div>
 <section id="install">
-<h2>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h2>
+<h1>Install<a class="headerlink" href="#install" title="Link to this heading">¶</a></h1>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>transports
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[connections]"</span><span class="w">   </span><span class="c1"># WebSocket server/client adapters</span>
 pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"transports[sse]"</span><span class="w">           </span><span class="c1"># Server-Sent Events adapter</span>
@@ -283,14 +287,14 @@ pip<span class="w"> </span>install<span class="w"> </span><span class="s2">"tran
 </div>
 </section>
 <section id="documentation">
-<h2>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h2>
+<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">¶</a></h1>
 <section id="tutorial">
-<h3>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h3>
+<h2>Tutorial<a class="headerlink" href="#tutorial" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="docs/src/quickstart.html"><span class="std std-doc">Quickstart</span></a> builds one hosted model and mirrors it with the in-process
 server/client protocol.</p>
 </section>
 <section id="how-to-guides">
-<h3>How-to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading">¶</a></h3>
+<h2>How-to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="docs/src/bridges.html"><span class="std std-doc">Model bridges</span></a> covers pydantic, dataclasses, msgspec, schemas, and plain
 JavaScript objects. <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a> covers WebSocket, SSE, Jupyter comm, and
 anywidget adapters. <a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> covers JSON, MessagePack, and custom codecs.
@@ -298,19 +302,18 @@ anywidget adapters. <a class="reference internal" href="docs/src/codecs.html"><s
 merge strategies. <a class="reference internal" href="docs/src/pyodide.html"><span class="std std-doc">Pyodide</span></a> covers building and loading transports in a browser.</p>
 </section>
 <section id="reference">
-<h3>Reference<a class="headerlink" href="#reference" title="Link to this heading">¶</a></h3>
+<h2>Reference<a class="headerlink" href="#reference" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="docs/src/api.html"><span class="std std-doc">API reference</span></a> lists the Python API. <a class="reference internal" href="docs/src/protocol-reference.html"><span class="std std-doc">Wire protocol reference</span></a>
 describes <code class="docutils literal notranslate"><span class="pre">Value</span></code>, patch operations, protocol messages, codecs, and model ids.</p>
 </section>
 <section id="explanation">
-<h3>Explanation<a class="headerlink" href="#explanation" title="Link to this heading">¶</a></h3>
+<h2>Explanation<a class="headerlink" href="#explanation" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="docs/src/concepts.html"><span class="std std-doc">Concepts</span></a> explains why transports uses incremental patches, server-owned
 revisions, a shared Rust core, and transport-agnostic adapters.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
 <p>This library was generated using <a class="reference external" href="https://copier.readthedocs.io/en/stable/">copier</a> from the <a class="reference external" href="https://github.com/python-project-templates/base">Base Python Project Template repository</a></p>
 </div>
-</section>
 </section>
 </section>
 
