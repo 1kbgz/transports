@@ -360,7 +360,15 @@ mirrored value as a Python model.</p>
 <section id="current-bridge-limits">
 <h2>Current bridge limits<a class="headerlink" href="#current-bridge-limits" title="Link to this heading">¶</a></h2>
 <p>Nested Python models are currently inlined as <code class="docutils literal notranslate"><span class="pre">Map</span></code> values. The Rust core has a <code class="docutils literal notranslate"><span class="pre">Submodel</span></code> value,
-but the Python and JavaScript bridges do not yet emit submodel-by-id references.</p>
+but the Python and JavaScript bridges do not yet emit submodel-by-id references. Inlining costs
+identity — the same instance referenced from two places syncs as two independent maps, and cycles
+are unsupported — but not type fidelity: a polymorphic nested model round-trips to its concrete
+subclass whenever its dump carries the discriminator. On pydantic 2.13+ the bridge dumps
+polymorphically by default, so a subclass instance in a base-annotated field keeps all its fields
+on the wire — pydantic discriminated unions and ccflow-style <code class="docutils literal notranslate"><span class="pre">type_</span></code> dispatch both work with no
+annotations. On older pydantic, dumps follow the field’s annotation (subclass-only fields are
+dropped); opt in per-field with <code class="docutils literal notranslate"><span class="pre">SerializeAsAny[Base]</span></code> (ccflow’s own <code class="docutils literal notranslate"><span class="pre">BaseModel</span></code> applies that to
+every field via its metaclass).</p>
 <p>JavaScript has one number type. Whole-valued JavaScript numbers encode as <code class="docutils literal notranslate"><span class="pre">Int</span></code>; other numbers
 encode as <code class="docutils literal notranslate"><span class="pre">Float</span></code>.</p>
 </section>

@@ -124,7 +124,15 @@ ws.send(client.edit(id, toValue({ name: "lamp", on: false })));
 ## Current bridge limits
 
 Nested Python models are currently inlined as `Map` values. The Rust core has a `Submodel` value,
-but the Python and JavaScript bridges do not yet emit submodel-by-id references.
+but the Python and JavaScript bridges do not yet emit submodel-by-id references. Inlining costs
+identity — the same instance referenced from two places syncs as two independent maps, and cycles
+are unsupported — but not type fidelity: a polymorphic nested model round-trips to its concrete
+subclass whenever its dump carries the discriminator. On pydantic 2.13+ the bridge dumps
+polymorphically by default, so a subclass instance in a base-annotated field keeps all its fields
+on the wire — pydantic discriminated unions and ccflow-style `type_` dispatch both work with no
+annotations. On older pydantic, dumps follow the field's annotation (subclass-only fields are
+dropped); opt in per-field with `SerializeAsAny[Base]` (ccflow's own `BaseModel` applies that to
+every field via its metaclass).
 
 JavaScript has one number type. Whole-valued JavaScript numbers encode as `Int`; other numbers
 encode as `Float`.
