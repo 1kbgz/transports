@@ -14,9 +14,7 @@ develop: develop-rs develop-js develop-py  ## setup project for development
 
 .PHONY: requirements-py requirements-js requirements-rs requirements
 requirements-py:  ## install prerequisite python build requirements
-	python -m pip install --upgrade pip toml
-	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print("\n".join(c["build-system"]["requires"]))'`
-	python -m pip install `python -c 'import toml; c = toml.load("pyproject.toml"); print(" ".join(c["project"]["optional-dependencies"]["develop"]))'`
+	uv pip install -r pyproject.toml --extra develop
 
 requirements-js:  ## install prerequisite javascript build requirements
 	cd js; pnpm install && npx playwright install
@@ -135,6 +133,7 @@ coverage-rs:  ## run rust tests and collect test coverage
 
 .PHONY: test test-pyodide test-pyodide-browser coverage tests
 test: test-py test-js test-rs  ## run all tests
+<<<<<<< before updating
 transports/extension/cdn/widget.js:  ## the in-wheel JS assets — cibuildwheel sets SKIP_HATCH_JS, so they must exist before the wheel builds
 	cd js; pnpm build
 
@@ -155,6 +154,9 @@ jupyterlite:  ## build the JupyterLite demo site into dist/lite (needs the Pyodi
 	uvx --with jupyterlite-pyodide-kernel==0.8.3 --with jupyter-server --with jupyterlab-widgets==3.0.15 --with anywidget --from jupyterlite-core==0.8.2 jupyter lite build --lite-dir examples/lite --output-dir $(CURDIR)/dist/lite
 test-jupyterlite: jupyterlite  ## drive the JupyterLite demo in a browser
 	cd js; pnpm exec playwright test tests/jupyterlite.test.js
+=======
+
+>>>>>>> after updating
 coverage: coverage-py coverage-js coverage-rs  ## run all tests and collect test coverage
 
 # alias
