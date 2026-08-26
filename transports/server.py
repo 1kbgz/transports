@@ -96,15 +96,31 @@ class Server:
                 reject = protocol.reject_msg(msg["id"], snap["rev"], error)
                 return {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
             relay = protocol.patch_msg(msg["id"], authoritative)
-            return {c: [self._encode_for(c, relay)] for c in self._codecs}
+            encoded: dict[str, list[Wire]] = {}
+            out: dict[Any, list[Wire]] = {}
+            for c, codec in self._codecs.items():
+                if codec not in encoded:
+                    encoded[codec] = [protocol.encode(relay, codec)]
+                out[c] = encoded[codec]
+            return out
         return {}
 
     def flush(self) -> dict[Any, list[Wire]]:
-        """Drain the session and return the patch messages to broadcast, encoded per connection."""
+        """Drain the session and return the patch messages to broadcast, encoded once per codec.
+
+        Encoding depends only on the codec, so a broadcast to N same-codec connections shares one
+        encoded copy instead of re-encoding per connection — the fan-out cost is O(messages x
+        distinct codecs), not O(messages x connections)."""
         msgs = [protocol.patch_msg(mid, patch) for mid, patch in self._session.drain()]
         if not msgs or not self._codecs:
             return {}
-        return {c: [self._encode_for(c, m) for m in msgs] for c in self._codecs}
+        encoded: dict[str, list[Wire]] = {}
+        out: dict[Any, list[Wire]] = {}
+        for conn, codec in self._codecs.items():
+            if codec not in encoded:
+                encoded[codec] = [protocol.encode(m, codec) for m in msgs]
+            out[conn] = encoded[codec]
+        return out
 
     def close(self, conn: Any) -> None:
         self._codecs.pop(conn, None)
