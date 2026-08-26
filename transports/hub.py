@@ -310,9 +310,16 @@ class Hub:
             if not drained:
                 continue
             conns = [c for c, k in self._conn_key.items() if k == key]
+            if not conns:
+                continue
+            # encode once per codec, not once per connection (see Server.flush)
+            msgs = [protocol.patch_msg(mid, patch) for mid, patch in drained]
+            encoded: dict[str, list[Wire]] = {}
             for c in conns:
-                for mid, patch in drained:
-                    out.setdefault(c, []).append(self._encode_for(c, protocol.patch_msg(mid, patch)))
+                codec = self._codecs.get(c, self.default_codec)
+                if codec not in encoded:
+                    encoded[codec] = [protocol.encode(m, codec) for m in msgs]
+                out.setdefault(c, []).extend(encoded[codec])
         for sid, fan in self._shared_outbox:
             for c, msgs in self._fanout(sid, fan).items():
                 out.setdefault(c, []).extend(msgs)

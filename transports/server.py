@@ -96,15 +96,31 @@ class Server:
                 reject = protocol.reject_msg(msg["id"], snap["rev"], error)
                 return {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
             relay = protocol.patch_msg(msg["id"], authoritative)
-            return {c: [self._encode_for(c, relay)] for c in self._codecs}
+            encoded: dict[str, list[Wire]] = {}
+            out: dict[Any, list[Wire]] = {}
+            for c, codec in self._codecs.items():
+                if codec not in encoded:
+                    encoded[codec] = [protocol.encode(relay, codec)]
+                out[c] = encoded[codec]
+            return out
         return {}
 
     def flush(self) -> dict[Any, list[Wire]]:
-        """Drain the session and return the patch messages to broadcast, encoded per connection."""
+        """Drain the session and return the patch messages to broadcast, encoded once per codec.
+
+        Encoding depends only on the codec, so a broadcast to N same-codec connections shares one
+        encoded copy instead of re-encoding per connection — the fan-out cost is O(messages x
+        distinct codecs), not O(messages x connections)."""
         msgs = [protocol.patch_msg(mid, patch) for mid, patch in self._session.drain()]
         if not msgs or not self._codecs:
             return {}
-        return {c: [self._encode_for(c, m) for m in msgs] for c in self._codecs}
+        encoded: dict[str, list[Wire]] = {}
+        out: dict[Any, list[Wire]] = {}
+        for conn, codec in self._codecs.items():
+            if codec not in encoded:
+                encoded[codec] = [protocol.encode(m, codec) for m in msgs]
+            out[conn] = encoded[codec]
+        return out
 
     def close(self, conn: Any) -> None:
         self._codecs.pop(conn, None)
@@ -155,21 +171,56 @@ def ws_endpoint(server: Broadcaster):
     return endpoint
 
 
-async def autosync(server: Broadcaster, interval: float = 0.01) -> None:
+async def autosync(server: Broadcaster, interval: float = 0.01, *, max_queue: int = 1024) -> None:
     """Background task: periodically flush and broadcast patches to all connections.
 
     Run exactly one of these per `Server`/`Hub` (not per connection), so a single drain feeds every
     client. The async counterpart of `sync` — use this for socket backends (WebSocket/SSE) driven by an
     event loop, and `sync` for the synchronous ones (Jupyter comm/anywidget).
+
+    Each connection gets a bounded send queue drained by its own writer task, so the flush loop
+    never blocks on a socket and one backpressured client cannot stall the broadcast. A client
+    whose queue exceeds ``max_queue`` pending messages is disconnected (the explicit
+    slow-consumer policy) — its reconnect resumes from its last revision via ``open(since=...)``.
     """
+    queues: dict[Any, asyncio.Queue] = {}
+    writers: dict[Any, asyncio.Task] = {}
+
+    def drop(conn: Any) -> None:
+        server.close(conn)
+        queues.pop(conn, None)
+        writer = writers.pop(conn, None)
+        if writer is not None and writer is not asyncio.current_task():
+            writer.cancel()
+
+    async def write(conn: Any, queue: asyncio.Queue) -> None:
+        try:
+            while True:
+                await _send(conn, await queue.get())
+        except asyncio.CancelledError:
+            raise
+        except Exception:  # noqa: BLE001
+            drop(conn)
+
     while True:
         await asyncio.sleep(interval)
         for conn, msgs in server.flush().items():
+            queue = queues.get(conn)
+            if queue is None:
+                # per-connection writer: the flush loop never awaits a socket, so one
+                # backpressured client cannot stall the broadcast to everyone else
+                queue = queues[conn] = asyncio.Queue()
+                writers[conn] = asyncio.get_running_loop().create_task(write(conn, queue))
+            if queue.qsize() + len(msgs) > max_queue:
+                # the explicit slow-consumer policy: a client that cannot keep up is
+                # disconnected rather than buffered without bound; on reconnect the
+                # resume protocol (`open(since=...)`) replays what it missed
+                drop(conn)
+                continue
             for msg in msgs:
-                try:
-                    await _send(conn, msg)
-                except Exception:  # noqa: BLE001
-                    server.close(conn)
+                queue.put_nowait(msg)
+        for conn in [c for c in queues if c not in server._codecs]:
+            drop(conn)
 
 
 def sync(server: Broadcaster) -> None:
