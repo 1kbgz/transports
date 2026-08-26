@@ -89,9 +89,19 @@ class Client:
         ``{"t": "snapshot", "id", "rev"}`` for a snapshot, the decoded patch message for a patch — or
         ``None`` for a patch whose revision was already applied, a ``reject`` (dispatched to
         `on_reject`), and an unrecognized message type, which is ignored so a newer server can add
-        message types without breaking older clients. Invalid frames raise without changing the
-        mirror or its accepted revision."""
+        message types without breaking older clients. A connection that negotiated ``?batch=1``
+        may receive batch frames, which apply in order and return the accepted changes as a
+        ``list``. Invalid frames raise without changing the mirror or its accepted revision."""
         msg = protocol.decode(data, self._codec)
+        t = msg.get("t")
+        if t == "batch":
+            # a negotiated batch frame: apply each message in order; the accepted changes come
+            # back as a list (only connections that requested ?batch=1 ever receive these)
+            accepted = [self._recv_msg(m) for m in msg["msgs"]]
+            return [a for a in accepted if a is not None] or None
+        return self._recv_msg(msg)
+
+    def _recv_msg(self, msg: dict) -> dict | None:
         t = msg.get("t")
         if t == "snapshot":
             mid: int = msg["id"]

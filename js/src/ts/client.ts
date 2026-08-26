@@ -50,6 +50,11 @@ function mapValue(value: Value | undefined): Record<string, Value> {
   throw new Error("patch path expected a map");
 }
 
+interface BatchMsg {
+  t: "batch";
+  msgs: (SnapshotMsg | PatchMsg | RejectMsg)[];
+}
+
 function listValue(value: Value | undefined): Value[] {
   if (
     value &&
@@ -270,9 +275,9 @@ export class Client {
    * mirror; consumers must not mutate them. Invalid frames throw without changing the mirror or its
    * accepted revision.
    */
-  recv(data: string | Uint8Array): ReceiveChange | undefined {
+  recv(data: string | Uint8Array): ReceiveChange | ReceiveChange[] | undefined {
     const custom = codecFor(this.codec);
-    let msg: SnapshotMsg | PatchMsg | RejectMsg;
+    let msg: SnapshotMsg | PatchMsg | RejectMsg | BatchMsg;
     if (custom) {
       msg = custom.decode(data) as SnapshotMsg | PatchMsg | RejectMsg;
     } else if (typeof data === "string") {
@@ -283,6 +288,20 @@ export class Client {
         this.codec === "cbor" ? cborToJson(data) : msgpackToJson(data),
       );
     }
+    if (msg.t === "batch") {
+      // a negotiated batch frame (the connection asked with ?batch=1): apply each message in
+      // order and return the accepted changes as an array
+      const accepted = msg.msgs
+        .map((m) => this.apply(m))
+        .filter((a): a is ReceiveChange => a !== undefined);
+      return accepted.length ? accepted : undefined;
+    }
+    return this.apply(msg);
+  }
+
+  private apply(
+    msg: SnapshotMsg | PatchMsg | RejectMsg,
+  ): ReceiveChange | undefined {
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
       this.revs.set(msg.id, msg.rev);

@@ -46,12 +46,13 @@ class Server:
     def __init__(self, session: Session, *, default_codec: str = protocol.JSON) -> None:
         self._session = session
         self._codecs: dict[Any, str] = {}
+        self._batched: set[Any] = set()
         self.default_codec = protocol.normalize_codec(default_codec)
 
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
         """Register a connection; return the messages that bring it up to date.
 
         Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only
@@ -59,6 +60,8 @@ class Server:
         replay log can't bridge the gap. So a reconnecting client replays the delta, not the whole model.
         """
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
+        if batch:
+            self._batched.add(conn)
         out: list[Wire] = []
         for mid in self._session.ids():
             client_rev = since.get(mid) if since else None
@@ -114,16 +117,22 @@ class Server:
         msgs = [protocol.patch_msg(mid, patch) for mid, patch in self._session.drain()]
         if not msgs or not self._codecs:
             return {}
-        encoded: dict[str, list[Wire]] = {}
+        # a batch-negotiated connection gets the whole flush as one frame (one send instead of
+        # one per message); a single-message flush skips the envelope either way
+        batched = [protocol.batch_msg(msgs)] if len(msgs) > 1 else msgs
+        encoded: dict[tuple[str, bool], list[Wire]] = {}
         out: dict[Any, list[Wire]] = {}
         for conn, codec in self._codecs.items():
-            if codec not in encoded:
-                encoded[codec] = [protocol.encode(m, codec) for m in msgs]
-            out[conn] = encoded[codec]
+            wants_batch = conn in self._batched
+            key = (codec, wants_batch)
+            if key not in encoded:
+                encoded[key] = [protocol.encode(m, codec) for m in (batched if wants_batch else msgs)]
+            out[conn] = encoded[key]
         return out
 
     def close(self, conn: Any) -> None:
         self._codecs.pop(conn, None)
+        self._batched.discard(conn)
 
 
 async def _send(conn: Any, msg: Wire) -> None:
@@ -147,8 +156,9 @@ def ws_endpoint(server: Broadcaster):
         codec = websocket.query_params.get("codec", server.default_codec)
         since_param = websocket.query_params.get("since")  # resume token: {mid: last_rev} JSON
         since = {int(k): int(v) for k, v in json.loads(since_param).items()} if since_param else None
+        batch = websocket.query_params.get("batch") in ("1", "true")
         await websocket.accept()
-        for msg in server.open(websocket, codec, since):
+        for msg in server.open(websocket, codec, since, batch=batch):
             await _send(websocket, msg)
         try:
             while True:

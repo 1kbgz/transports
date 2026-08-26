@@ -22,6 +22,8 @@ import psutil
 import pytest
 import websockets
 
+from transports import protocol
+
 _SERVER = Path(__file__).with_name("fanout_server.py")
 
 
@@ -134,32 +136,36 @@ class ClientFleet:
     async def _recv(self, ws, state: _ClientState) -> None:
         try:
             async for raw in ws:
-                message = json.loads(raw)
-                if message.get("t") == "patch":
-                    now = time.time()
-                    seq = stamp = None
-                    for op in message["patch"].get("ops", []):
-                        entry = op.get("Set")
-                        if not entry:
-                            continue
-                        key = entry["path"][0].get("Key")
-                        value = next(iter(entry["value"].values()))
-                        if key == "seq":
-                            seq = value
-                        elif key == "stamp":
-                            stamp = value
-                    if seq is not None:
-                        state.seq[message["id"]] = seq
-                        self.delivered += 1
-                    if stamp:
-                        self.latencies_ms.append((now - stamp) * 1000)
-                elif message.get("t") == "snapshot":
-                    value = message.get("value", {}).get("Map", {})
-                    seq = value.get("seq", {}).get("Int")
-                    if seq is not None:
-                        state.seq[message["id"]] = seq
+                frame = protocol.decode(raw)
+                for message in frame["msgs"] if frame.get("t") == "batch" else [frame]:
+                    self._apply(message, state)
         except websockets.ConnectionClosed:
             pass
+
+    def _apply(self, message: dict, state: _ClientState) -> None:
+        if message.get("t") == "patch":
+            now = time.time()
+            seq = stamp = None
+            for op in message["patch"].get("ops", []):
+                entry = op.get("Set")
+                if not entry:
+                    continue
+                key = entry["path"][0].get("Key")
+                value = next(iter(entry["value"].values()))
+                if key == "seq":
+                    seq = value
+                elif key == "stamp":
+                    stamp = value
+            if seq is not None:
+                state.seq[message["id"]] = seq
+                self.delivered += 1
+            if stamp:
+                self.latencies_ms.append((now - stamp) * 1000)
+        elif message.get("t") == "snapshot":
+            value = message.get("value", {}).get("Map", {})
+            seq = value.get("seq", {}).get("Int")
+            if seq is not None:
+                state.seq[message["id"]] = seq
 
     def wait_round(self, target: int, models: int, timeout: float = 120.0) -> None:
         self._run(self._wait(target, models, timeout))
