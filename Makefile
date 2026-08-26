@@ -45,8 +45,8 @@ install:  ## install python library
 #########
 .PHONY: lint-py lint-js lint-rs lint-docs lint lints
 lint-py:  ## run python linter with ruff
-	python -m ruff check transports
-	python -m ruff format --check transports
+	python -m ruff check transports benchmarks
+	python -m ruff format --check transports benchmarks
 
 lint-js:  ## run js linter
 	cd js; pnpm lint
@@ -65,8 +65,8 @@ lints: lint
 
 .PHONY: fix-py fix-js fix-rs fix-docs fix format
 fix-py:  ## fix python formatting with ruff
-	python -m ruff check --fix transports
-	python -m ruff format transports
+	python -m ruff check --fix transports benchmarks
+	python -m ruff format transports benchmarks
 
 fix-js:  ## fix js formatting
 	cd js; pnpm fix
@@ -102,9 +102,12 @@ check: checks
 #########
 # TESTS #
 #########
-.PHONY: test-py tests-py coverage-py
+.PHONY: test-py tests-py coverage-py benchmark-py
 test-py:  ## run python tests
 	python -m pytest -v transports/tests
+
+benchmark-py:  ## benchmark server fan-out and emit pytest-benchmark JSON
+	python -m pytest benchmarks --benchmark-only --benchmark-json=.benchmarks/pytest-benchmark.json
 
 # alias
 tests-py: test-py

@@ -162,3 +162,4 @@ AGENTS.md
 .superpowers
 examples/lite/pypi/
 .jupyterlite.doit.db
+.benchmarks/
