@@ -236,7 +236,9 @@ class Hub:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
+        # `batch` is accepted for endpoint parity but not yet applied: Hub.flush interleaves
+        # per-tenant and shared fan-outs, so its batching lands with that restructure.
         """Register a connection; return the messages to bring it up to date — its tenant's private models
         and its subscribed shared models. With ``since={mid: last_rev}`` a reconnecting client resumes its
         **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on)."""

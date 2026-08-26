@@ -19,6 +19,8 @@ import pytest
 
 UPDATES = int(os.environ.get("TRANSPORTS_BENCH_UPDATES", "50"))
 INTERVAL = float(os.environ.get("TRANSPORTS_BENCH_INTERVAL", "0.002"))
+CODEC = os.environ.get("TRANSPORTS_BENCH_CODEC", "json")
+BATCH = os.environ.get("TRANSPORTS_BENCH_BATCH", "") in ("1", "true")
 
 
 def percentile(samples: list[float], q: float) -> float:
@@ -38,7 +40,8 @@ def _grid() -> list[tuple[int, int]]:
 @pytest.mark.parametrize(("sessions", "streams"), _grid(), ids=lambda v: str(v))
 def test_fanout(benchmark, fanout_server, client_fleet, sessions: int, streams: int) -> None:
     server = fanout_server.start(models=streams)
-    client_fleet.start(sessions, server.ws_url)
+    query = f"?codec={CODEC}" + ("&batch=1" if BATCH else "")
+    client_fleet.start(sessions, server.ws_url + query)
     server.stats()  # drop startup-window lag samples
 
     cpu_before = server.process.cpu_times()
@@ -62,6 +65,8 @@ def test_fanout(benchmark, fanout_server, client_fleet, sessions: int, streams: 
             "streams": streams,
             "updates_per_round": UPDATES,
             "publish_interval_s": INTERVAL,
+            "codec": CODEC,
+            "batch": BATCH,
             "latency_p50_ms": round(percentile(client_fleet.latencies_ms, 0.50), 3),
             "latency_p95_ms": round(percentile(client_fleet.latencies_ms, 0.95), 3),
             "latency_p99_ms": round(percentile(client_fleet.latencies_ms, 0.99), 3),

@@ -91,6 +91,14 @@ def reject_msg(model_id: int, rev: int, error: str) -> str:
     return json.dumps({"t": "reject", "id": model_id, "rev": rev, "error": error})
 
 
+def batch_msg(msg_jsons: list[str]) -> str:
+    """Combine several already-serialized messages into one ``{"t": "batch", "msgs": [...]}`` frame.
+
+    Spliced as strings (each input is valid JSON), so batching adds no re-serialization cost.
+    Sent only to connections that negotiated ``batch`` — clients that never asked never see it."""
+    return '{"t":"batch","msgs":[' + ",".join(msg_jsons) + "]}"
+
+
 def encode(msg_json: str, codec: str = JSON) -> str | bytes:
     """Encode a JSON message string into the wire form for ``codec``.
 
