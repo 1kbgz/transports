@@ -306,7 +306,13 @@ class Hub:
 
     def flush(self) -> dict[Any, list[Wire]]:
         """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription."""
-        out: dict[Any, list[Wire]] = {}
+        return {conn: [wire for _, wire in tagged] for conn, tagged in self._flush_tagged().items()}
+
+    def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
+        """`flush`, with each message tagged by its model id so `autosync` can coalesce (see
+        `Server._flush_tagged`). Shared ids live above ``SHARED_ID_BASE``, so a connection's tenant
+        and shared tags never collide."""
+        out: dict[Any, list[tuple[int | None, Wire]]] = {}
         for key, sess in self._tenants.items():
             drained = sess.drain()
             if not drained:
@@ -315,16 +321,16 @@ class Hub:
             if not conns:
                 continue
             # encode once per codec, not once per connection (see Server.flush)
-            msgs = [protocol.patch_msg(mid, patch) for mid, patch in drained]
-            encoded: dict[str, list[Wire]] = {}
+            msgs = [(mid, protocol.patch_msg(mid, patch)) for mid, patch in drained]
+            encoded: dict[str, list[tuple[int | None, Wire]]] = {}
             for c in conns:
                 codec = self._codecs.get(c, self.default_codec)
                 if codec not in encoded:
-                    encoded[codec] = [protocol.encode(m, codec) for m in msgs]
+                    encoded[codec] = [(mid, protocol.encode(m, codec)) for mid, m in msgs]
                 out.setdefault(c, []).extend(encoded[codec])
         for sid, fan in self._shared_outbox:
             for c, msgs in self._fanout(sid, fan).items():
-                out.setdefault(c, []).extend(msgs)
+                out.setdefault(c, []).extend((sid, wire) for wire in msgs)
         self._shared_outbox.clear()
         return out
 

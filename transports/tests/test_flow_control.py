@@ -1,8 +1,10 @@
-"""`autosync` flow control: bounded per-connection queues and the explicit slow-consumer policy.
+"""`autosync` flow control: per-connection coalescing and the explicit slow-consumer policy.
 
-The flush loop never awaits a socket — each connection's messages drain through its own bounded
-queue and writer task — so one backpressured client cannot stall the broadcast, and a client whose
-queue overflows is disconnected (its reconnect resumes from its last revision via ``open(since=)``).
+The flush loop never awaits a socket — each connection's undelivered messages live in a per-model
+map drained by its own writer task — so one backpressured client cannot stall the broadcast. State
+coalesces (a newer revision replaces the undelivered one), bounding a slow consumer's backlog by
+its model count; a connection whose backlog exceeds ``max_queue`` even after coalescing is
+disconnected (its reconnect resumes from its last revision via ``open(since=)``).
 """
 
 from __future__ import annotations
@@ -36,7 +38,7 @@ class StuckConn(FakeConn):
         await asyncio.Event().wait()
 
 
-def test_slow_consumer_is_disconnected_without_stalling_the_broadcast():
+def test_stuck_state_consumer_coalesces_instead_of_disconnecting():
     async def scenario() -> None:
         session = transports.Session()
         model = Counter()
@@ -49,8 +51,8 @@ def test_slow_consumer_is_disconnected_without_stalling_the_broadcast():
 
         sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001, max_queue=4))
         try:
-            # each mutation is one queued message per connection per flush; the stuck consumer's
-            # writer is wedged in its first send, so its queue can only grow
+            # the stuck consumer's writer is wedged in its first send, but its undelivered state
+            # coalesces to the newest revision per model — one model can never exceed the bound
             for expected in range(1, 21):
                 model.n = expected
                 await asyncio.sleep(0.005)
@@ -58,16 +60,88 @@ def test_slow_consumer_is_disconnected_without_stalling_the_broadcast():
             # the fast consumer kept receiving throughout — the stuck one never blocked it
             assert len(fast.sent) >= 10
 
-            # the slow consumer crossed max_queue and was disconnected (the explicit policy);
-            # the broadcast set no longer includes it
+            # bounded by coalescing, the stuck consumer stays connected (state semantics: it
+            # will receive the newest revision whenever it drains, not the history)
+            assert stuck in server._codecs
+            assert fast in server._codecs
+        finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_stuck_consumer_exceeding_the_bound_is_disconnected():
+    async def scenario() -> None:
+        session = transports.Session()
+        models = [Counter() for _ in range(6)]
+        for model in models:
+            session.host(model)
+        server = transports.Server(session)
+
+        fast, stuck = FakeConn(), StuckConn()
+        server.open(fast)
+        server.open(stuck)
+
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001, max_queue=4))
+        try:
+            # six models' undelivered revisions cannot coalesce below max_queue=4: the stuck
+            # consumer crosses the bound and is disconnected (the explicit policy)
+            for expected in range(1, 6):
+                for model in models:
+                    model.n = expected
+                await asyncio.sleep(0.005)
+
             assert stuck not in server._codecs
             assert fast in server._codecs
 
             # and the flow keeps working after the disconnect
             before = len(fast.sent)
-            model.n = 999
+            models[0].n = 999
             await asyncio.sleep(0.01)
             assert len(fast.sent) > before
+        finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_coalescing_delivers_the_newest_revision():
+    import json
+
+    class GatedConn(FakeConn):
+        """Delivery pauses until `gate` is set, so revisions pile up undelivered."""
+
+        def __init__(self) -> None:
+            super().__init__()
+            self.gate = asyncio.Event()
+
+        async def send_text(self, msg: str) -> None:
+            await self.gate.wait()
+            self.sent.append(msg)
+
+    async def scenario() -> None:
+        session = transports.Session()
+        model = Counter()
+        session.host(model)
+        server = transports.Server(session)
+
+        gated = GatedConn()
+        server.open(gated)
+
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001))
+        try:
+            # revisions land while delivery is gated; each flush replaces the undelivered wire
+            for value in (1, 2, 3):
+                model.n = value
+                await asyncio.sleep(0.005)
+            gated.gate.set()
+            await asyncio.sleep(0.02)
+
+            # the client got the newest state, not the whole history: fewer sends than revisions,
+            # and the last delivered patch carries the final value
+            assert 1 <= len(gated.sent) < 3
+            ops = json.loads(gated.sent[-1])["patch"]["ops"]
+            assert {"Set": {"path": [{"Key": "n"}], "value": {"Int": 3}}} in ops
         finally:
             sync_task.cancel()
 
