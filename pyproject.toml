@@ -93,7 +93,9 @@ Homepage = "https://github.com/1kbgz/transports"
 
 [tool.benched]
 benchmark_paths = ["benchmarks"]
-results_dir = ".benched/results"
+# committed: durable, commit-aware history recorded from the maintainer's stable machine
+# (`make benchmark-history`); the docs embed renders trends from it at build time
+results_dir = "benchmarks/results"
 
 [tool.bumpversion]
 current_version = "0.8.1"
@@ -292,3 +294,4 @@ exclude_patterns = [
     ".github",
 ]
 use-autoapi = false
+extensions = ["benched.sphinx"]
