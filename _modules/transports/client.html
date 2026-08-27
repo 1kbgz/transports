@@ -345,9 +345,20 @@
 <span class="sd">        ``{"t": "snapshot", "id", "rev"}`` for a snapshot, the decoded patch message for a patch — or</span>
 <span class="sd">        ``None`` for a patch whose revision was already applied, a ``reject`` (dispatched to</span>
 <span class="sd">        `on_reject`), and an unrecognized message type, which is ignored so a newer server can add</span>
-<span class="sd">        message types without breaking older clients. Invalid frames raise without changing the</span>
-<span class="sd">        mirror or its accepted revision."""</span>
+<span class="sd">        message types without breaking older clients. A connection that negotiated ``?batch=1``</span>
+<span class="sd">        may receive batch frames, which apply in order and return the accepted changes as a</span>
+<span class="sd">        ``list``. Invalid frames raise without changing the mirror or its accepted revision."""</span>
         <span class="n">msg</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"batch"</span><span class="p">:</span>
+            <span class="c1"># a negotiated batch frame: apply each message in order; the accepted changes come</span>
+            <span class="c1"># back as a list (only connections that requested ?batch=1 ever receive these)</span>
+            <span class="n">accepted</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_recv_msg</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"msgs"</span><span class="p">]]</span>
+            <span class="k">return</span> <span class="p">[</span><span class="n">a</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">accepted</span> <span class="k">if</span> <span class="n">a</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">]</span> <span class="ow">or</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_recv_msg</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_recv_msg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">t</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"snapshot"</span><span class="p">:</span>
             <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
@@ -372,8 +383,7 @@
                 <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
         <span class="c1"># an unrecognized message type is ignored (not an error): the server may be newer than this client</span>
-        <span class="k">return</span> <span class="kc">None</span></div>
-
+        <span class="k">return</span> <span class="kc">None</span>
 
 <div class="viewcode-block" id="Client.value">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.value">[docs]</a>
