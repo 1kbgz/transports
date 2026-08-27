@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Wire protocol reference" href="protocol-reference.html"><link rel="prev" title="How to run transports in a browser with Pyodide" href="pyodide.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>How to benchmark server fan-out - transports v0.8.2</title>
+        <title>Server fan-out benchmark results - transports v0.8.2</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -205,7 +205,7 @@
 <li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pyodide.html">How to run transports in a browser with Pyodide</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to benchmark server fan-out</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">Server fan-out benchmark results</a></li>
 <li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
@@ -246,100 +246,121 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="how-to-benchmark-server-fan-out">
-<h1>How to benchmark server fan-out<a class="headerlink" href="#how-to-benchmark-server-fan-out" title="Link to this heading">¶</a></h1>
-<p>This guide shows you how to run the fan-out benchmark harness, scale it, and record durable
-benchmark history with <a class="reference external" href="https://github.com/1kbgz/benched">benched</a>.</p>
-<p>The harness in <code class="docutils literal notranslate"><span class="pre">benchmarks/</span></code> is an ordinary pytest-benchmark suite. Each benchmark starts a real
-server subprocess, connects a fleet of WebSocket clients, publishes a burst of updates across every
-stream, and completes when every client has received the final revision of every stream — the
-primary statistic is end-to-end delivery time for the whole fleet. Derived metrics ride each
-benchmark’s <code class="docutils literal notranslate"><span class="pre">extra_info</span></code>: delivery-latency percentiles, delivered/published ratio (coalescing), and
-the server’s CPU, RSS, thread count, and event-loop lag.</p>
-<section id="run-the-harness-raw">
-<h2>Run the harness raw<a class="headerlink" href="#run-the-harness-raw" title="Link to this heading">¶</a></h2>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>benchmark-py
-</pre></div>
-</div>
-<p>This runs <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">benchmarks</span> <span class="pre">--benchmark-only</span></code> and writes plain pytest-benchmark JSON to
-<code class="docutils literal notranslate"><span class="pre">.benchmarks/pytest-benchmark.json</span></code>.</p>
-</section>
-<section id="scale-the-run">
-<h2>Scale the run<a class="headerlink" href="#scale-the-run" title="Link to this heading">¶</a></h2>
-<p>The default grid is <code class="docutils literal notranslate"><span class="pre">(sessions,</span> <span class="pre">streams)</span></code> of <code class="docutils literal notranslate"><span class="pre">(10,</span> <span class="pre">1)</span></code>, <code class="docutils literal notranslate"><span class="pre">(100,</span> <span class="pre">10)</span></code>, <code class="docutils literal notranslate"><span class="pre">(250,</span> <span class="pre">20)</span></code>. Environment
-variables control the grid and the burst:</p>
+          <section class="tex2jax_ignore mathjax_ignore" id="server-fan-out-benchmark-results">
+<h1>Server fan-out benchmark results<a class="headerlink" href="#server-fan-out-benchmark-results" title="Link to this heading">¶</a></h1>
+<p>The recorded baseline keeps WebSocket delivery below 7 ms at p95 with 100 concurrent clients,
+each receiving 10 state streams. At 250 clients and 20 streams, the server approaches one fully
+occupied CPU core: p95 latency rises to 97–99 ms and full-fleet completion takes 1.06 seconds.</p>
+<section id="latency-and-completion-time">
+<h2>Latency and completion time<a class="headerlink" href="#latency-and-completion-time" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper colwidths-auto docutils container">
 <table class="docutils align-default">
 <thead>
-<tr class="row-odd"><th class="head"><p>Variable</p></th>
-<th class="head"><p>Default</p></th>
-<th class="head"><p>Meaning</p></th>
+<tr class="row-odd"><th class="head text-right"><p>WebSocket clients</p></th>
+<th class="head text-right"><p>Streams per client</p></th>
+<th class="head text-right"><p>Active subscriptions</p></th>
+<th class="head text-right"><p>Fleet completion median</p></th>
+<th class="head text-right"><p>Delivery p50</p></th>
+<th class="head text-right"><p>Delivery p95</p></th>
+<th class="head text-right"><p>Delivery p99</p></th>
+<th class="head text-right"><p>Delivery max</p></th>
 </tr>
 </thead>
 <tbody>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">10:1,100:10,250:20</span></code></p></td>
-<td><p>Grid as <code class="docutils literal notranslate"><span class="pre">sessions:streams,...</span></code></p></td>
+<tr class="row-even"><td class="text-right"><p>10</p></td>
+<td class="text-right"><p>1</p></td>
+<td class="text-right"><p>10</p></td>
+<td class="text-right"><p>113–123 ms</p></td>
+<td class="text-right"><p>1.4–1.5 ms</p></td>
+<td class="text-right"><p>2.5 ms</p></td>
+<td class="text-right"><p>3.4–8.0 ms</p></td>
+<td class="text-right"><p>3.4–8.1 ms</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_UPDATES</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">50</span></code></p></td>
-<td><p>Updates published per stream per round</p></td>
+<tr class="row-odd"><td class="text-right"><p>100</p></td>
+<td class="text-right"><p>10</p></td>
+<td class="text-right"><p>1,000</p></td>
+<td class="text-right"><p>175.7–176.3 ms</p></td>
+<td class="text-right"><p>4.3 ms</p></td>
+<td class="text-right"><p>6.6–6.8 ms</p></td>
+<td class="text-right"><p>8.4–10.5 ms</p></td>
+<td class="text-right"><p>11.6–12.9 ms</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_INTERVAL</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">0.002</span></code></p></td>
-<td><p>Seconds between publishes</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_CODEC</span></code></p></td>
-<td><p><code class="docutils literal notranslate"><span class="pre">json</span></code></p></td>
-<td><p>Wire codec (<code class="docutils literal notranslate"><span class="pre">json</span></code> or <code class="docutils literal notranslate"><span class="pre">msgpack</span></code>)</p></td>
-</tr>
-<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_BATCH</span></code></p></td>
-<td><p>unset</p></td>
-<td><p>Set to <code class="docutils literal notranslate"><span class="pre">1</span></code> to batch frames per autosync window</p></td>
+<tr class="row-even"><td class="text-right"><p>250</p></td>
+<td class="text-right"><p>20</p></td>
+<td class="text-right"><p>5,000</p></td>
+<td class="text-right"><p>1.059–1.061 s</p></td>
+<td class="text-right"><p>59.7–60.8 ms</p></td>
+<td class="text-right"><p>97.0–99.1 ms</p></td>
+<td class="text-right"><p>107–111 ms</p></td>
+<td class="text-right"><p>116–123 ms</p></td>
 </tr>
 </tbody>
 </table>
 </div>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TRANSPORTS_BENCH</span><span class="o">=</span><span class="m">1000</span>:10<span class="w"> </span><span class="nv">TRANSPORTS_BENCH_CODEC</span><span class="o">=</span>msgpack<span class="w"> </span>make<span class="w"> </span>benchmark-py
-</pre></div>
-</div>
+<p>Ranges span two clean runs. Fleet completion measures the full round: publish 50 updates to every
+stream at 2 ms intervals, then wait until every client has received the final revision of every
+stream. Delivery latency measures individual patches from the server timestamp to receipt by a
+client.</p>
 </section>
-<section id="record-and-compare-runs-with-benched">
-<h2>Record and compare runs with benched<a class="headerlink" href="#record-and-compare-runs-with-benched" title="Link to this heading">¶</a></h2>
-<p>benched runs the same suite in an isolated subprocess and records an immutable, commit-aware run
-document under <code class="docutils literal notranslate"><span class="pre">benchmarks/results</span></code> — <strong>committed</strong>, so history accumulates in the repo and the
-report below always renders from real recorded runs. Record from a consistent machine (runner
-hardware is too noisy for durable history; see Continuous integration below). The suite and results
-directory are configured in <code class="docutils literal notranslate"><span class="pre">[tool.benched]</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>.</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>benchmark-history<span class="w">           </span><span class="c1"># benched run benchmarks --benchmark-only</span>
-</pre></div>
+<section id="server-resource-use">
+<h2>Server resource use<a class="headerlink" href="#server-resource-use" title="Link to this heading">¶</a></h2>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-right"><p>WebSocket clients</p></th>
+<th class="head text-right"><p>CPU</p></th>
+<th class="head text-right"><p>RSS</p></th>
+<th class="head text-right"><p>Event-loop lag p99</p></th>
+<th class="head text-right"><p>Revisions delivered</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-right"><p>10</p></td>
+<td class="text-right"><p>2.6–2.7%</p></td>
+<td class="text-right"><p>45.7–52.9 MB</p></td>
+<td class="text-right"><p>0.3–0.7 ms</p></td>
+<td class="text-right"><p>22.0–22.5%</p></td>
+</tr>
+<tr class="row-odd"><td class="text-right"><p>100</p></td>
+<td class="text-right"><p>44.3–45.0%</p></td>
+<td class="text-right"><p>54.8–54.9 MB</p></td>
+<td class="text-right"><p>4.7–4.8 ms</p></td>
+<td class="text-right"><p>32.0–33.0%</p></td>
+</tr>
+<tr class="row-even"><td class="text-right"><p>250</p></td>
+<td class="text-right"><p>92.1–92.3%</p></td>
+<td class="text-right"><p>75.6–75.7 MB</p></td>
+<td class="text-right"><p>17.5–18.0 ms</p></td>
+<td class="text-right"><p>96.0–97.0%</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<p>Inspect and compare recorded history:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>benched<span class="w"> </span>list<span class="w">                     </span><span class="c1"># collected benchmarks</span>
-benched<span class="w"> </span><span class="nb">history</span><span class="w">                  </span><span class="c1"># recorded runs</span>
-benched<span class="w"> </span>show<span class="w"> </span>latest<span class="w">              </span><span class="c1"># one full run document, extra_info included</span>
-benched<span class="w"> </span>compare<span class="w"> </span>previous<span class="w"> </span>latest<span class="w"> </span>--metric<span class="w"> </span>median
-benched<span class="w"> </span>report<span class="w"> </span>--format<span class="w"> </span>html<span class="w"> </span>--output<span class="w"> </span>build/benchmarks
-</pre></div>
-</div>
-<p>The environment knobs above apply to <code class="docutils literal notranslate"><span class="pre">benched</span> <span class="pre">run</span></code> as well; keep the grid consistent when comparing
-runs, and compare only runs recorded on the same machine.</p>
+<p>CPU is process CPU use, where 100% represents one fully occupied logical core. Revisions delivered
+below 100% reflect expected coalescing, not data loss: transports synchronizes state, so its 10 ms
+autosync window can replace intermediate revisions while every client still receives the final one.</p>
 </section>
-<section id="recorded-history">
-<h2>Recorded history<a class="headerlink" href="#recorded-history" title="Link to this heading">¶</a></h2>
-<p>The interactive report below is compiled at docs build time from the committed run history
-(default grid: 50 updates per stream per round at 2ms intervals, JSON codec, unbatched; round time
-is the median end-to-end delivery time for the full fleet). Delivered ratio below 1.0 is expected:
-state streams keep only the newest revision, so the 10ms autosync window coalesces bursts.</p>
-<benched-report src="../../_static/benched/reports/results-7df478e568b2.json" view="trend" metric="median" x-axis="version" data-theme="inherit"></benched-report><p>The <a class="reference internal" href="#../../benchmarks/index.html"><span class="xref myst">full report</span></a> with every view and filter is published alongside these
-docs.</p>
+<section id="recorded-workload">
+<h2>Recorded workload<a class="headerlink" href="#recorded-workload" title="Link to this heading">¶</a></h2>
+<p>These ranges come from two clean runs recorded on August 27, 2026:</p>
+<ul class="simple">
+<li><p>transports 0.8.2 at commit <code class="docutils literal notranslate"><span class="pre">60cb98f</span></code></p></li>
+<li><p>one server process and all clients on the same machine over loopback</p></li>
+<li><p>Apple silicon (<code class="docutils literal notranslate"><span class="pre">arm64</span></code>, 18 logical CPUs, 64 GiB RAM), macOS 25.5</p></li>
+<li><p>CPython 3.12.13, JSON codec, unbatched frames</p></li>
+<li><p>50 updates per stream per round, published every 2 ms</p></li>
+<li><p>one warm-up round followed by three measured rounds</p></li>
+</ul>
+<p>This is a single-machine fan-out baseline, not a capacity limit. It excludes network latency and does
+not predict cross-region or multi-host performance. Fleet completion also includes the approximately
+100 ms update-publishing interval, so it is broader than patch delivery latency.</p>
 </section>
-<section id="continuous-integration">
-<h2>Continuous integration<a class="headerlink" href="#continuous-integration" title="Link to this heading">¶</a></h2>
-<p>CI runs the suite at a reduced scale (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH=50:5</span></code>, 20 updates per round) on Linux and
-uploads the pytest-benchmark JSON as a build artifact for trend inspection. There are no
-absolute-latency gates — shared runners are too noisy for stable thresholds — so a CI failure means
-the harness itself failed (for example, clients not completing), not that a number moved.</p>
+<section id="interactive-results">
+<h2>Interactive results<a class="headerlink" href="#interactive-results" title="Link to this heading">¶</a></h2>
+<p>The report below is generated from committed benchmark records. It exposes the recorded runs,
+benchmark parameters, timing distributions, and machine metadata.</p>
+<benched-report src="../../_static/benched/reports/results-5fef6b2534b1.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>The <a class="reference external" href="https://1kbgz.github.io/transports/benchmarks/">full interactive report</a> includes all committed
+timing runs and filters.</p>
 </section>
 </section>
 
@@ -398,12 +419,11 @@ the harness itself failed (for example, clients not completing), not that a numb
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">How to benchmark server fan-out</a><ul>
-<li><a class="reference internal" href="#run-the-harness-raw">Run the harness raw</a></li>
-<li><a class="reference internal" href="#scale-the-run">Scale the run</a></li>
-<li><a class="reference internal" href="#record-and-compare-runs-with-benched">Record and compare runs with benched</a></li>
-<li><a class="reference internal" href="#recorded-history">Recorded history</a></li>
-<li><a class="reference internal" href="#continuous-integration">Continuous integration</a></li>
+<li><a class="reference internal" href="#">Server fan-out benchmark results</a><ul>
+<li><a class="reference internal" href="#latency-and-completion-time">Latency and completion time</a></li>
+<li><a class="reference internal" href="#server-resource-use">Server resource use</a></li>
+<li><a class="reference internal" href="#recorded-workload">Recorded workload</a></li>
+<li><a class="reference internal" href="#interactive-results">Interactive results</a></li>
 </ul>
 </li>
 </ul>
