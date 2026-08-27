@@ -1,0 +1,4 @@
+# The load harness (benchmarks/) runs under --benchmark-only, outside the coverage run;
+# its lines are not product code and must not count against patch coverage.
+ignore:
+  - "benchmarks"
