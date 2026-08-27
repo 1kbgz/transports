@@ -134,3 +134,34 @@ def test_batch_negotiated_connections_get_one_frame_per_flush():
     accepted = client.recv(server.flush()[batched][0])
     assert isinstance(accepted, list) and len(accepted) == 2
     assert client.model(next(iter(session.ids())), Counter).n == 4
+
+
+def test_hub_batches_multi_message_flushes_for_negotiated_connections():
+    import json
+
+    import transports
+
+    hub = transports.Hub(key=lambda c: c[0])
+    session = hub.tenant("t1")
+    first, second = Counter(), Counter()
+    session.host(first)
+    session.host(second)
+
+    hub.open(("t1", "plain"))
+    hub.open(("t1", "batched"), batch=True)
+
+    first.n = 1
+    second.n = 1
+    out = hub.flush()
+    # same tenant, same flush: the plain connection gets the individual messages, the
+    # negotiated one gets a single enveloped frame with the same patches in order
+    assert len(out[("t1", "plain")]) == 2
+    assert len(out[("t1", "batched")]) == 1
+    frame = json.loads(out[("t1", "batched")][0])
+    assert frame["t"] == "batch"
+    assert [m["t"] for m in frame["msgs"]] == ["patch", "patch"]
+
+    # a single-message flush skips the envelope
+    first.n = 2
+    out = hub.flush()
+    assert json.loads(out[("t1", "batched")][0])["t"] == "patch"

@@ -184,6 +184,7 @@ class Hub:
         self._next_shared = 0
         self._conn_key: dict[Any, Any] = {}
         self._codecs: dict[Any, str] = {}
+        self._batched: set[Any] = set()
         self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
         self._on_shared_write: Callable | None = None
 
@@ -237,14 +238,15 @@ class Hub:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
     def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
-        # `batch` is accepted for endpoint parity but not yet applied: Hub.flush interleaves
-        # per-tenant and shared fan-outs, so its batching lands with that restructure.
         """Register a connection; return the messages to bring it up to date — its tenant's private models
         and its subscribed shared models. With ``since={mid: last_rev}`` a reconnecting client resumes its
-        **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on)."""
+        **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on).
+        With ``batch=True`` (the ``?batch=1`` negotiation) multi-message flushes arrive as one frame."""
         key = self._key(conn)
         self._conn_key[conn] = key
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
+        if batch:
+            self._batched.add(conn)
         sess = self.tenant(key)
         out: list[Wire] = []
         for mid in sess.ids():
@@ -305,8 +307,12 @@ class Hub:
         return {c: [self._encode_for(c, relay)] for c, k in self._conn_key.items() if k == key}
 
     def flush(self) -> dict[Any, list[Wire]]:
-        """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription."""
-        out: dict[Any, list[Wire]] = {}
+        """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription.
+
+        Messages are collected per connection first, then encoded once per (codec, batch,
+        content) group — so same-tenant, same-codec connections share encoded copies, and a
+        batch-negotiated connection gets its whole flush as one frame (see `Server.flush`)."""
+        raw: dict[Any, list[str]] = {}
         for key, sess in self._tenants.items():
             drained = sess.drain()
             if not drained:
@@ -314,18 +320,28 @@ class Hub:
             conns = [c for c, k in self._conn_key.items() if k == key]
             if not conns:
                 continue
-            # encode once per codec, not once per connection (see Server.flush)
             msgs = [protocol.patch_msg(mid, patch) for mid, patch in drained]
-            encoded: dict[str, list[Wire]] = {}
             for c in conns:
-                codec = self._codecs.get(c, self.default_codec)
-                if codec not in encoded:
-                    encoded[codec] = [protocol.encode(m, codec) for m in msgs]
-                out.setdefault(c, []).extend(encoded[codec])
+                raw.setdefault(c, []).extend(msgs)
         for sid, fan in self._shared_outbox:
-            for c, msgs in self._fanout(sid, fan).items():
-                out.setdefault(c, []).extend(msgs)
+            sh = self._shared[sid]
+            msg = protocol.patch_msg(sid, fan)
+            for c, k in self._conn_key.items():
+                if k in sh.subs:
+                    raw.setdefault(c, []).append(msg)
         self._shared_outbox.clear()
+        if not raw:
+            return {}
+        out: dict[Any, list[Wire]] = {}
+        encoded: dict[tuple, list[Wire]] = {}
+        for conn, msgs in raw.items():
+            codec = self._codecs.get(conn, self.default_codec)
+            wants_batch = conn in self._batched and len(msgs) > 1
+            group = (codec, wants_batch, tuple(msgs))
+            if group not in encoded:
+                payload = [protocol.batch_msg(msgs)] if wants_batch else msgs
+                encoded[group] = [protocol.encode(m, codec) for m in payload]
+            out[conn] = encoded[group]
         return out
 
     def set_shared(self, sid: int, new_value_or_model: Any) -> None:
@@ -403,6 +419,7 @@ class Hub:
     def close(self, conn: Any) -> None:
         self._conn_key.pop(conn, None)
         self._codecs.pop(conn, None)
+        self._batched.discard(conn)
 
     def _write_shared(self, sid: int, patch: dict, origin: Any) -> dict | None:
         """Merge a write into a shared model; return the authoritative fan-out patch (or None)."""
@@ -424,6 +441,16 @@ class Hub:
         return fan
 
     def _fanout(self, sid: int, fan: dict) -> dict[Any, list[Wire]]:
+        # a live single-message echo: encode once per codec (no batch envelope for one message)
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
-        return {c: [self._encode_for(c, msg)] for c, k in self._conn_key.items() if k in sh.subs}
+        encoded: dict[str, list[Wire]] = {}
+        out: dict[Any, list[Wire]] = {}
+        for c, k in self._conn_key.items():
+            if k not in sh.subs:
+                continue
+            codec = self._codecs.get(c, self.default_codec)
+            if codec not in encoded:
+                encoded[codec] = [protocol.encode(msg, codec)]
+            out[c] = encoded[codec]
+        return out
