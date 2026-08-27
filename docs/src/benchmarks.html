@@ -3,10 +3,10 @@
   <head><meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="How to isolate tenants and share models" href="multitenancy.html"><link rel="prev" title="How to connect live clients" href="connections.html">
+<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Wire protocol reference" href="protocol-reference.html"><link rel="prev" title="How to run transports in a browser with Pyodide" href="pyodide.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>How to use codecs - transports v0.8.1</title>
+        <title>How to benchmark server fan-out - transports v0.8.1</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -201,10 +201,10 @@
 <li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
 <li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
 <li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to use codecs</a></li>
+<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
 <li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
 <li class="toctree-l1"><a class="reference internal" href="pyodide.html">How to run transports in a browser with Pyodide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">How to benchmark server fan-out</a></li>
+<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">How to benchmark server fan-out</a></li>
 <li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
 <li class="toctree-l1"><a class="reference internal" href="api.html">API Reference</a></li>
 </ul>
@@ -227,7 +227,7 @@
         </a>
         <div class="content-icon-container">
           <div class="view-this-page">
-  <a class="muted-link" href="../../_sources/docs/src/codecs.md.txt" title="View this page">
+  <a class="muted-link" href="../../_sources/docs/src/benchmarks.md.txt" title="View this page">
     <svg><use href="#svg-eye"></use></svg>
     <span class="visually-hidden">View this page</span>
   </a>
@@ -245,96 +245,145 @@
           </label>
         </div>
         <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="how-to-use-codecs">
-<h1>How to use codecs<a class="headerlink" href="#how-to-use-codecs" title="Link to this heading">¶</a></h1>
-<p>This guide shows you how to encode values and protocol messages as JSON, MessagePack, or a registered
-custom format.</p>
-<section id="encode-a-model-value">
-<h2>Encode a model value<a class="headerlink" href="#encode-a-model-value" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">encode_as</span></code> and <code class="docutils literal notranslate"><span class="pre">decode_as</span></code> operate on a JSON string containing a core <code class="docutils literal notranslate"><span class="pre">Value</span></code>.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
-
-<span class="k">class</span><span class="w"> </span><span class="nc">Device</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
-    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
-    <span class="n">on</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
-
-<span class="n">value</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">to_value</span><span class="p">(</span><span class="n">Device</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">"lamp"</span><span class="p">,</span> <span class="n">on</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-<span class="n">blob</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">encode_as</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s2">"application/msgpack"</span><span class="p">)</span>
-<span class="n">restored</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">decode_as</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="s2">"application/msgpack"</span><span class="p">))</span>
-
-<span class="k">assert</span> <span class="n">restored</span> <span class="o">==</span> <span class="n">value</span>
+          <section class="tex2jax_ignore mathjax_ignore" id="how-to-benchmark-server-fan-out">
+<h1>How to benchmark server fan-out<a class="headerlink" href="#how-to-benchmark-server-fan-out" title="Link to this heading">¶</a></h1>
+<p>This guide shows you how to run the fan-out benchmark harness, scale it, and record durable
+benchmark history with <a class="reference external" href="https://github.com/1kbgz/benched">benched</a>.</p>
+<p>The harness in <code class="docutils literal notranslate"><span class="pre">benchmarks/</span></code> is an ordinary pytest-benchmark suite. Each benchmark starts a real
+server subprocess, connects a fleet of WebSocket clients, publishes a burst of updates across every
+stream, and completes when every client has received the final revision of every stream — the
+primary statistic is end-to-end delivery time for the whole fleet. Derived metrics ride each
+benchmark’s <code class="docutils literal notranslate"><span class="pre">extra_info</span></code>: delivery-latency percentiles, delivered/published ratio (coalescing), and
+the server’s CPU, RSS, thread count, and event-loop lag.</p>
+<section id="run-the-harness-raw">
+<h2>Run the harness raw<a class="headerlink" href="#run-the-harness-raw" title="Link to this heading">¶</a></h2>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>benchmark-py
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">transports.encode(value_json)</span></code> and <code class="docutils literal notranslate"><span class="pre">transports.decode(bytes)</span></code> are JSON-codec shortcuts for model
-values.</p>
+<p>This runs <code class="docutils literal notranslate"><span class="pre">pytest</span> <span class="pre">benchmarks</span> <span class="pre">--benchmark-only</span></code> and writes plain pytest-benchmark JSON to
+<code class="docutils literal notranslate"><span class="pre">.benchmarks/pytest-benchmark.json</span></code>.</p>
 </section>
-<section id="select-a-connection-codec">
-<h2>Select a connection codec<a class="headerlink" href="#select-a-connection-codec" title="Link to this heading">¶</a></h2>
-<p>Use JSON when you want readable text frames. Use MessagePack when you want compact binary frames.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"msgpack"</span><span class="p">)</span>
-<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
+<section id="scale-the-run">
+<h2>Scale the run<a class="headerlink" href="#scale-the-run" title="Link to this heading">¶</a></h2>
+<p>The default grid is <code class="docutils literal notranslate"><span class="pre">(sessions,</span> <span class="pre">streams)</span></code> of <code class="docutils literal notranslate"><span class="pre">(10,</span> <span class="pre">1)</span></code>, <code class="docutils literal notranslate"><span class="pre">(100,</span> <span class="pre">10)</span></code>, <code class="docutils literal notranslate"><span class="pre">(250,</span> <span class="pre">20)</span></code>. Environment
+variables control the grid and the burst:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Variable</p></th>
+<th class="head"><p>Default</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">10:1,100:10,250:20</span></code></p></td>
+<td><p>Grid as <code class="docutils literal notranslate"><span class="pre">sessions:streams,...</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_UPDATES</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">50</span></code></p></td>
+<td><p>Updates published per stream per round</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_INTERVAL</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">0.002</span></code></p></td>
+<td><p>Seconds between publishes</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_CODEC</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">json</span></code></p></td>
+<td><p>Wire codec (<code class="docutils literal notranslate"><span class="pre">json</span></code> or <code class="docutils literal notranslate"><span class="pre">msgpack</span></code>)</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_BATCH</span></code></p></td>
+<td><p>unset</p></td>
+<td><p>Set to <code class="docutils literal notranslate"><span class="pre">1</span></code> to batch frames per autosync window</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nv">TRANSPORTS_BENCH</span><span class="o">=</span><span class="m">1000</span>:10<span class="w"> </span><span class="nv">TRANSPORTS_BENCH_CODEC</span><span class="o">=</span>msgpack<span class="w"> </span>make<span class="w"> </span>benchmark-py
 </pre></div>
 </div>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"msgpack"</span><span class="p">);</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">);</span>
-</pre></div>
-</div>
-<p>The server stores the codec per connection. JSON and MessagePack clients can connect to the same
-server, send edits, and receive frames encoded for their own connection.</p>
 </section>
-<section id="convert-whole-protocol-messages">
-<h2>Convert whole protocol messages<a class="headerlink" href="#convert-whole-protocol-messages" title="Link to this heading">¶</a></h2>
-<p>Use <code class="docutils literal notranslate"><span class="pre">json_to_msgpack</span></code> and <code class="docutils literal notranslate"><span class="pre">msgpack_to_json</span></code> for whole snapshot or patch messages.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">msg</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"Device"</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
-<span class="n">wire</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">json_to_msgpack</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-<span class="n">round_trip</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">msgpack_to_json</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+<section id="record-and-compare-runs-with-benched">
+<h2>Record and compare runs with benched<a class="headerlink" href="#record-and-compare-runs-with-benched" title="Link to this heading">¶</a></h2>
+<p>benched runs the same suite in an isolated subprocess and records an immutable, commit-aware run
+document under <code class="docutils literal notranslate"><span class="pre">.benched/results</span></code> (gitignored). The suite and results directory are configured in
+<code class="docutils literal notranslate"><span class="pre">[tool.benched]</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>.</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>benchmark-history<span class="w">           </span><span class="c1"># benched run benchmarks --benchmark-only</span>
 </pre></div>
 </div>
+<p>Inspect and compare recorded history:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>benched<span class="w"> </span>list<span class="w">                     </span><span class="c1"># collected benchmarks</span>
+benched<span class="w"> </span><span class="nb">history</span><span class="w">                  </span><span class="c1"># recorded runs</span>
+benched<span class="w"> </span>show<span class="w"> </span>latest<span class="w">              </span><span class="c1"># one full run document, extra_info included</span>
+benched<span class="w"> </span>compare<span class="w"> </span>previous<span class="w"> </span>latest<span class="w"> </span>--metric<span class="w"> </span>median
+benched<span class="w"> </span>report<span class="w"> </span>--format<span class="w"> </span>html<span class="w"> </span>--output<span class="w"> </span>build/benchmarks
+</pre></div>
+</div>
+<p>The environment knobs above apply to <code class="docutils literal notranslate"><span class="pre">benched</span> <span class="pre">run</span></code> as well; keep the grid consistent when comparing
+runs, and compare only runs recorded on the same machine.</p>
 </section>
-<section id="register-a-custom-python-codec">
-<h2>Register a custom Python codec<a class="headerlink" href="#register-a-custom-python-codec" title="Link to this heading">¶</a></h2>
-<p>A custom codec maps a JSON-able object to <code class="docutils literal notranslate"><span class="pre">bytes</span></code> or <code class="docutils literal notranslate"><span class="pre">str</span></code>, and maps that wire value back to a
-JSON-able object.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">zlib</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">encode_zlib</span><span class="p">(</span><span class="n">obj</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">zlib</span><span class="o">.</span><span class="n">compress</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span>
-
-<span class="k">def</span><span class="w"> </span><span class="nf">decode_zlib</span><span class="p">(</span><span class="n">data</span><span class="p">):</span>
-    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">zlib</span><span class="o">.</span><span class="n">decompress</span><span class="p">(</span><span class="nb">bytes</span><span class="p">(</span><span class="n">data</span><span class="p">))</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
-
-<span class="n">transports</span><span class="o">.</span><span class="n">register_codec</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">,</span> <span class="n">encode_zlib</span><span class="p">,</span> <span class="n">decode_zlib</span><span class="p">)</span>
-</pre></div>
+<section id="baseline">
+<h2>Baseline<a class="headerlink" href="#baseline" title="Link to this heading">¶</a></h2>
+<p>Default grid, 50 updates per stream per round at 2ms intervals, JSON codec, unbatched. Recorded on
+an Apple M5 Pro (arm64, macOS), CPython 3.12. Round time is the median end-to-end delivery time for
+the full fleet; latency percentiles are per-message delivery latencies.</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head text-right"><p>Sessions</p></th>
+<th class="head text-right"><p>Streams</p></th>
+<th class="head text-right"><p>Round (ms)</p></th>
+<th class="head text-right"><p>p50 (ms)</p></th>
+<th class="head text-right"><p>p95 (ms)</p></th>
+<th class="head text-right"><p>p99 (ms)</p></th>
+<th class="head text-right"><p>Delivered ratio</p></th>
+<th class="head text-right"><p>Server CPU (%)</p></th>
+<th class="head text-right"><p>Server RSS (MB)</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td class="text-right"><p>10</p></td>
+<td class="text-right"><p>1</p></td>
+<td class="text-right"><p>123.1</p></td>
+<td class="text-right"><p>1.26</p></td>
+<td class="text-right"><p>3.86</p></td>
+<td class="text-right"><p>7.99</p></td>
+<td class="text-right"><p>0.23</p></td>
+<td class="text-right"><p>2.1</p></td>
+<td class="text-right"><p>66.6</p></td>
+</tr>
+<tr class="row-odd"><td class="text-right"><p>100</p></td>
+<td class="text-right"><p>10</p></td>
+<td class="text-right"><p>168.9</p></td>
+<td class="text-right"><p>4.32</p></td>
+<td class="text-right"><p>12.48</p></td>
+<td class="text-right"><p>15.81</p></td>
+<td class="text-right"><p>0.22</p></td>
+<td class="text-right"><p>30.3</p></td>
+<td class="text-right"><p>74.6</p></td>
+</tr>
+<tr class="row-even"><td class="text-right"><p>250</p></td>
+<td class="text-right"><p>20</p></td>
+<td class="text-right"><p>319.4</p></td>
+<td class="text-right"><p>13.62</p></td>
+<td class="text-right"><p>24.06</p></td>
+<td class="text-right"><p>26.87</p></td>
+<td class="text-right"><p>0.22</p></td>
+<td class="text-right"><p>66.1</p></td>
+<td class="text-right"><p>87.2</p></td>
+</tr>
+</tbody>
+</table>
 </div>
-<p>Once registered, the content type works wherever a codec name is accepted:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"application/x-json-zlib"</span><span class="p">)</span>
-<span class="n">blob</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">encode_as</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s2">"application/x-json-zlib"</span><span class="p">)</span>
-</pre></div>
-</div>
-<p>Register the same content type on every process that needs to read or write it. Built-in JSON and
-MessagePack names cannot be overridden.</p>
+<p>Delivered ratio below 1.0 is expected: state streams keep only the newest revision, so the 10ms
+autosync window coalesces bursts.</p>
 </section>
-<section id="register-a-custom-javascript-codec">
-<h2>Register a custom JavaScript codec<a class="headerlink" href="#register-a-custom-javascript-codec" title="Link to this heading">¶</a></h2>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">registerCodec</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
-
-<span class="nx">registerCodec</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">,</span><span class="w"> </span><span class="nx">encodeZlib</span><span class="p">,</span><span class="w"> </span><span class="nx">decodeZlib</span><span class="p">);</span>
-<span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">);</span>
-</pre></div>
-</div>
-<p>Custom codecs for browser WebSockets may return <code class="docutils literal notranslate"><span class="pre">string</span></code> or <code class="docutils literal notranslate"><span class="pre">Uint8Array</span></code>. A <code class="docutils literal notranslate"><span class="pre">string</span></code> is sent as a
-text frame; bytes are sent as a binary frame.</p>
-</section>
-<section id="remove-a-custom-codec">
-<h2>Remove a custom codec<a class="headerlink" href="#remove-a-custom-codec" title="Link to this heading">¶</a></h2>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">transports</span><span class="o">.</span><span class="n">unregister_codec</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">)</span>
-<span class="nb">print</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">registered_codecs</span><span class="p">())</span>
-</pre></div>
-</div>
+<section id="continuous-integration">
+<h2>Continuous integration<a class="headerlink" href="#continuous-integration" title="Link to this heading">¶</a></h2>
+<p>CI runs the suite at a reduced scale (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH=50:5</span></code>, 20 updates per round) on Linux and
+uploads the pytest-benchmark JSON as a build artifact for trend inspection. There are no
+absolute-latency gates — shared runners are too noisy for stable thresholds — so a CI failure means
+the harness itself failed (for example, clients not completing), not that a number moved.</p>
 </section>
 </section>
 
@@ -343,23 +392,23 @@ text frame; bytes are sent as a binary frame.</p>
       <footer>
         
         <div class="related-pages">
-          <a class="next-page" href="multitenancy.html">
+          <a class="next-page" href="protocol-reference.html">
               <div class="page-info">
                 <div class="context">
                   <span>Next</span>
                 </div>
-                <div class="title">How to isolate tenants and share models</div>
+                <div class="title">Wire protocol reference</div>
               </div>
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
             </a>
-          <a class="prev-page" href="connections.html">
+          <a class="prev-page" href="pyodide.html">
               <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
               <div class="page-info">
                 <div class="context">
                   <span>Previous</span>
                 </div>
                 
-                <div class="title">How to connect live clients</div>
+                <div class="title">How to run transports in a browser with Pyodide</div>
                 
               </div>
             </a>
@@ -393,13 +442,12 @@ text frame; bytes are sent as a binary frame.</p>
         <div class="toc-tree-container">
           <div class="toc-tree">
             <ul>
-<li><a class="reference internal" href="#">How to use codecs</a><ul>
-<li><a class="reference internal" href="#encode-a-model-value">Encode a model value</a></li>
-<li><a class="reference internal" href="#select-a-connection-codec">Select a connection codec</a></li>
-<li><a class="reference internal" href="#convert-whole-protocol-messages">Convert whole protocol messages</a></li>
-<li><a class="reference internal" href="#register-a-custom-python-codec">Register a custom Python codec</a></li>
-<li><a class="reference internal" href="#register-a-custom-javascript-codec">Register a custom JavaScript codec</a></li>
-<li><a class="reference internal" href="#remove-a-custom-codec">Remove a custom codec</a></li>
+<li><a class="reference internal" href="#">How to benchmark server fan-out</a><ul>
+<li><a class="reference internal" href="#run-the-harness-raw">Run the harness raw</a></li>
+<li><a class="reference internal" href="#scale-the-run">Scale the run</a></li>
+<li><a class="reference internal" href="#record-and-compare-runs-with-benched">Record and compare runs with benched</a></li>
+<li><a class="reference internal" href="#baseline">Baseline</a></li>
+<li><a class="reference internal" href="#continuous-integration">Continuous integration</a></li>
 </ul>
 </li>
 </ul>
