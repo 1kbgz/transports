@@ -1,0 +1,309 @@
+{
+  "schema_version": 1,
+  "run_id": "883985d7270f4b29b4f567b0231c696d",
+  "started_at": "2026-08-27T14:19:14.808301+00:00",
+  "ended_at": "2026-08-27T14:19:19.688866+00:00",
+  "status": "success",
+  "exit_code": 0,
+  "suite": {
+    "name": "transports",
+    "repository": "https://github.com/1kbgz/transports",
+    "version": "0.8.1",
+    "revision": "117e3d999cfd92c967b11deb2227cea9c19c9b67",
+    "branch": "bench-history",
+    "dirty": true,
+    "labels": {}
+  },
+  "subject": {
+    "name": "transports",
+    "repository": "https://github.com/1kbgz/transports",
+    "version": "0.8.0",
+    "revision": "117e3d999cfd92c967b11deb2227cea9c19c9b67",
+    "branch": "bench-history",
+    "dirty": true,
+    "labels": {}
+  },
+  "machine": {
+    "id": "mbp-m5",
+    "fingerprint": "4947e1f640c8e065b0bdc2b3f1c521f706461fb493daa642d995091105a41e96",
+    "metadata": {
+      "system": "Darwin",
+      "release": "25.5.0",
+      "architecture": "arm64",
+      "processor": "arm",
+      "cpu_count": 18,
+      "memory_gib": 64.0
+    },
+    "labels": {}
+  },
+  "environment": {
+    "fingerprint": "08a3e8e6b02c3b8e1bbdfca23dbe380db01a1fb4802f32e1154b169bf43bdabb",
+    "python_implementation": "CPython",
+    "python_version": "3.12.13",
+    "platform": "Darwin",
+    "architecture": "arm64",
+    "labels": {}
+  },
+  "tool": {
+    "benched": "0.5.0",
+    "pytest": "9.1.1",
+    "pytest_benchmark": "5.2.3"
+  },
+  "measurements": [
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=10&streams=1",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[10-1]",
+      "name": "test_fanout[10-1]",
+      "group": null,
+      "parameter_id": "10-1",
+      "parameters": {
+        "sessions": 10,
+        "streams": 1
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {
+        "sessions": 10,
+        "streams": 1,
+        "updates_per_round": 50,
+        "publish_interval_s": 0.002,
+        "codec": "json",
+        "batch": false,
+        "latency_p50_ms": 1.149,
+        "latency_p95_ms": 5.401,
+        "latency_p99_ms": 10.559,
+        "latency_max_ms": 10.607,
+        "delivered_ratio": 0.245,
+        "server_cpu_pct": 2.6,
+        "server_rss_mb": 66.8,
+        "server_threads": 1,
+        "server_loop_lag_p99_ms": 1.272,
+        "server_loop_lag_max_ms": 1.291
+      },
+      "stats": {
+        "min": 0.1364250830374658,
+        "max": 0.13691379223018885,
+        "mean": 0.13659626400719085,
+        "stddev": 0.0002752677018256934,
+        "rounds": 3,
+        "median": 0.13644991675391793,
+        "iqr": 0.00036653189454227686,
+        "q1": 0.13643129146657884,
+        "q3": 0.13679782336112112,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.1364250830374658,
+        "hd15iqr": 0.13691379223018885,
+        "ops": 7.320844440865211,
+        "total": 0.4097887920215726,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=10&streams=1:peak-memory",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[10-1]",
+      "name": "test_fanout[10-1] peak memory",
+      "group": null,
+      "parameter_id": "10-1",
+      "parameters": {
+        "sessions": 10,
+        "streams": 1
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 113426432
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=100&streams=10",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[100-10]",
+      "name": "test_fanout[100-10]",
+      "group": null,
+      "parameter_id": "100-10",
+      "parameters": {
+        "sessions": 100,
+        "streams": 10
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {
+        "sessions": 100,
+        "streams": 10,
+        "updates_per_round": 50,
+        "publish_interval_s": 0.002,
+        "codec": "json",
+        "batch": false,
+        "latency_p50_ms": 3.709,
+        "latency_p95_ms": 10.321,
+        "latency_p99_ms": 13.622,
+        "latency_max_ms": 14.92,
+        "delivered_ratio": 0.215,
+        "server_cpu_pct": 31.9,
+        "server_rss_mb": 74.7,
+        "server_threads": 1,
+        "server_loop_lag_p99_ms": 5.106,
+        "server_loop_lag_max_ms": 5.604
+      },
+      "stats": {
+        "min": 0.16176129085943103,
+        "max": 0.1621632077731192,
+        "mean": 0.162002082914114,
+        "stddev": 0.00021247222860300378,
+        "rounds": 3,
+        "median": 0.16208175010979176,
+        "iqr": 0.0003014376852661371,
+        "q1": 0.1618414056720212,
+        "q3": 0.16214284335728735,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.16176129085943103,
+        "hd15iqr": 0.1621632077731192,
+        "ops": 6.1727601399431,
+        "total": 0.486006248742342,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=100&streams=10:peak-memory",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[100-10]",
+      "name": "test_fanout[100-10] peak memory",
+      "group": null,
+      "parameter_id": "100-10",
+      "parameters": {
+        "sessions": 100,
+        "streams": 10
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 113426432
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=250&streams=20",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[250-20]",
+      "name": "test_fanout[250-20]",
+      "group": null,
+      "parameter_id": "250-20",
+      "parameters": {
+        "sessions": 250,
+        "streams": 20
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {
+        "sessions": 250,
+        "streams": 20,
+        "updates_per_round": 50,
+        "publish_interval_s": 0.002,
+        "codec": "json",
+        "batch": false,
+        "latency_p50_ms": 13.721,
+        "latency_p95_ms": 24.25,
+        "latency_p99_ms": 27.308,
+        "latency_max_ms": 31.653,
+        "delivered_ratio": 0.215,
+        "server_cpu_pct": 66.5,
+        "server_rss_mb": 87.1,
+        "server_threads": 1,
+        "server_loop_lag_p99_ms": 21.176,
+        "server_loop_lag_max_ms": 24.432
+      },
+      "stats": {
+        "min": 0.30582516733556986,
+        "max": 0.3372839577496052,
+        "mean": 0.3252580001329382,
+        "stddev": 0.01698706047364929,
+        "rounds": 3,
+        "median": 0.33266487531363964,
+        "iqr": 0.02359409281052649,
+        "q1": 0.3125350943300873,
+        "q3": 0.3361291871406138,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.30582516733556986,
+        "hd15iqr": 0.3372839577496052,
+        "ops": 3.0744824096295362,
+        "total": 0.9757740003988147,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_fanout.py::test_fanout|sessions=250&streams=20:peak-memory",
+      "nodeid": "benchmarks/test_fanout.py::test_fanout[250-20]",
+      "name": "test_fanout[250-20] peak memory",
+      "group": null,
+      "parameter_id": "250-20",
+      "parameters": {
+        "sessions": 250,
+        "streams": 20
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 113426432
+      },
+      "samples": null
+    }
+  ],
+  "provenance": {
+    "source_format": "pytest-benchmark",
+    "source_file": null,
+    "source_checksum": null,
+    "warnings": []
+  }
+}

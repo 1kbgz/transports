@@ -39,7 +39,7 @@ jobs:
         run: |
           uv pip install dist/*.whl
           uv pip install dist/*.whl --target . --no-deps
-          uv pip install "yardang[themes]"
+          uv pip install "yardang[themes]" "benched>=0.5,<0.6"
         if: github.event_name == 'workflow_run'
 
       - name: Install from source (manual trigger)
@@ -51,6 +51,10 @@ jobs:
 
       - name: Build documentation
         run: yardang build
+
+      # the standalone interactive report at /benchmarks, compiled from the committed history
+      - name: Build benchmark report
+        run: python -m benched report --format html --output docs/html/benchmarks
 
       - name: Download JupyterLite site
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8

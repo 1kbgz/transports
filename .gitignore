@@ -164,3 +164,5 @@ examples/lite/pypi/
 .jupyterlite.doit.db
 .benchmarks/
 .benched/
+# benchmarks/results is committed history (see [tool.benched]); local scratch stays out
+benchmarks/results/.lock
