@@ -17,7 +17,7 @@ import os
 import time
 
 import pytest
-from conftest import LOOP
+from conftest import LOOP, WS_DEFLATE
 from test_fanout import _grid
 
 IDLE_WINDOW = float(os.environ.get("TRANSPORTS_BENCH_IDLE", "5.0"))
@@ -54,6 +54,7 @@ def test_idle_session_cost(benchmark, fanout_server, client_fleet, sessions: int
             "streams": streams,
             "idle_window_s": IDLE_WINDOW,
             "loop": LOOP,
+            "ws_deflate": WS_DEFLATE,
             "rss_kb_per_idle_session": round(rss_kb_per_session, 1),
             "idle_cpu_pct": round(idle_cpu_pct, 2),
             "server_threads_before": threads_before,

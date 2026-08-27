@@ -29,6 +29,9 @@ _SERVER = Path(__file__).with_name("fanout_server.py")
 # the server's event loop implementation (asyncio | uvloop | rsloop); the client fleet stays
 # on asyncio so loop comparisons vary only the measured process
 LOOP = os.environ.get("TRANSPORTS_BENCH_LOOP", "asyncio")
+# permessage-deflate on the server (profiling showed it re-compresses each shared frame per
+# connection — the single largest Python-side fan-out cost)
+WS_DEFLATE = os.environ.get("TRANSPORTS_BENCH_WS_DEFLATE", "1") in ("1", "true")
 
 
 def _free_port() -> int:
@@ -80,7 +83,20 @@ class _ServerFactory:
     def start(self, models: int) -> FanoutServer:
         port = _free_port()
         proc = subprocess.Popen(
-            [sys.executable, str(_SERVER), "--port", str(port), "--models", str(models), "--loop", LOOP],
+            [
+                sys.executable,
+                str(_SERVER),
+                "--port",
+                str(port),
+                "--models",
+                str(models),
+                "--loop",
+                LOOP,
+                "--ws-deflate",
+                str(int(WS_DEFLATE)),
+                "--flush-interval",
+                os.environ.get("TRANSPORTS_BENCH_FLUSH_INTERVAL", "0.01"),
+            ],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )

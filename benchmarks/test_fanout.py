@@ -16,7 +16,7 @@ import os
 import time
 
 import pytest
-from conftest import LOOP
+from conftest import LOOP, WS_DEFLATE
 
 UPDATES = int(os.environ.get("TRANSPORTS_BENCH_UPDATES", "50"))
 INTERVAL = float(os.environ.get("TRANSPORTS_BENCH_INTERVAL", "0.002"))
@@ -77,6 +77,7 @@ def test_fanout(benchmark, fanout_server, client_fleet, sessions: int, streams: 
             "codec": CODEC,
             "batch": BATCH,
             "loop": LOOP,
+            "ws_deflate": WS_DEFLATE,
             "latency_p50_ms": round(percentile(client_fleet.latencies_ms, 0.50), 3),
             "latency_p95_ms": round(percentile(client_fleet.latencies_ms, 0.95), 3),
             "latency_p99_ms": round(percentile(client_fleet.latencies_ms, 0.99), 3),
