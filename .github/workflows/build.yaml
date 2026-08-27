@@ -103,6 +103,22 @@ jobs:
         run: make coverage
         if: matrix.target == 'native'
 
+      # reduced scale for shared runners; the artifact is for trend inspection only —
+      # no absolute-latency gates, hosted runners are too noisy for stable thresholds
+      - name: Benchmark
+        run: make benchmark-py
+        env:
+          TRANSPORTS_BENCH: "50:5"
+          TRANSPORTS_BENCH_UPDATES: "20"
+        if: matrix.name == 'ubuntu-latest'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: benchmark-results
+          path: .benchmarks/pytest-benchmark.json
+        if: matrix.name == 'ubuntu-latest'
+
       - name: Build and test Pyodide wheel
         run: make test-pyodide test-pyodide-browser test-jupyterlite
         if: matrix.target == 'pyodide'
