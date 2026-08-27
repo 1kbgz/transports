@@ -146,8 +146,8 @@ class RelayBroadcaster:
         self._caught.add(sid)
 
     # --- broadcaster contract: delegate to the hub; recv also publishes shared writes to the cluster ---
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None) -> list[Wire]:
-        return self.hub.open(conn, codec, since)
+    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
+        return self.hub.open(conn, codec, since, batch=batch)
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         out = self.hub.recv(conn, data)  # apply + fan to this worker's clients
