@@ -54,7 +54,7 @@ jobs:
 
       # the standalone interactive report at /benchmarks, compiled from the committed history
       - name: Build benchmark report
-        run: python -m benched report --format html --output docs/html/benchmarks
+        run: python -m benched report --format html --output docs/html/benchmarks --benchmark 'test_fanout[[]*[]]'
 
       - name: Download JupyterLite site
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8
