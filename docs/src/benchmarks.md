@@ -44,6 +44,25 @@ This is a single-machine fan-out baseline, not a capacity limit. It excludes net
 not predict cross-region or multi-host performance. Fleet completion also includes the approximately
 100 ms update-publishing interval, so it is broader than patch delivery latency.
 
+## Session budgets
+
+The session-cost benchmark (`benchmarks/test_session_cost.py`) measures what a connected-but-idle
+session costs the server, and both benchmarks derive the budget metrics below. Measured on the
+recording machine at 1,000 clients × 10 streams:
+
+| Budget                                  |   Target | Measured |
+| --------------------------------------- | -------: | -------: |
+| RSS per idle session                    | < 100 KB |  73.7 KB |
+| Idle server CPU, whole fleet connected  |     < 5% |     0.4% |
+| CPU per state fan-out to 1k subscribers |   < 1 ms |  0.92 ms |
+| Thread growth across 1,000 connects     |        0 |        0 |
+
+Thread flatness is asserted unconditionally on every run — a session must never cost a thread. The
+absolute budgets are opt-in (`TRANSPORTS_BUDGETS=1`) because hosted CI runners are too noisy for
+stable thresholds; run them locally or on the recording machine. The fan-out CPU budget applies
+only at 250+ sessions (`TRANSPORTS_BUDGET_FANOUT_MIN_SESSIONS`) where fixed per-publish cost
+amortizes, and currently passes with under 10% headroom — a regression that trips it is real.
+
 ## Interactive results
 
 The report below is generated from committed benchmark records. It exposes the recorded runs,
