@@ -102,12 +102,16 @@ check: checks
 #########
 # TESTS #
 #########
-.PHONY: test-py tests-py coverage-py benchmark-py
+.PHONY: test-py tests-py coverage-py benchmark-py benchmark-history
 test-py:  ## run python tests
 	python -m pytest -v transports/tests
 
 benchmark-py:  ## benchmark server fan-out and emit pytest-benchmark JSON
 	python -m pytest benchmarks --benchmark-only --benchmark-json=.benchmarks/pytest-benchmark.json
+
+# same suite via benched: records an immutable commit-aware run under .benched/results
+benchmark-history:  ## benchmark server fan-out and record durable history with benched
+	python -m benched run benchmarks --benchmark-only
 
 # alias
 tests-py: test-py

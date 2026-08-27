@@ -56,6 +56,8 @@ JavaScript objects. [Connections](docs/src/connections.md) covers WebSocket, SSE
 anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, and custom codecs.
 [Multi-tenancy and sharing](docs/src/multitenancy.md) covers tenant isolation, shared models, and
 merge strategies. [Pyodide](docs/src/pyodide.md) covers building and loading transports in a browser.
+[Benchmarks](docs/src/benchmarks.md) covers the server fan-out benchmark harness, its scaling knobs,
+and recording benchmark history with [benched](https://github.com/1kbgz/benched).
 
 ### Reference
 

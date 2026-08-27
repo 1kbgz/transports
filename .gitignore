@@ -163,3 +163,4 @@ AGENTS.md
 examples/lite/pypi/
 .jupyterlite.doit.db
 .benchmarks/
+.benched/
