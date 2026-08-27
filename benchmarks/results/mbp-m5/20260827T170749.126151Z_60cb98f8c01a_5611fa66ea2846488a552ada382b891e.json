@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
-  "run_id": "883985d7270f4b29b4f567b0231c696d",
-  "started_at": "2026-08-27T14:19:14.808301+00:00",
-  "ended_at": "2026-08-27T14:19:19.688866+00:00",
+  "run_id": "5611fa66ea2846488a552ada382b891e",
+  "started_at": "2026-08-27T17:07:49.126151+00:00",
+  "ended_at": "2026-08-27T17:07:56.365973+00:00",
   "status": "success",
   "exit_code": 0,
   "suite": {
     "name": "transports",
     "repository": "https://github.com/1kbgz/transports",
-    "version": "0.8.1",
-    "revision": "117e3d999cfd92c967b11deb2227cea9c19c9b67",
-    "branch": "bench-history",
-    "dirty": true,
+    "version": "0.8.2",
+    "revision": "60cb98f8c01a5615a6fbf54b8f77eef5f252c718",
+    "branch": null,
+    "dirty": false,
     "labels": {}
   },
   "subject": {
     "name": "transports",
     "repository": "https://github.com/1kbgz/transports",
-    "version": "0.8.0",
-    "revision": "117e3d999cfd92c967b11deb2227cea9c19c9b67",
-    "branch": "bench-history",
-    "dirty": true,
+    "version": "0.8.2",
+    "revision": "60cb98f8c01a5615a6fbf54b8f77eef5f252c718",
+    "branch": null,
+    "dirty": false,
     "labels": {}
   },
   "machine": {
@@ -47,7 +47,7 @@
   "tool": {
     "benched": "0.5.0",
     "pytest": "9.1.1",
-    "pytest_benchmark": "5.2.3"
+    "pytest_benchmark": "5.3.0"
   },
   "measurements": [
     {
@@ -67,6 +67,8 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {
@@ -76,34 +78,34 @@
         "publish_interval_s": 0.002,
         "codec": "json",
         "batch": false,
-        "latency_p50_ms": 1.149,
-        "latency_p95_ms": 5.401,
-        "latency_p99_ms": 10.559,
-        "latency_max_ms": 10.607,
-        "delivered_ratio": 0.245,
+        "latency_p50_ms": 1.444,
+        "latency_p95_ms": 2.532,
+        "latency_p99_ms": 8.046,
+        "latency_max_ms": 8.085,
+        "delivered_ratio": 0.225,
         "server_cpu_pct": 2.6,
-        "server_rss_mb": 66.8,
+        "server_rss_mb": 52.9,
         "server_threads": 1,
-        "server_loop_lag_p99_ms": 1.272,
-        "server_loop_lag_max_ms": 1.291
+        "server_loop_lag_p99_ms": 0.653,
+        "server_loop_lag_max_ms": 0.667
       },
       "stats": {
-        "min": 0.1364250830374658,
-        "max": 0.13691379223018885,
-        "mean": 0.13659626400719085,
-        "stddev": 0.0002752677018256934,
+        "min": 0.11546958377584815,
+        "max": 0.12653949996456504,
+        "mean": 0.12163397235174973,
+        "stddev": 0.005641303865206249,
         "rounds": 3,
-        "median": 0.13644991675391793,
-        "iqr": 0.00036653189454227686,
-        "q1": 0.13643129146657884,
-        "q3": 0.13679782336112112,
+        "median": 0.12289283331483603,
+        "iqr": 0.008302437141537666,
+        "q1": 0.11732539616059512,
+        "q3": 0.12562783330213279,
         "iqr_outliers": 0,
         "stddev_outliers": 1,
         "outliers": "1;0",
-        "ld15iqr": 0.1364250830374658,
-        "hd15iqr": 0.13691379223018885,
-        "ops": 7.320844440865211,
-        "total": 0.4097887920215726,
+        "ld15iqr": 0.11546958377584815,
+        "hd15iqr": 0.12653949996456504,
+        "ops": 8.221387336657305,
+        "total": 0.3649019170552492,
         "iterations": 1
       },
       "samples": null
@@ -125,11 +127,13 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {},
       "stats": {
-        "peak_memory": 113426432
+        "peak_memory": 147144704
       },
       "samples": null
     },
@@ -150,6 +154,8 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {
@@ -159,34 +165,34 @@
         "publish_interval_s": 0.002,
         "codec": "json",
         "batch": false,
-        "latency_p50_ms": 3.709,
-        "latency_p95_ms": 10.321,
-        "latency_p99_ms": 13.622,
-        "latency_max_ms": 14.92,
-        "delivered_ratio": 0.215,
-        "server_cpu_pct": 31.9,
-        "server_rss_mb": 74.7,
+        "latency_p50_ms": 4.25,
+        "latency_p95_ms": 6.613,
+        "latency_p99_ms": 8.366,
+        "latency_max_ms": 11.611,
+        "delivered_ratio": 0.32,
+        "server_cpu_pct": 44.3,
+        "server_rss_mb": 54.9,
         "server_threads": 1,
-        "server_loop_lag_p99_ms": 5.106,
-        "server_loop_lag_max_ms": 5.604
+        "server_loop_lag_p99_ms": 4.803,
+        "server_loop_lag_max_ms": 5.037
       },
       "stats": {
-        "min": 0.16176129085943103,
-        "max": 0.1621632077731192,
-        "mean": 0.162002082914114,
-        "stddev": 0.00021247222860300378,
+        "min": 0.17535316618159413,
+        "max": 0.17629783367738128,
+        "mean": 0.1757806109574934,
+        "stddev": 0.000478690117737257,
         "rounds": 3,
-        "median": 0.16208175010979176,
-        "iqr": 0.0003014376852661371,
-        "q1": 0.1618414056720212,
-        "q3": 0.16214284335728735,
+        "median": 0.17569083301350474,
+        "iqr": 0.0007085006218403578,
+        "q1": 0.17543758288957179,
+        "q3": 0.17614608351141214,
         "iqr_outliers": 0,
         "stddev_outliers": 1,
         "outliers": "1;0",
-        "ld15iqr": 0.16176129085943103,
-        "hd15iqr": 0.1621632077731192,
-        "ops": 6.1727601399431,
-        "total": 0.486006248742342,
+        "ld15iqr": 0.17535316618159413,
+        "hd15iqr": 0.17629783367738128,
+        "ops": 5.688909570588626,
+        "total": 0.5273418328724802,
         "iterations": 1
       },
       "samples": null
@@ -208,11 +214,13 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {},
       "stats": {
-        "peak_memory": 113426432
+        "peak_memory": 147144704
       },
       "samples": null
     },
@@ -233,6 +241,8 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {
@@ -242,34 +252,34 @@
         "publish_interval_s": 0.002,
         "codec": "json",
         "batch": false,
-        "latency_p50_ms": 13.721,
-        "latency_p95_ms": 24.25,
-        "latency_p99_ms": 27.308,
-        "latency_max_ms": 31.653,
-        "delivered_ratio": 0.215,
-        "server_cpu_pct": 66.5,
-        "server_rss_mb": 87.1,
+        "latency_p50_ms": 59.677,
+        "latency_p95_ms": 96.987,
+        "latency_p99_ms": 106.987,
+        "latency_max_ms": 116.148,
+        "delivered_ratio": 0.97,
+        "server_cpu_pct": 92.3,
+        "server_rss_mb": 75.7,
         "server_threads": 1,
-        "server_loop_lag_p99_ms": 21.176,
-        "server_loop_lag_max_ms": 24.432
+        "server_loop_lag_p99_ms": 17.521,
+        "server_loop_lag_max_ms": 21.384
       },
       "stats": {
-        "min": 0.30582516733556986,
-        "max": 0.3372839577496052,
-        "mean": 0.3252580001329382,
-        "stddev": 0.01698706047364929,
+        "min": 1.0558681250549853,
+        "max": 1.068476041778922,
+        "mean": 1.0612396666159232,
+        "stddev": 0.006507541340780156,
         "rounds": 3,
-        "median": 0.33266487531363964,
-        "iqr": 0.02359409281052649,
-        "q1": 0.3125350943300873,
-        "q3": 0.3361291871406138,
+        "median": 1.0593748330138624,
+        "iqr": 0.009455937542952597,
+        "q1": 1.0567448020447046,
+        "q3": 1.0662007395876572,
         "iqr_outliers": 0,
         "stddev_outliers": 1,
         "outliers": "1;0",
-        "ld15iqr": 0.30582516733556986,
-        "hd15iqr": 0.3372839577496052,
-        "ops": 3.0744824096295362,
-        "total": 0.9757740003988147,
+        "ld15iqr": 1.0558681250549853,
+        "hd15iqr": 1.068476041778922,
+        "ops": 0.9422942163373859,
+        "total": 3.1837189998477697,
         "iterations": 1
       },
       "samples": null
@@ -291,11 +301,13 @@
         "min_rounds": 5,
         "max_time": 1.0,
         "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
         "warmup": false
       },
       "extra_info": {},
       "stats": {
-        "peak_memory": 113426432
+        "peak_memory": 147144704
       },
       "samples": null
     }
