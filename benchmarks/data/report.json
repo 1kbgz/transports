@@ -1,9 +1,10 @@
 {
   "schema_version": 1,
-  "generated_at": "2026-08-27T17:08:03.489471+00:00",
+  "generated_at": "2026-08-27T22:12:33.896972+00:00",
   "source_run_ids": [
     "5611fa66ea2846488a552ada382b891e",
-    "bf0902bb884c4f59985ebbd654f3c31a"
+    "bf0902bb884c4f59985ebbd654f3c31a",
+    "8b5a178b577e4016864b359da1e70311"
   ],
   "runs": [
     {
@@ -93,6 +94,50 @@
         "architecture": "arm64",
         "labels": {}
       }
+    },
+    {
+      "run_id": "8b5a178b577e4016864b359da1e70311",
+      "started_at": "2026-08-27T22:12:09.253845+00:00",
+      "status": "success",
+      "suite": {
+        "name": "transports",
+        "repository": "https://github.com/1kbgz/transports",
+        "version": "0.8.2",
+        "revision": "43ba422d492c3c638095e6174e8c449b567865fa",
+        "branch": "session-cost-audit",
+        "dirty": false,
+        "labels": {}
+      },
+      "subject": {
+        "name": "transports",
+        "repository": "https://github.com/1kbgz/transports",
+        "version": "0.8.0",
+        "revision": "43ba422d492c3c638095e6174e8c449b567865fa",
+        "branch": "session-cost-audit",
+        "dirty": false,
+        "labels": {}
+      },
+      "machine": {
+        "id": "mbp-m5",
+        "fingerprint": "4947e1f640c8e065b0bdc2b3f1c521f706461fb493daa642d995091105a41e96",
+        "metadata": {
+          "architecture": "arm64",
+          "cpu_count": 18,
+          "memory_gib": 64.0,
+          "processor": "arm",
+          "release": "25.5.0",
+          "system": "Darwin"
+        },
+        "labels": {}
+      },
+      "environment": {
+        "fingerprint": "08a3e8e6b02c3b8e1bbdfca23dbe380db01a1fb4802f32e1154b169bf43bdabb",
+        "python_implementation": "CPython",
+        "python_version": "3.12.13",
+        "platform": "Darwin",
+        "architecture": "arm64",
+        "labels": {}
+      }
     }
   ],
   "benchmarks": [
@@ -126,6 +171,17 @@
             "min": 0.11240637535229325,
             "max": 0.11649512499570847,
             "ops": 8.768967288301598,
+            "peak_memory": null
+          }
+        },
+        {
+          "run_id": "8b5a178b577e4016864b359da1e70311",
+          "metrics": {
+            "median": 0.12381933256983757,
+            "mean": 0.1239170553162694,
+            "min": 0.12362829130142927,
+            "max": 0.12430354207754135,
+            "ops": 8.06991416514646,
             "peak_memory": null
           }
         }
@@ -163,6 +219,17 @@
             "ops": 5.676350580985492,
             "peak_memory": null
           }
+        },
+        {
+          "run_id": "8b5a178b577e4016864b359da1e70311",
+          "metrics": {
+            "median": 0.15896387491375208,
+            "mean": 0.16234026399130622,
+            "min": 0.15811145771294832,
+            "max": 0.16994545934721828,
+            "ops": 6.1599012802735915,
+            "peak_memory": null
+          }
         }
       ]
     },
@@ -196,6 +263,17 @@
             "min": 1.0302082081325352,
             "max": 1.1130642080679536,
             "ops": 0.9361604131256138,
+            "peak_memory": null
+          }
+        },
+        {
+          "run_id": "8b5a178b577e4016864b359da1e70311",
+          "metrics": {
+            "median": 0.33059662533923984,
+            "mean": 0.3279684303949277,
+            "min": 0.31541266571730375,
+            "max": 0.3378960001282394,
+            "ops": 3.049073957502057,
             "peak_memory": null
           }
         }

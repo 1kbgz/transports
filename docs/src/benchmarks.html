@@ -355,11 +355,100 @@ autosync window can replace intermediate revisions while every client still rece
 not predict cross-region or multi-host performance. Fleet completion also includes the approximately
 100 ms update-publishing interval, so it is broader than patch delivery latency.</p>
 </section>
+<section id="session-budgets">
+<h2>Session budgets<a class="headerlink" href="#session-budgets" title="Link to this heading">¶</a></h2>
+<p>The session-cost benchmark (<code class="docutils literal notranslate"><span class="pre">benchmarks/test_session_cost.py</span></code>) measures what a connected-but-idle
+session costs the server, and both benchmarks derive the budget metrics below. Measured on the
+recording machine at 1,000 clients × 10 streams:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Budget</p></th>
+<th class="head text-right"><p>Target</p></th>
+<th class="head text-right"><p>Measured</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>RSS per idle session</p></td>
+<td class="text-right"><p>&lt; 100 KB</p></td>
+<td class="text-right"><p>73.7 KB</p></td>
+</tr>
+<tr class="row-odd"><td><p>Idle server CPU, whole fleet connected</p></td>
+<td class="text-right"><p>&lt; 5%</p></td>
+<td class="text-right"><p>0.4%</p></td>
+</tr>
+<tr class="row-even"><td><p>CPU per state fan-out to 1k subscribers</p></td>
+<td class="text-right"><p>&lt; 1 ms</p></td>
+<td class="text-right"><p>0.92 ms</p></td>
+</tr>
+<tr class="row-odd"><td><p>Thread growth across 1,000 connects</p></td>
+<td class="text-right"><p>0</p></td>
+<td class="text-right"><p>0</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>Thread flatness is asserted unconditionally on every run — a session must never cost a thread. The
+absolute budgets are opt-in (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BUDGETS=1</span></code>) because hosted CI runners are too noisy for
+stable thresholds; run them locally or on the recording machine. The fan-out CPU budget applies
+only at 250+ sessions (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BUDGET_FANOUT_MIN_SESSIONS</span></code>) where fixed per-publish cost
+amortizes, and currently passes with under 10% headroom — a regression that trips it is real.</p>
+</section>
+<section id="event-loop-comparison">
+<h2>Event loop comparison<a class="headerlink" href="#event-loop-comparison" title="Link to this heading">¶</a></h2>
+<p>The harness can swap the server’s event loop (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_LOOP=asyncio|uvloop|rsloop</span></code>; the
+client fleet always stays on asyncio so only the measured process varies). At 1,000 clients × 10
+streams on the recording machine, ranges over two runs each:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Loop</p></th>
+<th class="head text-right"><p>Delivery p50</p></th>
+<th class="head text-right"><p>Delivery p99</p></th>
+<th class="head text-right"><p>CPU per 1k-subscriber fan-out</p></th>
+<th class="head text-right"><p>Server CPU</p></th>
+<th class="head text-right"><p>RSS per idle session</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>asyncio</p></td>
+<td class="text-right"><p>82–89 ms</p></td>
+<td class="text-right"><p>173–174 ms</p></td>
+<td class="text-right"><p>0.90–0.92 ms</p></td>
+<td class="text-right"><p>68–69%</p></td>
+<td class="text-right"><p>73.6 KB</p></td>
+</tr>
+<tr class="row-odd"><td><p>uvloop</p></td>
+<td class="text-right"><p>124–127 ms</p></td>
+<td class="text-right"><p>245–250 ms</p></td>
+<td class="text-right"><p>0.97–1.02 ms</p></td>
+<td class="text-right"><p>68–70%</p></td>
+<td class="text-right"><p>73.2 KB</p></td>
+</tr>
+<tr class="row-even"><td><p>rsloop</p></td>
+<td class="text-right"><p>32–32 ms</p></td>
+<td class="text-right"><p>103–113 ms</p></td>
+<td class="text-right"><p>1.21–1.24 ms</p></td>
+<td class="text-right"><p>88%</p></td>
+<td class="text-right"><p>124 KB</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>No loop dominates. rsloop delivers dramatically lower latency — it appears to flush writes far
+more eagerly — but spends ~34% more CPU per fan-out and ~70% more memory per idle session,
+breaking both budgets above. uvloop batches more aggressively than asyncio (lowest event-loop
+lag) but that shows up as <em>higher</em> delivery latency under this fan-out shape. asyncio remains the
+default: it wins both budget metrics, and the latency headroom (p99 well under the 150 ms target)
+does not yet justify rsloop’s CPU cost on a small-instance budget. Worth revisiting once encode/
+diff hot paths move into Rust and CPU headroom opens up — and re-measuring on Linux, where these
+loops’ relative standings are known to differ from macOS.</p>
+</section>
 <section id="interactive-results">
 <h2>Interactive results<a class="headerlink" href="#interactive-results" title="Link to this heading">¶</a></h2>
 <p>The report below is generated from committed benchmark records. It exposes the recorded runs,
 benchmark parameters, timing distributions, and machine metadata.</p>
-<benched-report src="../../_static/benched/reports/results-5fef6b2534b1.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>The <a class="reference external" href="https://1kbgz.github.io/transports/benchmarks/">full interactive report</a> includes all committed
+<benched-report src="../../_static/benched/reports/results-1eaf5c11cf90.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>The <a class="reference external" href="https://1kbgz.github.io/transports/benchmarks/">full interactive report</a> includes all committed
 timing runs and filters.</p>
 </section>
 </section>
@@ -423,6 +512,8 @@ timing runs and filters.</p>
 <li><a class="reference internal" href="#latency-and-completion-time">Latency and completion time</a></li>
 <li><a class="reference internal" href="#server-resource-use">Server resource use</a></li>
 <li><a class="reference internal" href="#recorded-workload">Recorded workload</a></li>
+<li><a class="reference internal" href="#session-budgets">Session budgets</a></li>
+<li><a class="reference internal" href="#event-loop-comparison">Event loop comparison</a></li>
 <li><a class="reference internal" href="#interactive-results">Interactive results</a></li>
 </ul>
 </li>
