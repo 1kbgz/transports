@@ -36,7 +36,17 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--models", type=int, default=1)
+    parser.add_argument("--loop", choices=("asyncio", "uvloop", "rsloop"), default="asyncio")
     args = parser.parse_args()
+
+    if args.loop == "uvloop":
+        import uvloop
+
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    elif args.loop == "rsloop":
+        import rsloop
+
+        asyncio.set_event_loop_policy(rsloop.EventLoopPolicy())
 
     session = transports.Session()
     models = [Stream() for _ in range(args.models)]

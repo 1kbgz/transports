@@ -63,6 +63,27 @@ stable thresholds; run them locally or on the recording machine. The fan-out CPU
 only at 250+ sessions (`TRANSPORTS_BUDGET_FANOUT_MIN_SESSIONS`) where fixed per-publish cost
 amortizes, and currently passes with under 10% headroom — a regression that trips it is real.
 
+## Event loop comparison
+
+The harness can swap the server's event loop (`TRANSPORTS_BENCH_LOOP=asyncio|uvloop|rsloop`; the
+client fleet always stays on asyncio so only the measured process varies). At 1,000 clients × 10
+streams on the recording machine, ranges over two runs each:
+
+| Loop    | Delivery p50 | Delivery p99 | CPU per 1k-subscriber fan-out | Server CPU | RSS per idle session |
+| ------- | -----------: | -----------: | ----------------------------: | ---------: | -------------------: |
+| asyncio |     82–89 ms |   173–174 ms |                  0.90–0.92 ms |     68–69% |              73.6 KB |
+| uvloop  |   124–127 ms |   245–250 ms |                  0.97–1.02 ms |     68–70% |              73.2 KB |
+| rsloop  |     32–32 ms |   103–113 ms |                  1.21–1.24 ms |        88% |               124 KB |
+
+No loop dominates. rsloop delivers dramatically lower latency — it appears to flush writes far
+more eagerly — but spends ~34% more CPU per fan-out and ~70% more memory per idle session,
+breaking both budgets above. uvloop batches more aggressively than asyncio (lowest event-loop
+lag) but that shows up as *higher* delivery latency under this fan-out shape. asyncio remains the
+default: it wins both budget metrics, and the latency headroom (p99 well under the 150 ms target)
+does not yet justify rsloop's CPU cost on a small-instance budget. Worth revisiting once encode/
+diff hot paths move into Rust and CPU headroom opens up — and re-measuring on Linux, where these
+loops' relative standings are known to differ from macOS.
+
 ## Interactive results
 
 The report below is generated from committed benchmark records. It exposes the recorded runs,
