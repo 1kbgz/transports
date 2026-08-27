@@ -208,3 +208,37 @@ def test_batch_negotiated_connections_get_one_frame_per_flush():
     accepted = client.recv(server.flush()[batched][0])
     assert isinstance(accepted, list) and len(accepted) == 2
     assert client.model(next(iter(session.ids())), Counter).n == 4
+
+
+def test_wedged_socket_is_cut_by_the_watchdog_and_its_shard_resumes():
+    async def scenario() -> None:
+        session = transports.Session()
+        model = Counter()
+        session.host(model)
+        server = transports.Server(session)
+
+        fast, stuck = FakeConn(), StuckConn()
+        server.open(stuck)
+        server.open(fast)
+
+        # one shard: the wedged send stalls the healthy consumer too, until the watchdog
+        # (probing progress every stall_timeout) cuts the wedged conn and restarts the shard
+        sync_task = asyncio.get_running_loop().create_task(
+            transports.autosync(server, interval=0.001, shards=1, stall_timeout=0.05)
+        )
+        try:
+            model.n = 1
+            await asyncio.sleep(0.02)
+            starved = len(fast.sent)
+
+            await asyncio.sleep(0.25)
+            assert stuck not in server._codecs
+
+            model.n = 2
+            await asyncio.sleep(0.05)
+            assert fast in server._codecs
+            assert len(fast.sent) > starved
+        finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
