@@ -56,13 +56,12 @@ JavaScript objects. [Connections](docs/src/connections.md) covers WebSocket, SSE
 anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, and custom codecs.
 [Multi-tenancy and sharing](docs/src/multitenancy.md) covers tenant isolation, shared models, and
 merge strategies. [Pyodide](docs/src/pyodide.md) covers building and loading transports in a browser.
-[Benchmarks](docs/src/benchmarks.md) covers the server fan-out benchmark harness, its scaling knobs,
-and recording benchmark history with [benched](https://github.com/1kbgz/benched).
 
 ### Reference
 
 [API reference](docs/src/api.md) lists the Python API. [Wire protocol reference](docs/src/protocol-reference.md)
-describes `Value`, patch operations, protocol messages, codecs, and model ids.
+describes `Value`, patch operations, protocol messages, codecs, and model ids. [Benchmark results](docs/src/benchmarks.md)
+reports recorded server fan-out latency, completion time, and resource use.
 
 ### Explanation
 
