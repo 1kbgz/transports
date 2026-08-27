@@ -10,6 +10,7 @@ import os
 import random
 import sys
 import tempfile
+from unittest.mock import patch
 
 import pytest
 
@@ -108,6 +109,17 @@ class MemBackplane(Backplane):
         for p in self.bus.peers:
             if p is not self:
                 p._deliver(framed)
+
+
+def test_open_forwards_batch_negotiation_to_hub():
+    hub = Hub(key=lambda conn: conn)
+    relay = RelayBroadcaster(hub, MemBackplane(_Bus()))
+    conn = object()
+
+    with patch.object(hub, "open", wraps=hub.open) as open_hub:
+        relay.open(conn, "json", {1: 2}, batch=True)
+
+    open_hub.assert_called_once_with(conn, "json", {1: 2}, batch=True)
 
 
 def test_late_joiner_catches_up_and_inherits_the_clock():
