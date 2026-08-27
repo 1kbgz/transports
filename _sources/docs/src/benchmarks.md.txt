@@ -39,8 +39,10 @@ TRANSPORTS_BENCH=1000:10 TRANSPORTS_BENCH_CODEC=msgpack make benchmark-py
 ## Record and compare runs with benched
 
 benched runs the same suite in an isolated subprocess and records an immutable, commit-aware run
-document under `.benched/results` (gitignored). The suite and results directory are configured in
-`[tool.benched]` in `pyproject.toml`.
+document under `benchmarks/results` — **committed**, so history accumulates in the repo and the
+report below always renders from real recorded runs. Record from a consistent machine (runner
+hardware is too noisy for durable history; see Continuous integration below). The suite and results
+directory are configured in `[tool.benched]` in `pyproject.toml`.
 
 ```bash
 make benchmark-history           # benched run benchmarks --benchmark-only
@@ -59,20 +61,21 @@ benched report --format html --output build/benchmarks
 The environment knobs above apply to `benched run` as well; keep the grid consistent when comparing
 runs, and compare only runs recorded on the same machine.
 
-## Baseline
+## Recorded history
 
-Default grid, 50 updates per stream per round at 2ms intervals, JSON codec, unbatched. Recorded on
-an Apple M5 Pro (arm64, macOS), CPython 3.12. Round time is the median end-to-end delivery time for
-the full fleet; latency percentiles are per-message delivery latencies.
+The interactive report below is compiled at docs build time from the committed run history
+(default grid: 50 updates per stream per round at 2ms intervals, JSON codec, unbatched; round time
+is the median end-to-end delivery time for the full fleet). Delivered ratio below 1.0 is expected:
+state streams keep only the newest revision, so the 10ms autosync window coalesces bursts.
 
-| Sessions | Streams | Round (ms) | p50 (ms) | p95 (ms) | p99 (ms) | Delivered ratio | Server CPU (%) | Server RSS (MB) |
-| -------: | ------: | ---------: | -------: | -------: | -------: | --------------: | -------------: | --------------: |
-|       10 |       1 |      123.1 |     1.26 |     3.86 |     7.99 |            0.23 |            2.1 |            66.6 |
-|      100 |      10 |      168.9 |     4.32 |    12.48 |    15.81 |            0.22 |           30.3 |            74.6 |
-|      250 |      20 |      319.4 |    13.62 |    24.06 |    26.87 |            0.22 |           66.1 |            87.2 |
+```{benched} ../../benchmarks/results
+:view: trend
+:metric: median
+:x-axis: version
+```
 
-Delivered ratio below 1.0 is expected: state streams keep only the newest revision, so the 10ms
-autosync window coalesces bursts.
+The [full report](../../benchmarks/index.html) with every view and filter is published alongside these
+docs.
 
 ## Continuous integration
 

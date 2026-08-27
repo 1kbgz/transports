@@ -13,6 +13,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
+    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=8486d09b" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=890fd012" />
@@ -306,8 +307,10 @@ variables control the grid and the burst:</p>
 <section id="record-and-compare-runs-with-benched">
 <h2>Record and compare runs with benched<a class="headerlink" href="#record-and-compare-runs-with-benched" title="Link to this heading">¶</a></h2>
 <p>benched runs the same suite in an isolated subprocess and records an immutable, commit-aware run
-document under <code class="docutils literal notranslate"><span class="pre">.benched/results</span></code> (gitignored). The suite and results directory are configured in
-<code class="docutils literal notranslate"><span class="pre">[tool.benched]</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>.</p>
+document under <code class="docutils literal notranslate"><span class="pre">benchmarks/results</span></code> — <strong>committed</strong>, so history accumulates in the repo and the
+report below always renders from real recorded runs. Record from a consistent machine (runner
+hardware is too noisy for durable history; see Continuous integration below). The suite and results
+directory are configured in <code class="docutils literal notranslate"><span class="pre">[tool.benched]</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>benchmark-history<span class="w">           </span><span class="c1"># benched run benchmarks --benchmark-only</span>
 </pre></div>
 </div>
@@ -322,61 +325,14 @@ benched<span class="w"> </span>report<span class="w"> </span>--format<span class
 <p>The environment knobs above apply to <code class="docutils literal notranslate"><span class="pre">benched</span> <span class="pre">run</span></code> as well; keep the grid consistent when comparing
 runs, and compare only runs recorded on the same machine.</p>
 </section>
-<section id="baseline">
-<h2>Baseline<a class="headerlink" href="#baseline" title="Link to this heading">¶</a></h2>
-<p>Default grid, 50 updates per stream per round at 2ms intervals, JSON codec, unbatched. Recorded on
-an Apple M5 Pro (arm64, macOS), CPython 3.12. Round time is the median end-to-end delivery time for
-the full fleet; latency percentiles are per-message delivery latencies.</p>
-<div class="table-wrapper colwidths-auto docutils container">
-<table class="docutils align-default">
-<thead>
-<tr class="row-odd"><th class="head text-right"><p>Sessions</p></th>
-<th class="head text-right"><p>Streams</p></th>
-<th class="head text-right"><p>Round (ms)</p></th>
-<th class="head text-right"><p>p50 (ms)</p></th>
-<th class="head text-right"><p>p95 (ms)</p></th>
-<th class="head text-right"><p>p99 (ms)</p></th>
-<th class="head text-right"><p>Delivered ratio</p></th>
-<th class="head text-right"><p>Server CPU (%)</p></th>
-<th class="head text-right"><p>Server RSS (MB)</p></th>
-</tr>
-</thead>
-<tbody>
-<tr class="row-even"><td class="text-right"><p>10</p></td>
-<td class="text-right"><p>1</p></td>
-<td class="text-right"><p>123.1</p></td>
-<td class="text-right"><p>1.26</p></td>
-<td class="text-right"><p>3.86</p></td>
-<td class="text-right"><p>7.99</p></td>
-<td class="text-right"><p>0.23</p></td>
-<td class="text-right"><p>2.1</p></td>
-<td class="text-right"><p>66.6</p></td>
-</tr>
-<tr class="row-odd"><td class="text-right"><p>100</p></td>
-<td class="text-right"><p>10</p></td>
-<td class="text-right"><p>168.9</p></td>
-<td class="text-right"><p>4.32</p></td>
-<td class="text-right"><p>12.48</p></td>
-<td class="text-right"><p>15.81</p></td>
-<td class="text-right"><p>0.22</p></td>
-<td class="text-right"><p>30.3</p></td>
-<td class="text-right"><p>74.6</p></td>
-</tr>
-<tr class="row-even"><td class="text-right"><p>250</p></td>
-<td class="text-right"><p>20</p></td>
-<td class="text-right"><p>319.4</p></td>
-<td class="text-right"><p>13.62</p></td>
-<td class="text-right"><p>24.06</p></td>
-<td class="text-right"><p>26.87</p></td>
-<td class="text-right"><p>0.22</p></td>
-<td class="text-right"><p>66.1</p></td>
-<td class="text-right"><p>87.2</p></td>
-</tr>
-</tbody>
-</table>
-</div>
-<p>Delivered ratio below 1.0 is expected: state streams keep only the newest revision, so the 10ms
-autosync window coalesces bursts.</p>
+<section id="recorded-history">
+<h2>Recorded history<a class="headerlink" href="#recorded-history" title="Link to this heading">¶</a></h2>
+<p>The interactive report below is compiled at docs build time from the committed run history
+(default grid: 50 updates per stream per round at 2ms intervals, JSON codec, unbatched; round time
+is the median end-to-end delivery time for the full fleet). Delivered ratio below 1.0 is expected:
+state streams keep only the newest revision, so the 10ms autosync window coalesces bursts.</p>
+<benched-report src="../../_static/benched/reports/results-7df478e568b2.json" view="trend" metric="median" x-axis="version" data-theme="inherit"></benched-report><p>The <a class="reference internal" href="#../../benchmarks/index.html"><span class="xref myst">full report</span></a> with every view and filter is published alongside these
+docs.</p>
 </section>
 <section id="continuous-integration">
 <h2>Continuous integration<a class="headerlink" href="#continuous-integration" title="Link to this heading">¶</a></h2>
@@ -446,7 +402,7 @@ the harness itself failed (for example, clients not completing), not that a numb
 <li><a class="reference internal" href="#run-the-harness-raw">Run the harness raw</a></li>
 <li><a class="reference internal" href="#scale-the-run">Scale the run</a></li>
 <li><a class="reference internal" href="#record-and-compare-runs-with-benched">Record and compare runs with benched</a></li>
-<li><a class="reference internal" href="#baseline">Baseline</a></li>
+<li><a class="reference internal" href="#recorded-history">Recorded history</a></li>
 <li><a class="reference internal" href="#continuous-integration">Continuous integration</a></li>
 </ul>
 </li>
@@ -465,6 +421,7 @@ the harness itself failed (for example, clients not completing), not that a numb
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
     <script src="../../_static/design-tabs.js?v=f930bc37"></script>
     <script src="../../_static/js/custom.js?v=956e5d78"></script>
     </body>
