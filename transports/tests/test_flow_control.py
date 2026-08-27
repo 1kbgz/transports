@@ -223,9 +223,7 @@ def test_wedged_socket_is_cut_by_the_watchdog_and_its_shard_resumes():
 
         # one shard: the wedged send stalls the healthy consumer too, until the watchdog
         # (probing progress every stall_timeout) cuts the wedged conn and restarts the shard
-        sync_task = asyncio.get_running_loop().create_task(
-            transports.autosync(server, interval=0.001, shards=1, stall_timeout=0.05)
-        )
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001, shards=1, stall_timeout=0.05))
         try:
             model.n = 1
             await asyncio.sleep(0.02)
