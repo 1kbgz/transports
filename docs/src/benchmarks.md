@@ -1,85 +1,58 @@
-# How to benchmark server fan-out
+# Server fan-out benchmark results
 
-This guide shows you how to run the fan-out benchmark harness, scale it, and record durable
-benchmark history with [benched](https://github.com/1kbgz/benched).
+The recorded baseline keeps WebSocket delivery below 25 ms at p95 with 250 concurrent clients,
+each receiving 20 state streams. At that load, all 5,000 client-stream subscriptions reach the final
+revision in 333 ms while the server uses 66.5% CPU and 87.1 MB RSS.
 
-The harness in `benchmarks/` is an ordinary pytest-benchmark suite. Each benchmark starts a real
-server subprocess, connects a fleet of WebSocket clients, publishes a burst of updates across every
-stream, and completes when every client has received the final revision of every stream — the
-primary statistic is end-to-end delivery time for the whole fleet. Derived metrics ride each
-benchmark's `extra_info`: delivery-latency percentiles, delivered/published ratio (coalescing), and
-the server's CPU, RSS, thread count, and event-loop lag.
+## Latency and completion time
 
-## Run the harness raw
+| WebSocket clients | Streams per client | Active subscriptions | Fleet completion (median) | Delivery p50 | Delivery p95 | Delivery p99 | Delivery max |
+| ----------------: | -----------------: | -------------------: | ------------------------: | -----------: | -----------: | -----------: | -----------: |
+|                10 |                  1 |                   10 |                    136 ms |       1.1 ms |       5.4 ms |      10.6 ms |      10.6 ms |
+|               100 |                 10 |                1,000 |                    162 ms |       3.7 ms |      10.3 ms |      13.6 ms |      14.9 ms |
+|               250 |                 20 |                5,000 |                    333 ms |      13.7 ms |      24.3 ms |      27.3 ms |      31.7 ms |
 
-```bash
-make benchmark-py
-```
+Fleet completion measures the full round: publish 50 updates to every stream at 2 ms intervals, then
+wait until every client has received the final revision of every stream. Delivery latency measures
+individual patches from the server timestamp to receipt by a client.
 
-This runs `pytest benchmarks --benchmark-only` and writes plain pytest-benchmark JSON to
-`.benchmarks/pytest-benchmark.json`.
+## Server resource use
 
-## Scale the run
+| WebSocket clients |   CPU |     RSS | Event-loop lag p99 | Revisions delivered |
+| ----------------: | ----: | ------: | -----------------: | ------------------: |
+|                10 |  2.6% | 66.8 MB |             1.3 ms |               24.5% |
+|               100 | 31.9% | 74.7 MB |             5.1 ms |               21.5% |
+|               250 | 66.5% | 87.1 MB |            21.2 ms |               21.5% |
 
-The default grid is `(sessions, streams)` of `(10, 1)`, `(100, 10)`, `(250, 20)`. Environment
-variables control the grid and the burst:
+CPU is process CPU use, where 100% represents one fully occupied logical core. Revisions delivered
+below 100% reflect expected coalescing, not data loss: transports synchronizes state, so its 10 ms
+autosync window can replace intermediate revisions while every client still receives the final one.
 
-| Variable                    | Default              | Meaning                                        |
-| --------------------------- | -------------------- | ---------------------------------------------- |
-| `TRANSPORTS_BENCH`          | `10:1,100:10,250:20` | Grid as `sessions:streams,...`                 |
-| `TRANSPORTS_BENCH_UPDATES`  | `50`                 | Updates published per stream per round         |
-| `TRANSPORTS_BENCH_INTERVAL` | `0.002`              | Seconds between publishes                      |
-| `TRANSPORTS_BENCH_CODEC`    | `json`               | Wire codec (`json` or `msgpack`)               |
-| `TRANSPORTS_BENCH_BATCH`    | unset                | Set to `1` to batch frames per autosync window |
+## Recorded workload
 
-```bash
-TRANSPORTS_BENCH=1000:10 TRANSPORTS_BENCH_CODEC=msgpack make benchmark-py
-```
+These numbers come from the latest recorded run for each load on August 27, 2026:
 
-## Record and compare runs with benched
+- transports 0.8.0 at commit `117e3d9`
+- one server process and all clients on the same machine over loopback
+- Apple silicon (`arm64`, 18 logical CPUs, 64 GiB RAM), macOS 25.5
+- CPython 3.12.13, JSON codec, unbatched frames
+- 50 updates per stream per round, published every 2 ms
+- one warm-up round followed by three measured rounds
 
-benched runs the same suite in an isolated subprocess and records an immutable, commit-aware run
-document under `benchmarks/results` — **committed**, so history accumulates in the repo and the
-report below always renders from real recorded runs. Record from a consistent machine (runner
-hardware is too noisy for durable history; see Continuous integration below). The suite and results
-directory are configured in `[tool.benched]` in `pyproject.toml`.
+This is a single-machine fan-out baseline, not a capacity limit. It excludes network latency and does
+not predict cross-region or multi-host performance. Fleet completion also includes the approximately
+100 ms update-publishing interval, so it is broader than patch delivery latency.
 
-```bash
-make benchmark-history           # benched run benchmarks --benchmark-only
-```
+## Interactive results
 
-Inspect and compare recorded history:
-
-```bash
-benched list                     # collected benchmarks
-benched history                  # recorded runs
-benched show latest              # one full run document, extra_info included
-benched compare previous latest --metric median
-benched report --format html --output build/benchmarks
-```
-
-The environment knobs above apply to `benched run` as well; keep the grid consistent when comparing
-runs, and compare only runs recorded on the same machine.
-
-## Recorded history
-
-The interactive report below is compiled at docs build time from the committed run history
-(default grid: 50 updates per stream per round at 2ms intervals, JSON codec, unbatched; round time
-is the median end-to-end delivery time for the full fleet). Delivered ratio below 1.0 is expected:
-state streams keep only the newest revision, so the 10ms autosync window coalesces bursts.
+The report below is generated from committed benchmark records. It exposes the recorded runs,
+benchmark parameters, timing distributions, and machine metadata.
 
 ```{benched} ../../benchmarks/results
-:view: trend
+:view: overview
 :metric: median
-:x-axis: version
+:selector: latest-per-benchmark
 ```
 
-The [full report](../../benchmarks/index.html) with every view and filter is published alongside these
-docs.
-
-## Continuous integration
-
-CI runs the suite at a reduced scale (`TRANSPORTS_BENCH=50:5`, 20 updates per round) on Linux and
-uploads the pytest-benchmark JSON as a build artifact for trend inspection. There are no
-absolute-latency gates — shared runners are too noisy for stable thresholds — so a CI failure means
-the harness itself failed (for example, clients not completing), not that a number moved.
+The [full interactive report](https://1kbgz.github.io/transports/benchmarks/) includes every recorded
+run and filter.
