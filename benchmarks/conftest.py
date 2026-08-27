@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -25,6 +26,9 @@ import websockets
 from transports import protocol
 
 _SERVER = Path(__file__).with_name("fanout_server.py")
+# the server's event loop implementation (asyncio | uvloop | rsloop); the client fleet stays
+# on asyncio so loop comparisons vary only the measured process
+LOOP = os.environ.get("TRANSPORTS_BENCH_LOOP", "asyncio")
 
 
 def _free_port() -> int:
@@ -76,7 +80,7 @@ class _ServerFactory:
     def start(self, models: int) -> FanoutServer:
         port = _free_port()
         proc = subprocess.Popen(
-            [sys.executable, str(_SERVER), "--port", str(port), "--models", str(models)],
+            [sys.executable, str(_SERVER), "--port", str(port), "--models", str(models), "--loop", LOOP],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
