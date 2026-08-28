@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="next" title="Wire protocol reference" href="protocol-reference.html"><link rel="prev" title="How to run transports in a browser with Pyodide" href="pyodide.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>Server fan-out benchmark results - transports v0.8.2</title>
+        <title>Server fan-out benchmark results - transports v0.8.3</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -168,7 +168,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.2</code></div></a>
+      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.3</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -189,7 +189,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.2</code></span>
+  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.3</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -470,6 +470,64 @@ with deflate disabled on the server (<code class="docutils literal notranslate">
 2.7× — the single most effective configuration change for a high-fan-out deployment where
 bandwidth is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.</p>
 </section>
+<section id="multi-tenant-hub">
+<h2>Multi-tenant hub<a class="headerlink" href="#multi-tenant-hub" title="Link to this heading">¶</a></h2>
+<p>The hub benchmark (<code class="docutils literal notranslate"><span class="pre">benchmarks/test_hub_fanout.py</span></code>) measures the two-tier <code class="docutils literal notranslate"><span class="pre">Hub</span></code> path in the
+csp-gateway shape: T tenants, one connection each, P private models per tenant (its own session)
+plus S shared models every tenant subscribes to. <code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_HUB=tenants:private:shared</span></code>
+sets the scale and <code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_HUB_MODE</span></code> selects the published class. At 1,000 tenants × 2
+private × 5 shared on the recording machine:</p>
+<div class="table-wrapper colwidths-auto docutils container">
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Published class</p></th>
+<th class="head text-right"><p>Fleet completion</p></th>
+<th class="head text-right"><p>Delivery p50</p></th>
+<th class="head text-right"><p>Delivery p99</p></th>
+<th class="head text-right"><p>CPU per 1k-subscriber fan-out</p></th>
+<th class="head text-right"><p>Server CPU</p></th>
+<th class="head text-right"><p>RSS growth per tenant</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p>shared only</p></td>
+<td class="text-right"><p>272 ms</p></td>
+<td class="text-right"><p>64 ms</p></td>
+<td class="text-right"><p>105 ms</p></td>
+<td class="text-right"><p>0.57 ms</p></td>
+<td class="text-right"><p>48%</p></td>
+<td class="text-right"><p>24 KB</p></td>
+</tr>
+<tr class="row-odd"><td><p>private only</p></td>
+<td class="text-right"><p>808 ms</p></td>
+<td class="text-right"><p>40 ms</p></td>
+<td class="text-right"><p>114 ms</p></td>
+<td class="text-right"><p>(7.2 ms)</p></td>
+<td class="text-right"><p>85%</p></td>
+<td class="text-right"><p>201 KB</p></td>
+</tr>
+<tr class="row-even"><td><p>mixed</p></td>
+<td class="text-right"><p>883 ms</p></td>
+<td class="text-right"><p>71 ms</p></td>
+<td class="text-right"><p>183 ms</p></td>
+<td class="text-right"><p>2.0 ms</p></td>
+<td class="text-right"><p>80%</p></td>
+<td class="text-right"><p>112 KB</p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p>The shared (broadcast) tier meets the fan-out budget. The private tier’s parenthesized number is
+not a like-for-like budget comparison: each private patch has exactly one subscriber, so the cost
+is per <em>unique</em> patch (~36 µs each: per-tenant drain, diff, encode, send — nothing can share
+encoded bytes across tenants). Bringing that down is the next optimization target. Two hub-path
+fixes landed with this benchmark: the per-tenant flush no longer rescans the connection map per
+tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once per
+connection — together worth ~24% CPU on the shared tier and ~12% on the private tier at this
+scale.</p>
+<p>Private-tier memory grows with each tenant’s bounded resume logs (512 patches per model by
+default); <code class="docutils literal notranslate"><span class="pre">Session(log_cap=...)</span></code> tunes the retention/memory trade for large-tenant deployments.</p>
+</section>
 <section id="recorded-workload">
 <h2>Recorded workload<a class="headerlink" href="#recorded-workload" title="Link to this heading">¶</a></h2>
 <p>These ranges come from two clean runs recorded on August 27, 2026:</p>
@@ -558,6 +616,7 @@ timing runs and filters.</p>
 <li><a class="reference internal" href="#session-budgets">Session budgets</a></li>
 <li><a class="reference internal" href="#event-loop-comparison">Event loop comparison</a></li>
 <li><a class="reference internal" href="#permessage-deflate">Permessage-deflate</a></li>
+<li><a class="reference internal" href="#multi-tenant-hub">Multi-tenant hub</a></li>
 <li><a class="reference internal" href="#recorded-workload">Recorded workload</a></li>
 <li><a class="reference internal" href="#interactive-results">Interactive results</a></li>
 </ul>
@@ -571,7 +630,7 @@ timing runs and filters.</p>
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=dbee5847"></script>
+</div><script src="../../_static/documentation_options.js?v=7f96dc5e"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
