@@ -26,6 +26,7 @@ import websockets
 from transports import protocol
 
 _SERVER = Path(__file__).with_name("fanout_server.py")
+_HUB_SERVER = Path(__file__).with_name("hub_server.py")
 # the server's event loop implementation (asyncio | uvloop | rsloop); the client fleet stays
 # on asyncio so loop comparisons vary only the measured process
 LOOP = os.environ.get("TRANSPORTS_BENCH_LOOP", "asyncio")
@@ -53,10 +54,10 @@ class FanoutServer:
     def ws_url(self) -> str:
         return f"ws://127.0.0.1:{self.port}/ws"
 
-    def bump(self, updates: int, interval: float) -> int:
+    def bump(self, updates: int, interval: float, **extra: object) -> int:
         request = urllib.request.Request(
             f"{self.url}/bump",
-            data=json.dumps({"updates": updates, "interval": interval}).encode(),
+            data=json.dumps({"updates": updates, "interval": interval, **extra}).encode(),
             headers={"content-type": "application/json"},
         )
         with urllib.request.urlopen(request) as response:
@@ -81,15 +82,20 @@ class _ServerFactory:
         self._procs: list[subprocess.Popen] = []
 
     def start(self, models: int) -> FanoutServer:
+        return self._spawn(_SERVER, ["--models", str(models)])
+
+    def start_hub(self, tenants: int, private: int, shared: int) -> FanoutServer:
+        return self._spawn(_HUB_SERVER, ["--tenants", str(tenants), "--private", str(private), "--shared", str(shared)])
+
+    def _spawn(self, script: Path, args: list[str]) -> FanoutServer:
         port = _free_port()
         proc = subprocess.Popen(
             [
                 sys.executable,
-                str(_SERVER),
+                str(script),
                 "--port",
                 str(port),
-                "--models",
-                str(models),
+                *args,
                 "--loop",
                 LOOP,
                 "--ws-deflate",
@@ -108,7 +114,7 @@ class _ServerFactory:
                     return FanoutServer(port=port, process=psutil.Process(proc.pid))
             except OSError:
                 time.sleep(0.1)
-        raise RuntimeError("fanout server did not become ready")
+        raise RuntimeError("benchmark server did not become ready")
 
     def stop(self) -> None:
         for proc in self._procs:
@@ -142,12 +148,14 @@ class ClientFleet:
     def _run(self, coro):
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result()
 
-    def start(self, count: int, ws_url: str) -> None:
+    def start(self, count: int, ws_url) -> None:
+        """Connect `count` clients; `ws_url` is one URL for all, or a callable of the client index
+        (per-tenant URLs for the hub benchmark)."""
         self._run(self._start(count, ws_url))
 
-    async def _start(self, count: int, ws_url: str) -> None:
-        for _ in range(count):
-            ws = await websockets.connect(ws_url, max_queue=4096)
+    async def _start(self, count: int, ws_url) -> None:
+        for i in range(count):
+            ws = await websockets.connect(ws_url(i) if callable(ws_url) else ws_url, max_queue=4096)
             state = _ClientState()
             self._sockets.append(ws)
             self._clients.append(state)
@@ -187,17 +195,25 @@ class ClientFleet:
             if seq is not None:
                 state.seq[message["id"]] = seq
 
-    def wait_round(self, target: int, models: int, timeout: float = 120.0) -> None:
-        self._run(self._wait(target, models, timeout))
+    def wait_round(self, target: int, models: int, timeout: float = 120.0, id_min: int = 0, id_max: int | None = None) -> None:
+        """Wait until every client's tracked models (optionally only ids in [id_min, id_max]) hit
+        `target` — the id bounds separate a hub's private models from shared ones (SHARED_ID_BASE)."""
+        self._run(self._wait(target, models, timeout, id_min, id_max))
 
-    async def _wait(self, target: int, models: int, timeout: float) -> None:
+    async def _wait(self, target: int, models: int, timeout: float, id_min: int, id_max: int | None) -> None:
+        def tracked(c: _ClientState) -> list[int]:
+            return [s for mid, s in c.seq.items() if mid >= id_min and (id_max is None or mid < id_max)]
+
+        def caught_up(c: _ClientState) -> bool:
+            seqs = tracked(c)
+            return len(seqs) == models and all(s >= target for s in seqs)
+
         deadline = asyncio.get_running_loop().time() + timeout
         while True:
-            done = all(len(c.seq) == models and all(s >= target for s in c.seq.values()) for c in self._clients)
-            if done:
+            if all(caught_up(c) for c in self._clients):
                 return
             if asyncio.get_running_loop().time() > deadline:
-                behind = sum(1 for c in self._clients if not (len(c.seq) == models and all(s >= target for s in c.seq.values())))
+                behind = sum(1 for c in self._clients if not caught_up(c))
                 raise TimeoutError(f"{behind}/{len(self._clients)} clients did not reach seq {target}")
             await asyncio.sleep(0.01)
 

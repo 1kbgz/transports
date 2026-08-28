@@ -87,6 +87,32 @@ Disabling deflate improves every measured axis on loopback, and cuts idle memory
 2.7× — the single most effective configuration change for a high-fan-out deployment where
 bandwidth is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.
 
+## Multi-tenant hub
+
+The hub benchmark (`benchmarks/test_hub_fanout.py`) measures the two-tier `Hub` path in the
+csp-gateway shape: T tenants, one connection each, P private models per tenant (its own session)
+plus S shared models every tenant subscribes to. `TRANSPORTS_BENCH_HUB=tenants:private:shared`
+sets the scale and `TRANSPORTS_BENCH_HUB_MODE` selects the published class. At 1,000 tenants × 2
+private × 5 shared on the recording machine:
+
+| Published class | Fleet completion | Delivery p50 | Delivery p99 | CPU per 1k-subscriber fan-out | Server CPU | RSS growth per tenant |
+| --------------- | ---------------: | -----------: | -----------: | ----------------------------: | ---------: | --------------------: |
+| shared only     |           272 ms |        64 ms |       105 ms |                       0.57 ms |        48% |                 24 KB |
+| private only    |           808 ms |        40 ms |       114 ms |                      (7.2 ms) |        85% |                201 KB |
+| mixed           |           883 ms |        71 ms |       183 ms |                        2.0 ms |        80% |                112 KB |
+
+The shared (broadcast) tier meets the fan-out budget. The private tier's parenthesized number is
+not a like-for-like budget comparison: each private patch has exactly one subscriber, so the cost
+is per *unique* patch (~36 µs each: per-tenant drain, diff, encode, send — nothing can share
+encoded bytes across tenants). Bringing that down is the next optimization target. Two hub-path
+fixes landed with this benchmark: the per-tenant flush no longer rescans the connection map per
+tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once per
+connection — together worth ~24% CPU on the shared tier and ~12% on the private tier at this
+scale.
+
+Private-tier memory grows with each tenant's bounded resume logs (512 patches per model by
+default); `Session(log_cap=...)` tunes the retention/memory trade for large-tenant deployments.
+
 ## Recorded workload
 
 These ranges come from two clean runs recorded on August 27, 2026:
