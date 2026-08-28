@@ -21,7 +21,7 @@ from .transports import Store as _CoreStore, apply as _apply, diff as _diff
 
 
 class Session:
-    def __init__(self) -> None:
+    def __init__(self, *, log_cap: int = 512) -> None:
         self._store = _CoreStore()
         self._models: dict[int, Any] = {}
         self._schemas: dict[str, dict] = {}
@@ -30,7 +30,7 @@ class Session:
         self.outbox: list[tuple[int, dict]] = []
         self._on_patch: Callable[[int, dict], None] | None = None
         self._log: dict[int, list[tuple[int, dict]]] = {}  # per-model replay log of (rev, patch), bounded
-        self._log_cap = 512  # patches retained per model for resume; older are evicted (resume → snapshot)
+        self._log_cap = log_cap  # patches retained per model for resume; older are evicted (resume → snapshot)
         #: why the last `submit` was rejected (None after a successful submit) — the model's validation
         #: message where available, so callers can put it on the wire (the `reject` frame)
         self.reject_reason: str | None = None

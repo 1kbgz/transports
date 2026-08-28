@@ -313,11 +313,15 @@ class Hub:
         `Server._flush_tagged`). Shared ids live above ``SHARED_ID_BASE``, so a connection's tenant
         and shared tags never collide."""
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
+        # invert the conn->tenant map once: scanning it per tenant is O(tenants^2) at scale
+        conns_by_key: dict[Any, list[Any]] = {}
+        for c, k in self._conn_key.items():
+            conns_by_key.setdefault(k, []).append(c)
         for key, sess in self._tenants.items():
             drained = sess.drain()
             if not drained:
                 continue
-            conns = [c for c, k in self._conn_key.items() if k == key]
+            conns = conns_by_key.get(key)
             if not conns:
                 continue
             # encode once per codec, not once per connection (see Server.flush)
@@ -432,4 +436,14 @@ class Hub:
     def _fanout(self, sid: int, fan: dict) -> dict[Any, list[Wire]]:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
-        return {c: [self._encode_for(c, msg)] for c, k in self._conn_key.items() if k in sh.subs}
+        # encode once per codec, not once per connection (see Server.flush)
+        encoded: dict[str, list[Wire]] = {}
+        out: dict[Any, list[Wire]] = {}
+        for c, k in self._conn_key.items():
+            if k not in sh.subs:
+                continue
+            codec = self._codecs.get(c, self.default_codec)
+            if codec not in encoded:
+                encoded[codec] = [protocol.encode(msg, codec)]
+            out[c] = encoded[codec]
+        return out
