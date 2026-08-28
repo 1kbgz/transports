@@ -37,6 +37,8 @@ def main() -> None:
     parser.add_argument("--port", type=int, required=True)
     parser.add_argument("--models", type=int, default=1)
     parser.add_argument("--loop", choices=("asyncio", "uvloop", "rsloop"), default="asyncio")
+    parser.add_argument("--ws-deflate", type=int, choices=(0, 1), default=1)
+    parser.add_argument("--flush-interval", type=float, default=0.01)
     args = parser.parse_args()
 
     if args.loop == "uvloop":
@@ -107,9 +109,16 @@ def main() -> None:
     )
 
     async def serve() -> None:
-        sync = asyncio.get_running_loop().create_task(transports.autosync(server))
+        sync = asyncio.get_running_loop().create_task(transports.autosync(server, interval=args.flush_interval))
         lag = asyncio.get_running_loop().create_task(lag_sampler())
-        config = uvicorn.Config(app, host="127.0.0.1", port=args.port, log_level="error", ws_max_queue=4096)
+        config = uvicorn.Config(
+            app,
+            host="127.0.0.1",
+            port=args.port,
+            log_level="error",
+            ws_max_queue=4096,
+            ws_per_message_deflate=bool(args.ws_deflate),
+        )
         await uvicorn.Server(config).serve()
         sync.cancel()
         lag.cancel()
