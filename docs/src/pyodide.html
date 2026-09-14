@@ -276,8 +276,8 @@ to send a client proposal through the authoritative server.</p>
 <section id="connect-to-a-live-server">
 <h2>Connect to a live server<a class="headerlink" href="#connect-to-a-live-server" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">Client.connect</span></code> and <code class="docutils literal notranslate"><span class="pre">Client.connect_sse</span></code> detect Pyodide (<code class="docutils literal notranslate"><span class="pre">sys.platform</span> <span class="pre">==</span> <span class="pre">&quot;emscripten&quot;</span></code>) and ride
-the browser’s native <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code> / <code class="docutils literal notranslate"><span class="pre">EventSource</span></code> through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI — the <code class="docutils literal notranslate"><span class="pre">websockets</span></code> and <code class="docutils literal notranslate"><span class="pre">httpx</span></code>
-libraries need raw sockets, which the browser does not give Python. The API is unchanged:</p>
+the browser’s native <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code> / <code class="docutils literal notranslate"><span class="pre">EventSource</span></code> through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI, because the <code class="docutils literal notranslate"><span class="pre">websockets</span></code> and
+<code class="docutils literal notranslate"><span class="pre">httpx</span></code> libraries need raw sockets and the browser does not give Python any. The API is unchanged:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
 <span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"msgpack"</span><span class="p">)</span>
@@ -285,8 +285,8 @@ libraries need raw sockets, which the browser does not give Python. The API is u
 </pre></div>
 </div>
 <p>Snapshots and patches update the mirror as they arrive; register <code class="docutils literal notranslate"><span class="pre">client.on_change</span></code> /
-<code class="docutils literal notranslate"><span class="pre">client.on_reject</span></code> to react. <code class="docutils literal notranslate"><span class="pre">Client.run</span></code> works the same way — reconnecting with <code class="docutils literal notranslate"><span class="pre">?since=</span></code> resume
-whenever the socket drops, with both <code class="docutils literal notranslate"><span class="pre">authority</span></code> modes (a client-authoritative mirror pushes its
+<code class="docutils literal notranslate"><span class="pre">client.on_reject</span></code> to react. <code class="docutils literal notranslate"><span class="pre">Client.run</span></code> works the same way. It reconnects with <code class="docutils literal notranslate"><span class="pre">?since=</span></code> resume
+whenever the socket drops, and both <code class="docutils literal notranslate"><span class="pre">authority</span></code> modes work (a client-authoritative mirror pushes its
 state back over the browser socket after the server re-snapshots).</p>
 </section>
 <section id="run-the-browser-test">
@@ -301,11 +301,11 @@ after changing Python or Rust code.</p>
 </section>
 <section id="use-the-jupyter-widget">
 <h2>Use the Jupyter widget<a class="headerlink" href="#use-the-jupyter-widget" title="Link to this heading">¶</a></h2>
-<p><code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds a turnkey <a class="reference external" href="https://anywidget.dev">anywidget</a>: display it and every
+<p><code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds an <a class="reference external" href="https://anywidget.dev">anywidget</a>. Display it and every
 hosted model mirrors live in the notebook frontend, updating on each <code class="docutils literal notranslate"><span class="pre">transports.sync(server)</span></code>. The
-frontend ships inside the wheel (<code class="docutils literal notranslate"><span class="pre">transports/extension/cdn/widget.js</span></code>) — mirroring and edits are pure
+frontend ships inside the wheel (<code class="docutils literal notranslate"><span class="pre">transports/extension/cdn/widget.js</span></code>). Mirroring and edits are pure
 TypeScript, so it never fetches wasm. Custom frontends hook the bubbled <code class="docutils literal notranslate"><span class="pre">transports-change</span></code> /
-<code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events or use <code class="docutils literal notranslate"><span class="pre">el.transports</span> <span class="pre">=</span> <span class="pre">{client,</span> <span class="pre">edit}</span></code> —
+<code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events or use <code class="docutils literal notranslate"><span class="pre">el.transports</span> <span class="pre">=</span> <span class="pre">{client,</span> <span class="pre">edit}</span></code>.
 <code class="docutils literal notranslate"><span class="pre">el.transports.edit(id,</span> <span class="pre">[&quot;brightness&quot;],</span> <span class="pre">75)</span></code> sends a wasm-free server-authoritative proposal, and a
 value the model rejects surfaces inline through the <code class="docutils literal notranslate"><span class="pre">reject</span></code> frame.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
@@ -320,31 +320,32 @@ value the model rejects surfaces inline through the <code class="docutils litera
 </section>
 <section id="run-it-all-in-jupyterlite">
 <h2>Run it all in JupyterLite<a class="headerlink" href="#run-it-all-in-jupyterlite" title="Link to this heading">¶</a></h2>
-<p>Both ends WebAssembly: the Pyodide kernel hosts the <code class="docutils literal notranslate"><span class="pre">Session</span></code>, the widget frontend mirrors it —
-no server, no sockets. A hosted build publishes with these docs at
-<a class="reference external" href="https://1kbgz.github.io/transports/lite/">/transports/lite/</a> — open <code class="docutils literal notranslate"><span class="pre">lab/index.html</span></code> →
+<p>Both ends run in WebAssembly: the Pyodide kernel hosts the <code class="docutils literal notranslate"><span class="pre">Session</span></code> and the widget frontend
+mirrors it, with no server and no sockets. A hosted build publishes with these docs at
+<a class="reference external" href="https://1kbgz.github.io/transports/lite/">/transports/lite/</a>. Open <code class="docutils literal notranslate"><span class="pre">lab/index.html</span></code>, then
 <code class="docutils literal notranslate"><span class="pre">transports-demo.ipynb</span></code>.</p>
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>make<span class="w"> </span>jupyterlite<span class="w">        </span><span class="c1"># builds the site into dist/lite (wheel + demo notebook included)</span>
 make<span class="w"> </span>test-jupyterlite<span class="w">   </span><span class="c1"># or: drive the site's REPL in Chromium end-to-end</span>
 </pre></div>
 </div>
 <p>Serve <code class="docutils literal notranslate"><span class="pre">dist/lite</span></code> from any static host. The transports wheel installs from the site’s own wheel
-index (<code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code> — or from PyPI, which carries the Pyodide wheel since v0.7.0);
-<code class="docutils literal notranslate"><span class="pre">anywidget</span></code> comes from PyPI. Widget <strong>frontend</strong> extensions cannot be <code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span></code>ed at runtime —
-the site build bundles them (<code class="docutils literal notranslate"><span class="pre">jupyterlab_widgets</span></code> for the ipywidgets manager plus <code class="docutils literal notranslate"><span class="pre">anywidget</span></code>; see
-the <code class="docutils literal notranslate"><span class="pre">jupyterlite</span></code> Make target). A Lite site built without them shows the widget’s text repr instead
-of the live view.</p>
+index with <code class="docutils literal notranslate"><span class="pre">%pip</span> <span class="pre">install</span> <span class="pre">transports</span></code>, or from PyPI, which carries the Pyodide wheel since v0.7.0.
+<code class="docutils literal notranslate"><span class="pre">anywidget</span></code> comes from PyPI. Widget frontend extensions cannot be installed with <code class="docutils literal notranslate"><span class="pre">%pip</span></code> at runtime,
+so the site build bundles them (<code class="docutils literal notranslate"><span class="pre">jupyterlab_widgets</span></code> for the ipywidgets manager plus <code class="docutils literal notranslate"><span class="pre">anywidget</span></code>;
+see the <code class="docutils literal notranslate"><span class="pre">jupyterlite</span></code> Make target). A Lite site built without them shows the widget’s text repr
+instead of the live view.</p>
 <p><strong>If a previously visited site misbehaves after a redeploy</strong> (e.g. <code class="docutils literal notranslate"><span class="pre">FileNotFoundError</span></code> from an old
-wheel, or <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">WebAssembly</span> <span class="pre">stack</span> <span class="pre">switching</span> <span class="pre">not</span> <span class="pre">supported</span></code>): JupyterLite caches hard — a
-service worker plus browser storage can keep serving the previous build’s kernel and packages. Hard
+wheel, or <code class="docutils literal notranslate"><span class="pre">RuntimeError:</span> <span class="pre">WebAssembly</span> <span class="pre">stack</span> <span class="pre">switching</span> <span class="pre">not</span> <span class="pre">supported</span></code>): JupyterLite caches
+aggressively. A service worker plus browser storage can keep serving the previous build’s kernel
+and packages. Hard
 refresh (Cmd/Ctrl+Shift+R), or clear the site’s data (service worker + IndexedDB) and reload.</p>
 </section>
 <section id="host-in-a-sharedworker-one-host-many-tabs">
 <h2>Host in a SharedWorker (one host, many tabs)<a class="headerlink" href="#host-in-a-sharedworker-one-host-many-tabs" title="Link to this heading">¶</a></h2>
 <p>A page-local host dies with its tab. For one authoritative in-browser host serving every tab of an
-origin, run Pyodide inside a <strong>SharedWorker</strong>: each tab’s <code class="docutils literal notranslate"><span class="pre">MessagePort</span></code> is just another connection
-handle, exactly like a comm or a widget — the worker posts wire strings out and relays inbound
-proposals to <code class="docutils literal notranslate"><span class="pre">server.recv</span></code>.</p>
+origin, run Pyodide inside a <strong>SharedWorker</strong>: each tab’s <code class="docutils literal notranslate"><span class="pre">MessagePort</span></code> is another connection
+handle, like a comm or a widget. The worker posts wire strings out and relays inbound proposals to
+<code class="docutils literal notranslate"><span class="pre">server.recv</span></code>.</p>
 <p>In the worker (<code class="docutils literal notranslate"><span class="pre">host-worker.js</span></code>), load Pyodide, install transports, and wire ports to the server:</p>
 <div class="highlight-js notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">ports</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[];</span>
 <span class="nx">self</span><span class="p">.</span><span class="nx">onconnect</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">e</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
@@ -381,10 +382,10 @@ API applies:</p>
 <span class="c1">// propose an edit: worker.port.postMessage(client.edit(id, value))</span>
 </pre></div>
 </div>
-<p>The same shape works in a <strong>service worker</strong> for background persistence across navigations, and the
-worker can simultaneously hold an upstream <code class="docutils literal notranslate"><span class="pre">Client.run(url)</span></code> to a real server — making the tab mesh
-an edge cache of the authoritative model. Concurrency across many writers is the usual story: put
-shared state behind a <code class="docutils literal notranslate"><span class="pre">Hub</span></code> with a CRDT <code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code>.</p>
+<p>The same shape works in a <strong>service worker</strong> for persistence across navigations. The worker can also
+hold an upstream <code class="docutils literal notranslate"><span class="pre">Client.run(url)</span></code> to a real server, which makes the tabs an edge cache of the
+authoritative model. For many concurrent writers, put shared state behind a <code class="docutils literal notranslate"><span class="pre">Hub</span></code> with a CRDT
+<code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code>.</p>
 </section>
 <section id="deploy-the-example">
 <h2>Deploy the example<a class="headerlink" href="#deploy-the-example" title="Link to this heading">¶</a></h2>

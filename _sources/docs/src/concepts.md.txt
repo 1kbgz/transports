@@ -22,8 +22,8 @@ in one place:
 apply(old, diff(old, new)) == new
 ```
 
-The bridge code at the edge is deliberately thin. Python model libraries and JavaScript objects are
-converted into `Value`; after that, both languages use the same machinery.
+The bridge code at the edge is thin. Python model libraries and JavaScript objects are converted
+into `Value`, and after that both languages run the same Rust code.
 
 ## Why a `Value` layer?
 
@@ -37,9 +37,10 @@ protocol boundary, a custom codec, or a language-neutral client.
 
 ## Why server-owned revisions?
 
-A client edit is a proposal, not an optimistic local commit. The server applies the proposed ops,
-assigns the next revision, refreshes its hosted Python object, and echoes the authoritative patch to
-every connection. The origin updates from that echo just like every other client.
+A client edit is a proposal. The client does not commit it locally first. The server applies the
+proposed ops, assigns the next revision, refreshes its hosted Python object, and echoes the
+authoritative patch to every connection. The origin updates from that echo just like every other
+client.
 
 This avoids two common sync problems. First, clients do not invent revisions that later conflict with
 the server's sequence. Second, the server's hosted object cannot become stale after it accepts a

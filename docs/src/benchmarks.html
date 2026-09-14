@@ -250,10 +250,10 @@
           <section class="tex2jax_ignore mathjax_ignore" id="server-fan-out-benchmark-results">
 <h1>Server fan-out benchmark results<a class="headerlink" href="#server-fan-out-benchmark-results" title="Link to this heading">¶</a></h1>
 <p>The recorded baseline completes a full 50-update broadcast round to 250 clients × 20 streams in
-about 160 ms at a third of one CPU core, with delivery p99 under 40 ms. Fan-out <strong>coalesces</strong>:
-under load, a connection’s undelivered state is replaced by the newest revision per model and the
-drain cadence self-clocks to send capacity, so intermediate revisions collapse instead of queueing
-— every client still converges on the final revision of every stream, sooner.</p>
+about 160 ms at a third of one CPU core, with delivery p99 under 40 ms. Fan-out coalesces. Under
+load, a connection’s undelivered state is replaced by the newest revision per model and the drain
+cadence self-clocks to send capacity, so intermediate revisions collapse instead of queueing. Every
+client still converges on the final revision of every stream, and sooner.</p>
 <section id="latency-and-completion-time">
 <h2>Latency and completion time<a class="headerlink" href="#latency-and-completion-time" title="Link to this heading">¶</a></h2>
 <div class="table-wrapper colwidths-auto docutils container">
@@ -340,11 +340,11 @@ client; because only the newest revision of a model ships, every delivered patch
 </table>
 </div>
 <p>CPU is process CPU use, where 100% represents one fully occupied logical core. Revisions delivered
-below 100% is the coalescing design working, not data loss: transports synchronizes <em>state</em>, so a
+below 100% is coalescing at work rather than data loss. transports synchronizes state, so a
 connection’s undelivered patch for a model is replaced by a newer revision, and the autosync drain
 cadence stretches to match send capacity (<code class="docutils literal notranslate"><span class="pre">interval</span></code> is the floor, <code class="docutils literal notranslate"><span class="pre">max_interval</span></code> the ceiling).
-Every client still receives the final revision of every stream — the completion times above are
-the proof.</p>
+Every client still receives the final revision of every stream, which the completion times above
+confirm.</p>
 </section>
 <section id="session-budgets">
 <h2>Session budgets<a class="headerlink" href="#session-budgets" title="Link to this heading">¶</a></h2>
@@ -379,7 +379,7 @@ recording machine at 1,000 clients × 10 streams:</p>
 </tbody>
 </table>
 </div>
-<p>Thread flatness is asserted unconditionally on every run — a session must never cost a thread. The
+<p>Thread flatness is asserted on every run: a session must never cost a thread. The
 absolute budgets are opt-in (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BUDGETS=1</span></code>) because hosted CI runners are too noisy for
 stable thresholds; run them locally or on the recording machine. The fan-out CPU budget applies
 only at 250+ sessions (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BUDGET_FANOUT_MIN_SESSIONS</span></code>) where fixed per-publish cost
@@ -426,16 +426,16 @@ streams on the recording machine, ranges over two runs each:</p>
 </tbody>
 </table>
 </div>
-<p>With coalescing in place the loops converge on CPU. uvloop has the best delivery p99; rsloop the
-fastest fleet completion, but ~15% more fan-out CPU and ~70% more memory per idle session — the
-latter over the session budget. asyncio remains the default; uvloop is a reasonable choice where
-tail latency matters most. Re-measure on the deployment platform — these standings shift between
-macOS and Linux.</p>
+<p>With coalescing in place the loops converge on CPU. uvloop has the best delivery p99. rsloop has
+the fastest fleet completion but about 15% more fan-out CPU and about 70% more memory per idle
+session, which puts it over the session budget. asyncio remains the default. uvloop is a reasonable
+choice where tail latency matters most. Re-measure on the deployment platform, since these standings
+shift between macOS and Linux.</p>
 </section>
 <section id="permessage-deflate">
 <h2>Permessage-deflate<a class="headerlink" href="#permessage-deflate" title="Link to this heading">¶</a></h2>
-<p>WebSocket permessage-deflate compresses each frame <strong>per connection</strong> — encode-once sharing stops
-at the compression extension — and its zlib context dominates idle-session memory. At 1,000 × 10
+<p>WebSocket permessage-deflate compresses each frame per connection, so encode-once sharing stops at
+the compression extension, and its zlib context dominates idle-session memory. At 1,000 × 10
 with deflate disabled on the server (<code class="docutils literal notranslate"><span class="pre">TRANSPORTS_BENCH_WS_DEFLATE=0</span></code>, i.e. uvicorn’s
 <code class="docutils literal notranslate"><span class="pre">ws_per_message_deflate=False</span></code>):</p>
 <div class="table-wrapper colwidths-auto docutils container">
@@ -467,9 +467,9 @@ with deflate disabled on the server (<code class="docutils literal notranslate">
 </tbody>
 </table>
 </div>
-<p>Disabling deflate improves every measured axis on loopback, and cuts idle memory per session
-2.7× — the single most effective configuration change for a high-fan-out deployment where
-bandwidth is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.</p>
+<p>Disabling deflate improves every measured axis on loopback and cuts idle memory per session 2.7×.
+It is the most effective single configuration change for a high-fan-out deployment where bandwidth
+is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.</p>
 </section>
 <section id="multi-tenant-hub">
 <h2>Multi-tenant hub<a class="headerlink" href="#multi-tenant-hub" title="Link to this heading">¶</a></h2>
@@ -520,12 +520,12 @@ private × 5 shared on the recording machine:</p>
 </div>
 <p>The shared (broadcast) tier meets the fan-out budget. The private tier’s parenthesized number is
 not a like-for-like budget comparison: each private patch has exactly one subscriber, so the cost
-is per <em>unique</em> patch (~36 µs each: per-tenant drain, diff, encode, send — nothing can share
-encoded bytes across tenants). Bringing that down is the next optimization target. Two hub-path
-fixes landed with this benchmark: the per-tenant flush no longer rescans the connection map per
-tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once per
-connection — together worth ~24% CPU on the shared tier and ~12% on the private tier at this
-scale.</p>
+is per unique patch (about 36 µs each for per-tenant drain, diff, encode, and send; nothing can
+share encoded bytes across tenants). Bringing that down is the next optimization target. Two
+hub-path fixes landed with this benchmark: the per-tenant flush no longer rescans the connection
+map per tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once
+per connection. Together they are worth about 24% CPU on the shared tier and 12% on the private
+tier at this scale.</p>
 <p>Private-tier memory grows with each tenant’s bounded resume logs (512 patches per model by
 default); <code class="docutils literal notranslate"><span class="pre">Session(log_cap=...)</span></code> tunes the retention/memory trade for large-tenant deployments.</p>
 </section>

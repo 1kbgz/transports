@@ -312,20 +312,22 @@ resulting patches to all open connections.</p>
 <span class="p">});</span>
 </pre></div>
 </div>
-<p>To send an edit, propose it over the active connection — <code class="docutils literal notranslate"><span class="pre">connect()</span></code>/<code class="docutils literal notranslate"><span class="pre">run()</span></code> own the socket, so no
-socket handling is needed:</p>
+<p>To send an edit, propose it over the active connection. <code class="docutils literal notranslate"><span class="pre">connect()</span></code> and <code class="docutils literal notranslate"><span class="pre">run()</span></code> own the socket, so
+you do not handle it yourself:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
 <span class="nx">client</span><span class="p">.</span><span class="nx">propose</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}));</span><span class="w"> </span><span class="c1">// send(edit(id, value)) over the managed connection</span>
 </pre></div>
 </div>
-<p>The local mirror updates when the server echoes the authoritative patch (or <code class="docutils literal notranslate"><span class="pre">onReject</span></code> fires with
-why it was refused). <code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way — it is what an
-adapter hands its send callback, e.g. spaday’s <code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame when no managed connection is open (matching a
-browser WebSocket’s send on a closed socket, so they are safe fire-and-forget callbacks even across
-<code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect gaps); check <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> (or the return value) when delivery matters. With
-a hand-rolled socket, send <code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code> yourself as before.</p>
+<p>The local mirror updates when the server echoes the authoritative patch, or <code class="docutils literal notranslate"><span class="pre">onReject</span></code> fires with
+the reason the edit was refused. <code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way. It is
+what an adapter hands its send callback, for example spaday’s
+<code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame
+when no managed connection is open. This matches a browser WebSocket’s send on a closed socket, so
+they are safe as fire-and-forget callbacks even across <code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect gaps. Check
+<code class="docutils literal notranslate"><span class="pre">client.connected</span></code> (or the return value) when delivery matters. With a hand-rolled socket, send
+<code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code> yourself as before.</p>
 </section>
 <section id="mirror-the-server-in-python">
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
@@ -334,10 +336,10 @@ a hand-rolled socket, send <code class="docutils literal notranslate"><span clas
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Edits work the same as in JS: <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose(mid,</span> <span class="pre">value)</span></code> (or <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.send(frame)</span></code>)
-rides the active <code class="docutils literal notranslate"><span class="pre">connect()</span></code>/<code class="docutils literal notranslate"><span class="pre">run()</span></code> connection — native or Pyodide — returning <code class="docutils literal notranslate"><span class="pre">False</span></code> (dropped)
-when there is none, with <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> to check first; with a hand-rolled socket, send
-<code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> yourself.</p>
+<p>Edits work the same as in JS. <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose(mid,</span> <span class="pre">value)</span></code> (or <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.send(frame)</span></code>)
+rides the active <code class="docutils literal notranslate"><span class="pre">connect()</span></code> or <code class="docutils literal notranslate"><span class="pre">run()</span></code> connection, native or Pyodide. It returns <code class="docutils literal notranslate"><span class="pre">False</span></code> and drops
+the frame when there is none, so check <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> first when delivery matters. With a
+hand-rolled socket, send <code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> yourself.</p>
 </section>
 <section id="use-messagepack-on-a-connection">
 <h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>
@@ -403,15 +405,15 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 </section>
 <section id="use-anywidget-custom-messages">
 <h2>Use anywidget custom messages<a class="headerlink" href="#use-anywidget-custom-messages" title="Link to this heading">¶</a></h2>
-<p>For the common case, <code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> is turnkey: it builds an <code class="docutils literal notranslate"><span class="pre">anywidget.AnyWidget</span></code>
-whose frontend ships inside the wheel — display it and every hosted model mirrors live, with
-<code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events and a wasm-free <code class="docutils literal notranslate"><span class="pre">el.transports.edit</span></code> for
-proposals. See <a class="reference internal" href="pyodide.html"><span class="std std-doc">Pyodide</span></a> for details.</p>
+<p>For the common case, <code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds an <code class="docutils literal notranslate"><span class="pre">anywidget.AnyWidget</span></code> whose frontend
+ships inside the wheel. Display it and every hosted model mirrors live. The frontend emits
+<code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events and exposes a wasm-free <code class="docutils literal notranslate"><span class="pre">el.transports.edit</span></code>
+for proposals. See <a class="reference internal" href="pyodide.html"><span class="std std-doc">Pyodide</span></a> for details.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">w</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">widget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>   <span class="c1"># pip install anywidget</span>
 <span class="n">w</span>                               <span class="c1"># display; then mutate models + transports.sync(server)</span>
 </pre></div>
 </div>
-<p>For a custom frontend, <code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> wires any anywidget-style <code class="docutils literal notranslate"><span class="pre">send</span></code> / <code class="docutils literal notranslate"><span class="pre">on_msg</span></code> object — you
+<p>For a custom frontend, <code class="docutils literal notranslate"><span class="pre">serve_anywidget</span></code> wires any anywidget-style <code class="docutils literal notranslate"><span class="pre">send</span></code> / <code class="docutils literal notranslate"><span class="pre">on_msg</span></code> object. You
 supply the <code class="docutils literal notranslate"><span class="pre">_esm</span></code>. The frontend sends <code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true}</span></code> before snapshots are delivered.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">conn</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">serve_anywidget</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">widget</span><span class="p">)</span>
 

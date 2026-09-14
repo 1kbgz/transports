@@ -268,8 +268,8 @@ in one place:</p>
 <div class="highlight-text notranslate"><div class="highlight"><pre><span></span>apply(old, diff(old, new)) == new
 </pre></div>
 </div>
-<p>The bridge code at the edge is deliberately thin. Python model libraries and JavaScript objects are
-converted into <code class="docutils literal notranslate"><span class="pre">Value</span></code>; after that, both languages use the same machinery.</p>
+<p>The bridge code at the edge is thin. Python model libraries and JavaScript objects are converted
+into <code class="docutils literal notranslate"><span class="pre">Value</span></code>, and after that both languages run the same Rust code.</p>
 </section>
 <section id="why-a-value-layer">
 <h2>Why a <code class="docutils literal notranslate"><span class="pre">Value</span></code> layer?<a class="headerlink" href="#why-a-value-layer" title="Link to this heading">¶</a></h2>
@@ -282,9 +282,10 @@ protocol boundary, a custom codec, or a language-neutral client.</p>
 </section>
 <section id="why-server-owned-revisions">
 <h2>Why server-owned revisions?<a class="headerlink" href="#why-server-owned-revisions" title="Link to this heading">¶</a></h2>
-<p>A client edit is a proposal, not an optimistic local commit. The server applies the proposed ops,
-assigns the next revision, refreshes its hosted Python object, and echoes the authoritative patch to
-every connection. The origin updates from that echo just like every other client.</p>
+<p>A client edit is a proposal. The client does not commit it locally first. The server applies the
+proposed ops, assigns the next revision, refreshes its hosted Python object, and echoes the
+authoritative patch to every connection. The origin updates from that echo just like every other
+client.</p>
 <p>This avoids two common sync problems. First, clients do not invent revisions that later conflict with
 the server’s sequence. Second, the server’s hosted object cannot become stale after it accepts a
 remote edit.</p>
