@@ -72,8 +72,8 @@ ws.addEventListener("message", () => {
 });
 ```
 
-To send an edit, propose it over the active connection — `connect()`/`run()` own the socket, so no
-socket handling is needed:
+To send an edit, propose it over the active connection. `connect()` and `run()` own the socket, so
+you do not handle it yourself:
 
 ```ts
 import { toValue } from "1kbgz/transports";
@@ -82,13 +82,14 @@ const [id] = client.ids();
 client.propose(id, toValue({ tick: 10 })); // send(edit(id, value)) over the managed connection
 ```
 
-The local mirror updates when the server echoes the authoritative patch (or `onReject` fires with
-why it was refused). `client.send(frame)` sends any pre-built frame the same way — it is what an
-adapter hands its send callback, e.g. spaday's `connectStore(store, client, (f) => client.send(f),
-codec)`. Both return `false` and drop the frame when no managed connection is open (matching a
-browser WebSocket's send on a closed socket, so they are safe fire-and-forget callbacks even across
-`run()` reconnect gaps); check `client.connected` (or the return value) when delivery matters. With
-a hand-rolled socket, send `client.edit(id, value)` yourself as before.
+The local mirror updates when the server echoes the authoritative patch, or `onReject` fires with
+the reason the edit was refused. `client.send(frame)` sends any pre-built frame the same way. It is
+what an adapter hands its send callback, for example spaday's
+`connectStore(store, client, (f) => client.send(f), codec)`. Both return `false` and drop the frame
+when no managed connection is open. This matches a browser WebSocket's send on a closed socket, so
+they are safe as fire-and-forget callbacks even across `run()` reconnect gaps. Check
+`client.connected` (or the return value) when delivery matters. With a hand-rolled socket, send
+`client.edit(id, value)` yourself as before.
 
 ## Mirror the server in Python
 
@@ -99,10 +100,10 @@ client = transports.Client()
 await client.connect("ws://127.0.0.1:8000/ws")
 ```
 
-Edits work the same as in JS: `await client.propose(mid, value)` (or `await client.send(frame)`)
-rides the active `connect()`/`run()` connection — native or Pyodide — returning `False` (dropped)
-when there is none, with `client.connected` to check first; with a hand-rolled socket, send
-`client.edit(mid, value)` yourself.
+Edits work the same as in JS. `await client.propose(mid, value)` (or `await client.send(frame)`)
+rides the active `connect()` or `run()` connection, native or Pyodide. It returns `False` and drops
+the frame when there is none, so check `client.connected` first when delivery matters. With a
+hand-rolled socket, send `client.edit(mid, value)` yourself.
 
 ## Use MessagePack on a connection
 
@@ -181,17 +182,17 @@ The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON c
 
 ## Use anywidget custom messages
 
-For the common case, `transports.widget(server)` is turnkey: it builds an `anywidget.AnyWidget`
-whose frontend ships inside the wheel — display it and every hosted model mirrors live, with
-`transports-change` / `transports-reject` DOM events and a wasm-free `el.transports.edit` for
-proposals. See [Pyodide](pyodide.md) for details.
+For the common case, `transports.widget(server)` builds an `anywidget.AnyWidget` whose frontend
+ships inside the wheel. Display it and every hosted model mirrors live. The frontend emits
+`transports-change` / `transports-reject` DOM events and exposes a wasm-free `el.transports.edit`
+for proposals. See [Pyodide](pyodide.md) for details.
 
 ```python
 w = transports.widget(server)   # pip install anywidget
 w                               # display; then mutate models + transports.sync(server)
 ```
 
-For a custom frontend, `serve_anywidget` wires any anywidget-style `send` / `on_msg` object — you
+For a custom frontend, `serve_anywidget` wires any anywidget-style `send` / `on_msg` object. You
 supply the `_esm`. The frontend sends `{"ready": true}` before snapshots are delivered.
 
 ```python

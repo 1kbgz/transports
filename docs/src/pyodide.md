@@ -34,8 +34,8 @@ to send a client proposal through the authoritative server.
 ## Connect to a live server
 
 `Client.connect` and `Client.connect_sse` detect Pyodide (`sys.platform == "emscripten"`) and ride
-the browser's native `WebSocket` / `EventSource` through the `js` FFI — the `websockets` and `httpx`
-libraries need raw sockets, which the browser does not give Python. The API is unchanged:
+the browser's native `WebSocket` / `EventSource` through the `js` FFI, because the `websockets` and
+`httpx` libraries need raw sockets and the browser does not give Python any. The API is unchanged:
 
 ```python
 import transports
@@ -45,8 +45,8 @@ await client.connect("wss://example.com/ws")  # the browser's WebSocket under Py
 ```
 
 Snapshots and patches update the mirror as they arrive; register `client.on_change` /
-`client.on_reject` to react. `Client.run` works the same way — reconnecting with `?since=` resume
-whenever the socket drops, with both `authority` modes (a client-authoritative mirror pushes its
+`client.on_reject` to react. `Client.run` works the same way. It reconnects with `?since=` resume
+whenever the socket drops, and both `authority` modes work (a client-authoritative mirror pushes its
 state back over the browser socket after the server re-snapshots).
 
 ## Run the browser test
@@ -63,11 +63,11 @@ after changing Python or Rust code.
 
 ## Use the Jupyter widget
 
-`transports.widget(server)` builds a turnkey [anywidget](https://anywidget.dev): display it and every
+`transports.widget(server)` builds an [anywidget](https://anywidget.dev). Display it and every
 hosted model mirrors live in the notebook frontend, updating on each `transports.sync(server)`. The
-frontend ships inside the wheel (`transports/extension/cdn/widget.js`) — mirroring and edits are pure
+frontend ships inside the wheel (`transports/extension/cdn/widget.js`). Mirroring and edits are pure
 TypeScript, so it never fetches wasm. Custom frontends hook the bubbled `transports-change` /
-`transports-reject` DOM events or use `el.transports = {client, edit}` —
+`transports-reject` DOM events or use `el.transports = {client, edit}`.
 `el.transports.edit(id, ["brightness"], 75)` sends a wasm-free server-authoritative proposal, and a
 value the model rejects surfaces inline through the `reject` frame.
 
@@ -83,9 +83,9 @@ w                               # display; then mutate models + transports.sync(
 
 ## Run it all in JupyterLite
 
-Both ends WebAssembly: the Pyodide kernel hosts the `Session`, the widget frontend mirrors it —
-no server, no sockets. A hosted build publishes with these docs at
-[/transports/lite/](https://1kbgz.github.io/transports/lite/) — open `lab/index.html` →
+Both ends run in WebAssembly: the Pyodide kernel hosts the `Session` and the widget frontend
+mirrors it, with no server and no sockets. A hosted build publishes with these docs at
+[/transports/lite/](https://1kbgz.github.io/transports/lite/). Open `lab/index.html`, then
 `transports-demo.ipynb`.
 
 ```bash
@@ -94,23 +94,24 @@ make test-jupyterlite   # or: drive the site's REPL in Chromium end-to-end
 ```
 
 Serve `dist/lite` from any static host. The transports wheel installs from the site's own wheel
-index (`%pip install transports` — or from PyPI, which carries the Pyodide wheel since v0.7.0);
-`anywidget` comes from PyPI. Widget **frontend** extensions cannot be `%pip install`ed at runtime —
-the site build bundles them (`jupyterlab_widgets` for the ipywidgets manager plus `anywidget`; see
-the `jupyterlite` Make target). A Lite site built without them shows the widget's text repr instead
-of the live view.
+index with `%pip install transports`, or from PyPI, which carries the Pyodide wheel since v0.7.0.
+`anywidget` comes from PyPI. Widget frontend extensions cannot be installed with `%pip` at runtime,
+so the site build bundles them (`jupyterlab_widgets` for the ipywidgets manager plus `anywidget`;
+see the `jupyterlite` Make target). A Lite site built without them shows the widget's text repr
+instead of the live view.
 
 **If a previously visited site misbehaves after a redeploy** (e.g. `FileNotFoundError` from an old
-wheel, or `RuntimeError: WebAssembly stack switching not supported`): JupyterLite caches hard — a
-service worker plus browser storage can keep serving the previous build's kernel and packages. Hard
+wheel, or `RuntimeError: WebAssembly stack switching not supported`): JupyterLite caches
+aggressively. A service worker plus browser storage can keep serving the previous build's kernel
+and packages. Hard
 refresh (Cmd/Ctrl+Shift+R), or clear the site's data (service worker + IndexedDB) and reload.
 
 ## Host in a SharedWorker (one host, many tabs)
 
 A page-local host dies with its tab. For one authoritative in-browser host serving every tab of an
-origin, run Pyodide inside a **SharedWorker**: each tab's `MessagePort` is just another connection
-handle, exactly like a comm or a widget — the worker posts wire strings out and relays inbound
-proposals to `server.recv`.
+origin, run Pyodide inside a **SharedWorker**: each tab's `MessagePort` is another connection
+handle, like a comm or a widget. The worker posts wire strings out and relays inbound proposals to
+`server.recv`.
 
 In the worker (`host-worker.js`), load Pyodide, install transports, and wire ports to the server:
 
@@ -154,10 +155,10 @@ worker.port.start();
 // propose an edit: worker.port.postMessage(client.edit(id, value))
 ```
 
-The same shape works in a **service worker** for background persistence across navigations, and the
-worker can simultaneously hold an upstream `Client.run(url)` to a real server — making the tab mesh
-an edge cache of the authoritative model. Concurrency across many writers is the usual story: put
-shared state behind a `Hub` with a CRDT `MergeStrategy`.
+The same shape works in a **service worker** for persistence across navigations. The worker can also
+hold an upstream `Client.run(url)` to a real server, which makes the tabs an edge cache of the
+authoritative model. For many concurrent writers, put shared state behind a `Hub` with a CRDT
+`MergeStrategy`.
 
 ## Deploy the example
 

@@ -157,8 +157,8 @@ that model.
 
 `Client.recv()` (Python and JavaScript alike) returns `{t: "snapshot", id, rev}` for an accepted
 snapshot, the decoded patch message for an accepted patch, and `None`/`undefined` for an ignored
-revision or an unrecognized message type — unknown types are ignored, not errors, so a newer server
-can add message types without breaking older clients. Reactive adapters can consume the returned
+revision or an unrecognized message type. Unknown types are ignored rather than raised, so a newer
+server can add message types without breaking older clients. Reactive adapters can consume the returned
 patch paths without reading and decoding the complete mirror, either from the `recv()` return value
 or via `Client.on_change` / `Client.onChange`, which fires with the same accepted change under the
 managed connect/run/SSE paths. The returned change and `Client.value()` share immutable branches
@@ -167,10 +167,10 @@ an invalid path raises; failed frames leave the mirror and its accepted revision
 
 ### Reject
 
-The server refuses a proposed edit that fails validation — or a write to a shared model the tenant
-cannot write — by sending the proposer (and only the proposer) the authoritative revert followed by a
+The server refuses a proposed edit that fails validation (or a write to a shared model the tenant
+cannot write) by sending the proposer, and only the proposer, the authoritative revert followed by a
 typed reject saying why. `rev` is the server's current revision for the model, and `error` carries
-the model's validation message where available (e.g. pydantic's).
+the model's validation message where available, for example pydantic's.
 
 ```json
 {
@@ -182,8 +182,8 @@ the model's validation message where available (e.g. pydantic's).
 ```
 
 A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
-`Client.on_reject` / `Client.onReject` so an app can show *why* the edit died instead of a silent
-revert.
+`Client.on_reject` / `Client.onReject` so an app can show why the edit was refused instead of only
+reverting.
 
 ## Model ids
 

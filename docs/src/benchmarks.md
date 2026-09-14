@@ -1,10 +1,10 @@
 # Server fan-out benchmark results
 
 The recorded baseline completes a full 50-update broadcast round to 250 clients × 20 streams in
-about 160 ms at a third of one CPU core, with delivery p99 under 40 ms. Fan-out **coalesces**:
-under load, a connection's undelivered state is replaced by the newest revision per model and the
-drain cadence self-clocks to send capacity, so intermediate revisions collapse instead of queueing
-— every client still converges on the final revision of every stream, sooner.
+about 160 ms at a third of one CPU core, with delivery p99 under 40 ms. Fan-out coalesces. Under
+load, a connection's undelivered state is replaced by the newest revision per model and the drain
+cadence self-clocks to send capacity, so intermediate revisions collapse instead of queueing. Every
+client still converges on the final revision of every stream, and sooner.
 
 ## Latency and completion time
 
@@ -28,11 +28,11 @@ client; because only the newest revision of a model ships, every delivered patch
 |               250 | 31.5–31.9% | 86.1–86.2 MB |       17.9–20.1 ms |                5.0% |
 
 CPU is process CPU use, where 100% represents one fully occupied logical core. Revisions delivered
-below 100% is the coalescing design working, not data loss: transports synchronizes *state*, so a
+below 100% is coalescing at work rather than data loss. transports synchronizes state, so a
 connection's undelivered patch for a model is replaced by a newer revision, and the autosync drain
 cadence stretches to match send capacity (`interval` is the floor, `max_interval` the ceiling).
-Every client still receives the final revision of every stream — the completion times above are
-the proof.
+Every client still receives the final revision of every stream, which the completion times above
+confirm.
 
 ## Session budgets
 
@@ -47,7 +47,7 @@ recording machine at 1,000 clients × 10 streams:
 | CPU per state fan-out to 1k subscribers |   < 1 ms | 0.16–0.19 ms |
 | Thread growth across 1,000 connects     |        0 |            0 |
 
-Thread flatness is asserted unconditionally on every run — a session must never cost a thread. The
+Thread flatness is asserted on every run: a session must never cost a thread. The
 absolute budgets are opt-in (`TRANSPORTS_BUDGETS=1`) because hosted CI runners are too noisy for
 stable thresholds; run them locally or on the recording machine. The fan-out CPU budget applies
 only at 250+ sessions (`TRANSPORTS_BUDGET_FANOUT_MIN_SESSIONS`) where fixed per-publish cost
@@ -65,16 +65,16 @@ streams on the recording machine, ranges over two runs each:
 | uvloop  |       264–274 ms |     83–92 ms |   128–137 ms |                  0.18–0.19 ms |              73.2 KB |
 | rsloop  |       215–216 ms |     80–83 ms |   219–224 ms |                       0.21 ms |               124 KB |
 
-With coalescing in place the loops converge on CPU. uvloop has the best delivery p99; rsloop the
-fastest fleet completion, but ~15% more fan-out CPU and ~70% more memory per idle session — the
-latter over the session budget. asyncio remains the default; uvloop is a reasonable choice where
-tail latency matters most. Re-measure on the deployment platform — these standings shift between
-macOS and Linux.
+With coalescing in place the loops converge on CPU. uvloop has the best delivery p99. rsloop has
+the fastest fleet completion but about 15% more fan-out CPU and about 70% more memory per idle
+session, which puts it over the session budget. asyncio remains the default. uvloop is a reasonable
+choice where tail latency matters most. Re-measure on the deployment platform, since these standings
+shift between macOS and Linux.
 
 ## Permessage-deflate
 
-WebSocket permessage-deflate compresses each frame **per connection** — encode-once sharing stops
-at the compression extension — and its zlib context dominates idle-session memory. At 1,000 × 10
+WebSocket permessage-deflate compresses each frame per connection, so encode-once sharing stops at
+the compression extension, and its zlib context dominates idle-session memory. At 1,000 × 10
 with deflate disabled on the server (`TRANSPORTS_BENCH_WS_DEFLATE=0`, i.e. uvicorn's
 `ws_per_message_deflate=False`):
 
@@ -83,9 +83,9 @@ with deflate disabled on the server (`TRANSPORTS_BENCH_WS_DEFLATE=0`, i.e. uvico
 | deflate on    |       339–345 ms |     63–68 ms |   184–192 ms |                  0.18–0.19 ms |              73.7 KB |
 | deflate off   |           260 ms |        51 ms |       110 ms |                       0.15 ms |          **26.8 KB** |
 
-Disabling deflate improves every measured axis on loopback, and cuts idle memory per session
-2.7× — the single most effective configuration change for a high-fan-out deployment where
-bandwidth is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.
+Disabling deflate improves every measured axis on loopback and cuts idle memory per session 2.7×.
+It is the most effective single configuration change for a high-fan-out deployment where bandwidth
+is cheaper than CPU and RAM. Keep it enabled where the network is the constraint.
 
 ## Multi-tenant hub
 
@@ -103,12 +103,12 @@ private × 5 shared on the recording machine:
 
 The shared (broadcast) tier meets the fan-out budget. The private tier's parenthesized number is
 not a like-for-like budget comparison: each private patch has exactly one subscriber, so the cost
-is per *unique* patch (~36 µs each: per-tenant drain, diff, encode, send — nothing can share
-encoded bytes across tenants). Bringing that down is the next optimization target. Two hub-path
-fixes landed with this benchmark: the per-tenant flush no longer rescans the connection map per
-tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once per
-connection — together worth ~24% CPU on the shared tier and ~12% on the private tier at this
-scale.
+is per unique patch (about 36 µs each for per-tenant drain, diff, encode, and send; nothing can
+share encoded bytes across tenants). Bringing that down is the next optimization target. Two
+hub-path fixes landed with this benchmark: the per-tenant flush no longer rescans the connection
+map per tenant (it was O(tenants²)), and shared-model writes encode once per codec instead of once
+per connection. Together they are worth about 24% CPU on the shared tier and 12% on the private
+tier at this scale.
 
 Private-tier memory grows with each tenant's bounded resume logs (512 patches per model by
 default); `Session(log_cap=...)` tunes the retention/memory trade for large-tenant deployments.
