@@ -39,7 +39,7 @@ class StuckConn(FakeConn):
         await asyncio.Event().wait()
 
 
-def test_websocket_direct_reply_queues_behind_an_inflight_patch():
+def test_starlette_websocket_direct_reply_queues_behind_an_inflight_patch():
     class GatedWebSocket(FakeConn):
         def __init__(self) -> None:
             super().__init__()
@@ -114,7 +114,7 @@ def test_websocket_direct_reply_queues_behind_an_inflight_patch():
     asyncio.run(scenario())
 
 
-def test_dropped_websocket_cannot_reenter_queue_with_rejected_proposals():
+def test_starlette_dropped_websocket_cannot_reenter_queue_with_rejected_proposals():
     class FakeWebSocket(FakeConn):
         def __init__(self) -> None:
             super().__init__()
@@ -166,7 +166,7 @@ def test_dropped_websocket_cannot_reenter_queue_with_rejected_proposals():
     asyncio.run(scenario())
 
 
-def test_direct_reply_does_not_drop_a_healthy_wide_burst():
+def test_starlette_direct_reply_does_not_drop_a_healthy_wide_burst():
     class GatedWebSocket(FakeConn):
         def __init__(self) -> None:
             super().__init__()
