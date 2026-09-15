@@ -400,7 +400,7 @@ replay log can’t bridge the gap. So a reconnecting client replays the delta, n
 <p>A client patch is a <em>proposal</em>: the server applies it, bumps its own authoritative <cite>rev</cite>, and
 echoes the resulting patch to <strong>every</strong> connection (including the origin), each in that
 connection’s codec. Models are server-authoritative — a client’s mirror updates when this echo
-arrives, not optimistically.</p>
+arrives, not optimistically. Pending host patches are returned before the proposal reply.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -586,20 +586,21 @@ over the relevant widgets.</p>
 <p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
 client. The async counterpart of <cite>sync</cite> — use this for socket backends (WebSocket/SSE) driven by an
 event loop, and <cite>sync</cite> for the synchronous ones (Jupyter comm/anywidget).</p>
-<p>Each connection’s undelivered messages live in a per-model map, and <strong>state coalesces</strong>: a
+<p>Each connection’s undelivered state patches live in a per-model map, and <strong>state coalesces</strong>: a
 newer revision of a model <em>replaces</em> that connection’s undelivered one (state semantics —
 clients need the newest revision, not the history), so a slow consumer’s backlog is bounded
-by its model count and it always receives fresh data. Non-coalescible messages (batch
-envelopes) accumulate under unique keys instead.</p>
+by its model count and it always receives fresh data. Non-coalescible messages (batch envelopes
+and direct replies) accumulate under unique keys instead.</p>
 <p>Delivery runs on a fixed pool of <code class="docutils literal notranslate"><span class="pre">shards</span></code> writer tasks, each serially draining its share of
 connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
 CPU regression at 1000 connections: task-scheduling churn, and no drain-rate feedback). The
-flush loop itself never awaits a socket. Two slow-consumer policies bound the pathological
-cases: a connection still holding more than <code class="docutils literal notranslate"><span class="pre">max_queue</span></code> undelivered messages from previous
-flushes — even after coalescing — is disconnected, and a connection whose send makes no
-progress for <code class="docutils literal notranslate"><span class="pre">stall_timeout</span></code> seconds (a wedged socket, which would stall its shard) is cut
-by a watchdog. A disconnected client’s reconnect resumes from its last revision via
-<code class="docutils literal notranslate"><span class="pre">open(since=...)</span></code>.</p>
+flush loop itself never awaits a socket. Direct replies from <cite>ws_endpoint</cite> enter the same queue,
+preserving revision order without making the receive loop wait on every recipient. Two
+slow-consumer policies bound the pathological cases: a connection still holding more than
+<code class="docutils literal notranslate"><span class="pre">max_queue</span></code> undelivered messages from previous flushes — even after coalescing — is disconnected,
+and a connection whose send makes no progress for <code class="docutils literal notranslate"><span class="pre">stall_timeout</span></code> seconds (a wedged socket, which
+would stall its shard) is cut by a watchdog. A disconnected client’s reconnect resumes from its
+last revision via <code class="docutils literal notranslate"><span class="pre">open(since=...)</span></code>.</p>
 </dd></dl>
 
 <dl class="py function">
@@ -689,7 +690,8 @@ and its subscribed shared models. With <code class="docutils literal notranslate
 <p>A patch to a private model is applied as the server (the tenant’s session owns <cite>rev</cite>) and the
 authoritative patch is broadcast to <em>all</em> of that tenant’s connections. A patch to a shared
 model (from a <cite>WRITE</cite> subscriber) is merged into the authoritative value and broadcast to
-every subscriber connection. Both paths are server-authoritative (origin included).</p>
+every subscriber connection. Both paths are server-authoritative (origin included), with
+pending host patches returned before the proposal reply.</p>
 </dd></dl>
 
 <dl class="py method">
