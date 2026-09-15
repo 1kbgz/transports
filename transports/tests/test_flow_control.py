@@ -2,7 +2,7 @@
 
 The flush loop never awaits a socket — each connection's undelivered messages live in a per-model
 map drained by its own writer task — so one backpressured client cannot stall the broadcast. State
-coalesces (a newer revision replaces the undelivered one), bounding a slow consumer's backlog by
+coalesces (new revisions compose into one undelivered patch), bounding a slow consumer's backlog by
 its model count; a connection whose backlog exceeds ``max_queue`` even after coalescing is
 disconnected (its reconnect resumes from its last revision via ``open(since=)``).
 """
@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 
+import pytest
 from pydantic import BaseModel
 
 import transports
@@ -21,9 +22,15 @@ class Counter(BaseModel):
     n: int = 0
 
 
+class Pair(BaseModel):
+    x: int = 0
+    y: int = 0
+    items: list[int] = []
+
+
 class FakeConn:
     def __init__(self) -> None:
-        self.sent: list[str] = []
+        self.sent: list[str | bytes] = []
 
     async def send_text(self, msg: str) -> None:
         self.sent.append(msg)
@@ -336,6 +343,62 @@ def test_coalescing_delivers_the_newest_revision():
             ops = json.loads(gated.sent[-1])["patch"]["ops"]
             assert {"Set": {"path": [{"Key": "n"}], "value": {"Int": 3}}} in ops
         finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
+def test_coalescing_preserves_ops_from_every_revision(codec):
+    class GatedConn(FakeConn):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gate = asyncio.Event()
+            self.started = asyncio.Event()
+
+        async def send_text(self, msg: str) -> None:
+            self.started.set()
+            await self.gate.wait()
+            self.sent.append(msg)
+
+        async def send_bytes(self, msg: bytes) -> None:
+            self.started.set()
+            await self.gate.wait()
+            self.sent.append(msg)
+
+    async def scenario() -> None:
+        session = transports.Session()
+        blocker = Counter()
+        session.host(blocker)
+        model = Pair()
+        mid = session.host(model)
+        server = transports.Server(session)
+        conn = GatedConn()
+        client = transports.Client(codec=codec)
+        for frame in server.open(conn, codec=codec):
+            client.recv(frame)
+
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001))
+        try:
+            blocker.n = 1
+            model.x = 1
+            model.items.append(1)
+            await asyncio.wait_for(conn.started.wait(), timeout=1)
+            model.y = 1
+            model.items.append(2)
+            await asyncio.sleep(0.01)
+            conn.gate.set()
+            for _ in range(100):
+                if len(conn.sent) == 2:
+                    break
+                await asyncio.sleep(0.001)
+
+            target_frames = [frame for frame in conn.sent if transports.protocol.decode(frame, codec)["id"] == mid]
+            assert len(target_frames) == 1
+            client.recv(target_frames[0])
+            assert client.model(mid, Pair) == Pair(x=1, y=1, items=[1, 2])
+        finally:
+            conn.gate.set()
             sync_task.cancel()
 
     asyncio.run(scenario())
