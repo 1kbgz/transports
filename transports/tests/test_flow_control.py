@@ -10,6 +10,7 @@ disconnected (its reconnect resumes from its last revision via ``open(since=)``)
 from __future__ import annotations
 
 import asyncio
+import json
 
 from pydantic import BaseModel
 
@@ -36,6 +37,198 @@ class StuckConn(FakeConn):
 
     async def send_text(self, msg: str) -> None:
         await asyncio.Event().wait()
+
+
+def test_websocket_direct_reply_queues_behind_an_inflight_patch():
+    class GatedWebSocket(FakeConn):
+        def __init__(self) -> None:
+            super().__init__()
+            self.query_params = {}
+            self.incoming: asyncio.Queue[dict] = asyncio.Queue()
+            self.gate = asyncio.Event()
+            self.started = asyncio.Event()
+            self.snapshots_ready = asyncio.Event()
+            self.proposal_taken = asyncio.Event()
+
+        async def accept(self) -> None:
+            pass
+
+        async def receive(self) -> dict:
+            frame = await self.incoming.get()
+            if frame.get("text") is not None:
+                self.proposal_taken.set()
+            return frame
+
+        async def send_text(self, msg: str) -> None:
+            decoded = json.loads(msg)
+            if decoded["t"] == "patch" and not self.started.is_set():
+                self.started.set()
+                await self.gate.wait()
+            self.sent.append(msg)
+            if sum(json.loads(frame)["t"] == "snapshot" for frame in self.sent) == 2:
+                self.snapshots_ready.set()
+
+    async def scenario() -> None:
+        session = transports.Session()
+        blocker = Counter()
+        session.host(blocker)
+        model = Counter()
+        mid = session.host(model)
+        server = transports.Server(session)
+        conn = GatedWebSocket()
+        endpoint = transports.ws_endpoint(server)
+
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001))
+        endpoint_task = asyncio.get_running_loop().create_task(endpoint(conn))
+        try:
+            await asyncio.wait_for(conn.snapshots_ready.wait(), timeout=1)
+            blocker.n = 1
+            model.n = 1
+            await asyncio.wait_for(conn.started.wait(), timeout=1)
+
+            proposal = transports.protocol.patch_msg(
+                mid,
+                {"rev": 2, "ops": [{"Set": {"path": [{"Key": "n"}], "value": {"Int": 2}}}]},
+            )
+            await conn.incoming.put({"text": proposal})
+            await asyncio.wait_for(conn.proposal_taken.wait(), timeout=1)
+            await asyncio.sleep(0)
+            model.n = 3
+            await asyncio.sleep(0.01)
+            conn.gate.set()
+            for _ in range(100):
+                target_revs = [
+                    message["patch"]["rev"] for frame in conn.sent if (message := json.loads(frame))["t"] == "patch" and message["id"] == mid
+                ]
+                if len(target_revs) == 3:
+                    break
+                await asyncio.sleep(0.001)
+
+            assert target_revs == [1, 2, 3]
+        finally:
+            conn.gate.set()
+            await conn.incoming.put({"type": "websocket.disconnect"})
+            await endpoint_task
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_dropped_websocket_cannot_reenter_queue_with_rejected_proposals():
+    class FakeWebSocket(FakeConn):
+        def __init__(self) -> None:
+            super().__init__()
+            self.query_params = {}
+            self.incoming: asyncio.Queue[dict] = asyncio.Queue()
+            self.snapshot_ready = asyncio.Event()
+            self.proposals_taken = asyncio.Event()
+            self.proposals = 0
+
+        async def accept(self) -> None:
+            pass
+
+        async def receive(self) -> dict:
+            frame = await self.incoming.get()
+            if frame.get("text") is not None:
+                self.proposals += 1
+                if self.proposals == 3:
+                    self.proposals_taken.set()
+            return frame
+
+        async def send_text(self, msg: str) -> None:
+            self.sent.append(msg)
+            if json.loads(msg)["t"] == "snapshot":
+                self.snapshot_ready.set()
+
+    async def scenario() -> None:
+        session = transports.Session()
+        session.host(Counter())
+        server = transports.Server(session)
+        conn = FakeWebSocket()
+        endpoint = transports.ws_endpoint(server)
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001, shards=1))
+        endpoint_task = asyncio.get_running_loop().create_task(endpoint(conn))
+        try:
+            await asyncio.wait_for(conn.snapshot_ready.wait(), timeout=1)
+            server.close(conn)
+            invalid = transports.protocol.patch_msg(999, {"rev": 1, "ops": []})
+            for _ in range(3):
+                await conn.incoming.put({"text": invalid})
+            await asyncio.wait_for(conn.proposals_taken.wait(), timeout=1)
+            await asyncio.sleep(0.01)
+
+            assert [json.loads(frame)["t"] for frame in conn.sent] == ["snapshot"]
+        finally:
+            await conn.incoming.put({"type": "websocket.disconnect"})
+            await endpoint_task
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_direct_reply_does_not_drop_a_healthy_wide_burst():
+    class GatedWebSocket(FakeConn):
+        def __init__(self) -> None:
+            super().__init__()
+            self.query_params = {}
+            self.incoming: asyncio.Queue[dict] = asyncio.Queue()
+            self.gate = asyncio.Event()
+            self.started = asyncio.Event()
+            self.snapshots_ready = asyncio.Event()
+            self.proposal_taken = asyncio.Event()
+
+        async def accept(self) -> None:
+            pass
+
+        async def receive(self) -> dict:
+            frame = await self.incoming.get()
+            if frame.get("text") is not None:
+                self.proposal_taken.set()
+            return frame
+
+        async def send_text(self, msg: str) -> None:
+            decoded = json.loads(msg)
+            if decoded["t"] == "patch" and not self.started.is_set():
+                self.started.set()
+                await self.gate.wait()
+            self.sent.append(msg)
+            if sum(json.loads(frame)["t"] == "snapshot" for frame in self.sent) == 6:
+                self.snapshots_ready.set()
+
+    async def scenario() -> None:
+        session = transports.Session()
+        models = [Counter() for _ in range(6)]
+        mids = [session.host(model) for model in models]
+        server = transports.Server(session)
+        conn = GatedWebSocket()
+        endpoint = transports.ws_endpoint(server)
+        sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.05, max_queue=4, shards=1))
+        endpoint_task = asyncio.get_running_loop().create_task(endpoint(conn))
+        try:
+            await asyncio.wait_for(conn.snapshots_ready.wait(), timeout=1)
+            for model in models:
+                model.n = 1
+            await asyncio.wait_for(conn.started.wait(), timeout=1)
+
+            proposal = transports.protocol.patch_msg(
+                mids[0],
+                {"rev": 2, "ops": [{"Set": {"path": [{"Key": "n"}], "value": {"Int": 2}}}]},
+            )
+            await conn.incoming.put({"text": proposal})
+            await asyncio.wait_for(conn.proposal_taken.wait(), timeout=1)
+            await asyncio.sleep(0)
+
+            assert conn in server._codecs
+            conn.gate.set()
+            await asyncio.sleep(0.06)
+            assert conn in server._codecs
+        finally:
+            conn.gate.set()
+            await conn.incoming.put({"type": "websocket.disconnect"})
+            await endpoint_task
+            sync_task.cancel()
+
+    asyncio.run(scenario())
 
 
 def test_stuck_state_consumer_coalesces_instead_of_disconnecting():

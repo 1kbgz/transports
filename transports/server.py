@@ -14,12 +14,26 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 import asyncio
 import itertools
 import json
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from . import protocol
 from .session import Session
 
 Wire = str | bytes
+# `ws_endpoint` uses the active autosync queue for direct replies, so one writer orders every frame
+# for a connection. The server stays alive while autosync is registered, making its id stable here.
+_AUTOSYNC_ENQUEUE: dict[int, Callable[[dict[Any, list[Wire]]], None]] = {}
+
+
+def _enqueue_if_autosync(server: "Broadcaster", messages: dict[Any, list[Wire]]) -> bool:
+    enqueue = _AUTOSYNC_ENQUEUE.get(id(server))
+    if enqueue is None:
+        enqueue = _AUTOSYNC_ENQUEUE.get(id(getattr(server, "hub", None)))
+    if enqueue is None:
+        return False
+    enqueue(messages)
+    return True
 
 
 class Broadcaster(Protocol):
@@ -83,7 +97,7 @@ class Server:
         A client patch is a *proposal*: the server applies it, bumps its own authoritative `rev`, and
         echoes the resulting patch to **every** connection (including the origin), each in that
         connection's codec. Models are server-authoritative — a client's mirror updates when this echo
-        arrives, not optimistically.
+        arrives, not optimistically. Pending host patches are returned before the proposal reply.
         """
         msg = protocol.decode(data, self._codecs.get(conn))
         if msg.get("t") == "patch":
@@ -94,20 +108,26 @@ class Server:
                 # `reject` frame saying why (the model's validation message). The server stays up and other
                 # connections are untouched — a round-trip validation failure self-corrects.
                 error = self._session.reject_reason or "rejected"
-                snap = self._session.snapshot(msg["id"])
-                if snap is None:
+                try:
+                    snap = self._session.snapshot(msg["id"])
+                except KeyError:
                     reject = protocol.reject_msg(msg["id"], 0, error)
-                    return {conn: [self._encode_for(conn, reject)]}
-                revert = protocol.snapshot_msg(msg["id"], snap["type_name"], snap["rev"], snap["value"])
-                reject = protocol.reject_msg(msg["id"], snap["rev"], error)
-                return {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
-            relay = protocol.patch_msg(msg["id"], authoritative)
-            encoded: dict[str, list[Wire]] = {}
-            out: dict[Any, list[Wire]] = {}
-            for c, codec in self._codecs.items():
-                if codec not in encoded:
-                    encoded[codec] = [protocol.encode(relay, codec)]
-                out[c] = encoded[codec]
+                    direct = {conn: [self._encode_for(conn, reject)]}
+                else:
+                    revert = protocol.snapshot_msg(msg["id"], snap["type_name"], snap["rev"], snap["value"])
+                    reject = protocol.reject_msg(msg["id"], snap["rev"], error)
+                    direct = {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
+            else:
+                relay = protocol.patch_msg(msg["id"], authoritative)
+                encoded: dict[str, list[Wire]] = {}
+                direct = {}
+                for c, codec in self._codecs.items():
+                    if codec not in encoded:
+                        encoded[codec] = [protocol.encode(relay, codec)]
+                    direct[c] = encoded[codec]
+            out = {target: [wire for _, wire in tagged] for target, tagged in self._flush_tagged().items()}
+            for target, wires in direct.items():
+                out.setdefault(target, []).extend(wires)
             return out
         return {}
 
@@ -182,7 +202,10 @@ def ws_endpoint(server: Broadcaster):
                     data = frame.get("bytes")
                 if data is None:
                     continue
-                for conn, msgs in server.recv(websocket, data).items():
+                replies = server.recv(websocket, data)
+                if _enqueue_if_autosync(server, replies):
+                    continue
+                for conn, msgs in replies.items():
                     for msg in msgs:
                         await _send(conn, msg)
         except WebSocketDisconnect:
@@ -208,23 +231,25 @@ async def autosync(
     client. The async counterpart of `sync` — use this for socket backends (WebSocket/SSE) driven by an
     event loop, and `sync` for the synchronous ones (Jupyter comm/anywidget).
 
-    Each connection's undelivered messages live in a per-model map, and **state coalesces**: a
+    Each connection's undelivered state patches live in a per-model map, and **state coalesces**: a
     newer revision of a model *replaces* that connection's undelivered one (state semantics —
     clients need the newest revision, not the history), so a slow consumer's backlog is bounded
-    by its model count and it always receives fresh data. Non-coalescible messages (batch
-    envelopes) accumulate under unique keys instead.
+    by its model count and it always receives fresh data. Non-coalescible messages (batch envelopes
+    and direct replies) accumulate under unique keys instead.
 
     Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of
     connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
     CPU regression at 1000 connections: task-scheduling churn, and no drain-rate feedback). The
-    flush loop itself never awaits a socket. Two slow-consumer policies bound the pathological
-    cases: a connection still holding more than ``max_queue`` undelivered messages from previous
-    flushes — even after coalescing — is disconnected, and a connection whose send makes no
-    progress for ``stall_timeout`` seconds (a wedged socket, which would stall its shard) is cut
-    by a watchdog. A disconnected client's reconnect resumes from its last revision via
-    ``open(since=...)``.
+    flush loop itself never awaits a socket. Direct replies from `ws_endpoint` enter the same queue,
+    preserving revision order without making the receive loop wait on every recipient. Two
+    slow-consumer policies bound the pathological cases: a connection still holding more than
+    ``max_queue`` undelivered messages from previous flushes — even after coalescing — is disconnected,
+    and a connection whose send makes no progress for ``stall_timeout`` seconds (a wedged socket, which
+    would stall its shard) is cut by a watchdog. A disconnected client's reconnect resumes from its
+    last revision via ``open(since=...)``.
     """
     pending: dict[Any, dict[Any, Wire]] = {}  # per conn: model id (or unique key) -> newest undelivered wire
+    epochs: dict[Any, int] = {}  # barriers keep later coalesced state behind direct or batch frames
     nonce = itertools.count()  # keys for non-coalescible messages
 
     class _Shard:
@@ -245,9 +270,37 @@ async def autosync(
     def drop(conn: Any) -> None:
         server.close(conn)
         pending.pop(conn, None)
+        epochs.pop(conn, None)
         shard = shard_of.pop(conn, None)
         if shard is not None:
             shard.conns.discard(conn)
+
+    def enqueue(conn: Any, tagged: list[tuple[int | None, Wire]], *, coalesce: bool = True) -> None:
+        undelivered = pending.get(conn)
+        if undelivered is None:
+            undelivered = pending[conn] = {}
+            shard = min(pool, key=lambda candidate: len(candidate.conns))
+            shard.conns.add(conn)
+            shard_of[conn] = shard
+            if shard.task is None:
+                shard.task = asyncio.get_running_loop().create_task(write(shard))
+        epoch = epochs.get(conn, 0)
+        for mid, wire in tagged:
+            if coalesce and mid is not None:
+                key = (epoch, mid)
+            else:
+                key = (None, next(nonce))
+                epoch += 1
+            undelivered[key] = wire
+        epochs[conn] = epoch
+        shard = shard_of[conn]
+        shard.busy = True
+        shard.wake.set()
+
+    def enqueue_direct(messages: dict[Any, list[Wire]]) -> None:
+        for conn, wires in messages.items():
+            if conn in server._codecs:
+                enqueue(conn, [(None, wire) for wire in wires], coalesce=False)
 
     async def write(shard: _Shard) -> None:
         while True:
@@ -296,6 +349,10 @@ async def autosync(
                     shard.wake.set()
                 seen[index] = (shard.current, shard.count)
 
+    queue_key = id(server)
+    if queue_key in _AUTOSYNC_ENQUEUE:
+        raise RuntimeError("autosync is already running for this server")
+    _AUTOSYNC_ENQUEUE[queue_key] = enqueue_direct
     watchdog_task = asyncio.get_running_loop().create_task(watchdog())
     loop_time = asyncio.get_running_loop().time
     sleep_for = interval
@@ -320,34 +377,19 @@ async def autosync(
             if fanout_started is not None:
                 drained_at = max((shard.idle_at for shard in pool), default=fanout_started)
                 sleep_for = min(max(interval, 4 * (drained_at - fanout_started)), max_interval)
+            # Enforce the bound on work left from the previous tick, after healthy writers had
+            # a chance to drain. A single wide flush or an interleaved direct reply must not drop
+            # a consumer before its writer gets scheduled.
+            for conn in [c for c, undelivered in pending.items() if len(undelivered) > max_queue]:
+                drop(conn)
             for conn, tagged in server._flush_tagged().items():
-                undelivered = pending.get(conn)
-                if undelivered is None:
-                    undelivered = pending[conn] = {}
-                    shard = min(pool, key=lambda s: len(s.conns))
-                    shard.conns.add(conn)
-                    shard_of[conn] = shard
-                    if shard.task is None:
-                        shard.task = asyncio.get_running_loop().create_task(write(shard))
-                if len(undelivered) > max_queue:
-                    # the explicit slow-consumer policy: a client still holding more than
-                    # ``max_queue`` undelivered messages from *previous* flushes — even after
-                    # coalescing — is disconnected rather than buffered without bound.
-                    # (Checked before the merge, so a wide burst never drops a healthy
-                    # consumer that drains promptly.)
-                    drop(conn)
-                    continue
-                for mid, wire in tagged:
-                    # keyed by model id: an undelivered older revision is replaced in place
-                    # (coalescing), keeping a slow consumer's backlog bounded by model count
-                    undelivered[mid if mid is not None else (None, next(nonce))] = wire
-                shard = shard_of[conn]
-                shard.busy = True
-                shard.wake.set()
+                enqueue(conn, tagged)
             fanout_started = loop_time()
             for conn in [c for c in pending if c not in server._codecs]:
                 drop(conn)
     finally:
+        if _AUTOSYNC_ENQUEUE.get(queue_key) is enqueue_direct:
+            _AUTOSYNC_ENQUEUE.pop(queue_key)
         watchdog_task.cancel()
         for shard in pool:
             if shard.task is not None:
