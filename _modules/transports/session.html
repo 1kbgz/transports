@@ -392,6 +392,7 @@
 <span class="sd">        proposal is rejected — then `reject_reason` says why.</span>
 <span class="sd">        """</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">flush</span><span class="p">()</span>
         <span class="n">snap</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">snapshot</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">snap</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">reject_reason</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"unknown model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">"</span>
