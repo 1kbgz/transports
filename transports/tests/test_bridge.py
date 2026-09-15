@@ -102,6 +102,23 @@ def test_no_change_no_patch():
     assert sess.drain() == []
 
 
+def test_submit_preserves_pending_host_mutation():
+    sess = Session()
+    d = Device(name="lamp")
+    mid = sess.host(d)
+
+    d.name = "desk"
+    accepted = sess.submit(
+        mid,
+        {"rev": 0, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]},
+    )
+
+    assert accepted == {"rev": 2, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]}
+    assert d == Device(name="desk", on=True)
+    assert from_value(sess.value(mid), Device) == d
+    assert sess.drain() == [(mid, {"rev": 1, "ops": [{"Set": {"path": [{"Key": "name"}], "value": {"Str": "desk"}}}]})]
+
+
 class Circle(BaseModel):
     kind: Literal["circle"] = "circle"
     radius: int = 1
