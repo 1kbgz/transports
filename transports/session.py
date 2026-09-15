@@ -118,6 +118,7 @@ class Session:
         proposal is rejected — then `reject_reason` says why.
         """
         self.reject_reason = None
+        self.flush()
         snap = self._store.snapshot(mid)
         if snap is None:
             self.reject_reason = f"unknown model {mid}"
