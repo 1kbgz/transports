@@ -71,6 +71,42 @@ def test_client_edit_relays_to_other_clients():
     assert b.model(mid, Device).on is True
 
 
+def test_pending_host_patch_precedes_client_edit_reply():
+    session = Session()
+    server = Server(session)
+    model = Device(name="lamp")
+    mid = session.host(model)
+    clients = {name: Client() for name in ("a", "b")}
+    for name, client in clients.items():
+        for frame in server.open(name):
+            client.recv(frame)
+
+    model.name = "desk"
+    reply = server.recv("a", clients["a"].edit(mid, to_value(Device(name="lamp", on=True))))
+
+    for name, client in clients.items():
+        assert [json.loads(frame)["patch"]["rev"] for frame in reply[name]] == [1, 2]
+        for frame in reply[name]:
+            client.recv(frame)
+        assert client.model(mid, Device) == Device(name="desk", on=True)
+    assert server.flush() == {}
+
+
+def test_unknown_client_edit_does_not_discard_pending_host_patch():
+    session = Session()
+    server = Server(session)
+    model = Device(name="lamp")
+    session.host(model)
+    server.open("a")
+
+    model.name = "desk"
+    out = server.recv("a", protocol.patch_msg(999, {"rev": 1, "ops": []}))
+
+    assert [json.loads(frame)["t"] for frame in out["a"]] == ["patch", "reject"]
+    assert json.loads(out["a"][0])["patch"]["rev"] == 1
+    assert server.flush() == {}
+
+
 def test_flush_without_connections_is_empty():
     session = Session()
     server = Server(session)

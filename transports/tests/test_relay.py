@@ -85,7 +85,7 @@ def test_concurrent_cross_worker_edits_converge():
 
 # --- catch-up + durability (relay logic over a tiny in-process bus) ---
 
-from transports import DeepLwwCrdt, Hub, RelayBroadcaster
+from transports import WRITE, DeepLwwCrdt, Hub, RelayBroadcaster, autosync, ws_endpoint
 from transports.backplane import Backplane
 
 
@@ -109,6 +109,83 @@ class MemBackplane(Backplane):
         for p in self.bus.peers:
             if p is not self:
                 p._deliver(framed)
+
+
+def test_websocket_relay_uses_hub_autosync_queue_for_direct_replies():
+    class GatedWebSocket:
+        def __init__(self):
+            self.query_params = {}
+            self.incoming = asyncio.Queue()
+            self.sent = []
+            self.gate = asyncio.Event()
+            self.started = asyncio.Event()
+            self.snapshot_ready = asyncio.Event()
+            self.proposal_taken = asyncio.Event()
+
+        async def accept(self):
+            pass
+
+        async def receive(self):
+            frame = await self.incoming.get()
+            if frame.get("text") is not None:
+                self.proposal_taken.set()
+            return frame
+
+        async def send_text(self, msg):
+            decoded = json.loads(msg)
+            if decoded["t"] == "patch" and not self.started.is_set():
+                self.started.set()
+                await self.gate.wait()
+            self.sent.append(msg)
+            if decoded["t"] == "snapshot":
+                self.snapshot_ready.set()
+
+        async def send_bytes(self, msg):
+            raise AssertionError(f"unexpected binary frame: {msg!r}")
+
+    async def go():
+        hub = Hub(key=lambda conn: "tenant")
+        sid = hub.share({"Map": {"x": {"Int": 0}, "y": {"Int": 0}, "z": {"Int": 0}}}, "Doc")
+        hub.subscribe("tenant", sid, WRITE)
+        relay = RelayBroadcaster(hub, MemBackplane(_Bus()))
+        websocket = GatedWebSocket()
+        endpoint = ws_endpoint(relay)
+        sync_task = asyncio.create_task(autosync(hub, interval=0.001))
+        endpoint_task = asyncio.create_task(endpoint(websocket))
+        try:
+            await asyncio.wait_for(websocket.snapshot_ready.wait(), timeout=1)
+            hub.set_shared(sid, {"Map": {"x": {"Int": 1}, "y": {"Int": 0}, "z": {"Int": 0}}})
+            await asyncio.wait_for(websocket.started.wait(), timeout=1)
+
+            proposal = json.dumps(
+                {
+                    "t": "patch",
+                    "id": sid,
+                    "patch": {"rev": 2, "ops": [{"Set": {"path": [{"Key": "y"}], "value": {"Int": 1}}}]},
+                }
+            )
+            await websocket.incoming.put({"text": proposal})
+            await asyncio.wait_for(websocket.proposal_taken.wait(), timeout=1)
+            await asyncio.sleep(0)
+            hub.set_shared(sid, {"Map": {"x": {"Int": 1}, "y": {"Int": 1}, "z": {"Int": 1}}})
+            await asyncio.sleep(0.01)
+            websocket.gate.set()
+            for _ in range(100):
+                revisions = [
+                    message["patch"]["rev"] for frame in websocket.sent if (message := json.loads(frame))["t"] == "patch" and message["id"] == sid
+                ]
+                if len(revisions) == 3:
+                    break
+                await asyncio.sleep(0.001)
+
+            assert revisions == [1, 2, 3]
+        finally:
+            websocket.gate.set()
+            await websocket.incoming.put({"type": "websocket.disconnect"})
+            await endpoint_task
+            sync_task.cancel()
+
+    asyncio.run(go())
 
 
 def test_open_forwards_batch_negotiation_to_hub():

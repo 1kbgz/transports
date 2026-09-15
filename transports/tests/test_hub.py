@@ -34,6 +34,24 @@ def test_private_models_are_tenant_isolated():
     assert cb.model(1, Doc).x == 2
 
 
+def test_reopening_connection_under_new_tenant_removes_old_routing():
+    tenant_for = {"conn": "t1"}
+    h = Hub(key=tenant_for.__getitem__)
+    first = Doc()
+    second = Doc()
+    h.tenant("t1").host(first)
+    h.tenant("t2").host(second)
+    h.open("conn")
+
+    tenant_for["conn"] = "t2"
+    h.open("conn")
+    first.x = 1
+    assert h.flush() == {}
+
+    second.x = 2
+    assert set(h.flush()) == {"conn"}
+
+
 def test_private_edit_relays_only_within_tenant():
     h = hub()
     h.tenant("t1").host(Doc())
@@ -125,6 +143,48 @@ def test_shared_write_relays_to_other_writers():
     for m in out[c2]:
         cl2.recv(m)
     assert cl2.value(sid)["Map"]["x"] == {"Int": 5}
+
+
+def test_pending_shared_patch_precedes_client_write_reply():
+    h = hub()
+    sid = h.share(Doc())
+    h.subscribe("t1", sid, WRITE)
+    h.subscribe("t2", sid, WRITE)
+    conns = [("t1", "a"), ("t2", "b")]
+    clients = {conn: Client() for conn in conns}
+    for conn, client in clients.items():
+        for frame in h.open(conn):
+            client.recv(frame)
+
+    h.set_shared(sid, Doc(x=1))
+    reply = h.recv(conns[0], clients[conns[0]].edit(sid, {"Map": {"x": {"Int": 0}, "y": {"Int": 1}}}))
+
+    for conn, client in clients.items():
+        assert [json.loads(frame)["patch"]["rev"] for frame in reply[conn]] == [1, 2]
+        for frame in reply[conn]:
+            client.recv(frame)
+        assert client.model(sid, Doc) == Doc(x=1, y=1)
+    assert h.flush() == {}
+
+
+def test_private_reply_only_drains_the_proposer_tenant():
+    h = hub()
+    models = {tenant: Doc() for tenant in ("t1", "t2")}
+    conns = {tenant: (tenant, "a") for tenant in models}
+    clients = {tenant: Client() for tenant in models}
+    for tenant, model in models.items():
+        h.tenant(tenant).host(model)
+        for frame in h.open(conns[tenant]):
+            clients[tenant].recv(frame)
+
+    models["t1"].x = 1
+    models["t2"].x = 2
+    out = h.recv(conns["t1"], clients["t1"].edit(1, {"Map": {"x": {"Int": 1}, "y": {"Int": 1}}}))
+
+    assert set(out) == {conns["t1"]}
+    remaining = h.flush()
+    assert set(remaining) == {conns["t2"]}
+    assert json.loads(remaining[conns["t2"]][0])["patch"]["rev"] == 1
 
 
 def test_n_by_n_routes_each_connection_its_subscribed_set():
