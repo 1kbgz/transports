@@ -168,7 +168,7 @@ class Server:
 
     def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
         """`flush`, with each message tagged by its model id (``None`` for a batch envelope) so
-        `autosync` can coalesce a connection's undelivered state to the newest revision per model."""
+        `autosync` can compose a connection's undelivered state per model."""
         tagged = [(mid, protocol.patch_msg(mid, patch)) for mid, patch in self._session.drain()]
         if not tagged or not self._codecs:
             return {}
@@ -252,6 +252,7 @@ async def autosync(
     interval: float = 0.01,
     *,
     max_queue: int = 1024,
+    max_queue_bytes: int = 16 * 1024 * 1024,
     max_interval: float = 0.25,
     shards: int = 32,
     stall_timeout: float = 0.5,
@@ -264,21 +265,24 @@ async def autosync(
 
     Each connection's undelivered state patches live in a per-model map, and **state coalesces**:
     a newer revision is composed with that model's undelivered patch into one frame, so no delta is
-    lost while a slow consumer's backlog stays bounded by its model count. Non-coalescible messages
-    (batch envelopes and direct replies) accumulate under unique keys instead.
+    lost while a slow consumer's frame count stays bounded by its model count. Composed operations
+    can still grow one frame, so ``max_queue_bytes`` also bounds each connection's queued encoded
+    payload. Non-coalescible messages (batch envelopes and direct replies) use unique keys.
 
     Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of
     connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
     CPU regression at 1000 connections: task-scheduling churn, and no drain-rate feedback). The
     flush loop itself never awaits a socket. Direct replies from `ws_endpoint` enter the same queue,
     preserving revision order without making the receive loop wait on every recipient. Two
-    slow-consumer policies bound the pathological cases: a connection still holding more than
-    ``max_queue`` undelivered messages from previous flushes — even after coalescing — is disconnected,
-    and a connection whose send makes no progress for ``stall_timeout`` seconds (a wedged socket, which
-    would stall its shard) is cut by a watchdog. A disconnected client's reconnect resumes from its
-    last revision via ``open(since=...)``.
+    slow-consumer policies bound the pathological cases: after writers have had a drain cycle, a
+    connection still holding more than ``max_queue`` undelivered messages or more than
+    ``max_queue_bytes`` of encoded payload is disconnected. This lets one ready-to-send flush exceed
+    either threshold without rejecting a healthy connection. A connection whose send makes no
+    progress for ``stall_timeout`` seconds (a wedged socket, which would stall its shard) is cut by a
+    watchdog. A disconnected client's reconnect resumes from its last revision via ``open(since=...)``.
     """
-    pending: dict[Any, dict[Any, Wire]] = {}  # per conn: model id (or unique key) -> newest undelivered wire
+    pending: dict[Any, dict[Any, tuple[Wire, int]]] = {}  # per conn: key -> undelivered wire and encoded size
+    queued_bytes: dict[Any, int] = {}
     epochs: dict[Any, int] = {}  # barriers keep later coalesced state behind direct or batch frames
     nonce = itertools.count()  # keys for non-coalescible messages
 
@@ -297,11 +301,15 @@ async def autosync(
     pool = [_Shard() for _ in range(max(1, shards))]
     shard_of: dict[Any, _Shard] = {}
 
+    def wire_size(wire: Wire) -> int:
+        return len(wire.encode()) if isinstance(wire, str) else len(wire)
+
     def drop(conn: Any) -> None:
         server.close(conn)
         undelivered = pending.pop(conn, None)
         if undelivered is not None:
             undelivered.clear()
+        queued_bytes.pop(conn, None)
         epochs.pop(conn, None)
         shard = shard_of.pop(conn, None)
         if shard is not None:
@@ -324,7 +332,7 @@ async def autosync(
                 if previous is not None:
                     try:
                         codec = server._codecs.get(conn, server.default_codec)
-                        older = protocol.decode(previous, codec)
+                        older = protocol.decode(previous[0], codec)
                         newer = protocol.decode(wire, codec)
                         patch = dict(newer["patch"])
                         patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
@@ -335,7 +343,14 @@ async def autosync(
             else:
                 key = (None, next(nonce))
                 epoch += 1
-            undelivered[key] = wire
+            previous = undelivered.get(key)
+            try:
+                size = wire_size(wire)
+            except Exception:  # noqa: BLE001
+                drop(conn)
+                return
+            undelivered[key] = (wire, size)
+            queued_bytes[conn] = queued_bytes.get(conn, 0) - (previous[1] if previous is not None else 0) + size
         epochs[conn] = epoch
         shard = shard_of[conn]
         shard.busy = True
@@ -360,7 +375,8 @@ async def autosync(
                             key = next(iter(undelivered))
                             # pop before the send: a revision arriving mid-send re-keys and
                             # is delivered on the next pass, preserving per-model ordering
-                            wire = undelivered.pop(key)
+                            wire, size = undelivered.pop(key)
+                            queued_bytes[conn] -= size
                             shard.current = conn
                             await _send(conn, wire)
                             shard.count += 1
@@ -424,8 +440,9 @@ async def autosync(
             # Enforce the bound on work left from the previous tick, after healthy writers had
             # a chance to drain. A single wide flush or an interleaved direct reply must not drop
             # a consumer before its writer gets scheduled.
-            for conn in [c for c, undelivered in pending.items() if len(undelivered) > max_queue]:
-                drop(conn)
+            for conn, undelivered in list(pending.items()):
+                if len(undelivered) > max_queue or queued_bytes.get(conn, 0) > max_queue_bytes:
+                    drop(conn)
             for conn, tagged in server._flush_tagged().items():
                 enqueue(conn, tagged)
             fanout_started = loop_time()

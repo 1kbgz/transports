@@ -2,9 +2,9 @@
 
 The recorded baseline completes a full 50-update broadcast round to 250 clients × 20 streams in
 about 160 ms at a third of one CPU core, with delivery p99 under 40 ms. Fan-out coalesces. Under
-load, a connection's undelivered state is replaced by the newest revision per model and the drain
-cadence self-clocks to send capacity, so intermediate revisions collapse instead of queueing. Every
-client still converges on the final revision of every stream, and sooner.
+load, undelivered operations for each model compose into one frame and the drain cadence self-clocks
+to send capacity. Every client still applies each queued operation and converges on the final
+revision of every stream.
 
 ## Latency and completion time
 
@@ -17,7 +17,7 @@ client still converges on the final revision of every stream, and sooner.
 Ranges span two clean runs. Fleet completion measures the full round: publish 50 updates to every
 stream at 2 ms intervals, then wait until every client has received the final revision of every
 stream. Delivery latency measures individual patches from the server timestamp to receipt by a
-client; because only the newest revision of a model ships, every delivered patch is fresh.
+client. One delivered patch can compose operations from several revisions.
 
 ## Server resource use
 
@@ -28,11 +28,13 @@ client; because only the newest revision of a model ships, every delivered patch
 |               250 | 31.5–31.9% | 86.1–86.2 MB |       17.9–20.1 ms |                5.0% |
 
 CPU is process CPU use, where 100% represents one fully occupied logical core. Revisions delivered
-below 100% is coalescing at work rather than data loss. transports synchronizes state, so a
-connection's undelivered patch for a model is replaced by a newer revision, and the autosync drain
-cadence stretches to match send capacity (`interval` is the floor, `max_interval` the ceiling).
-Every client still receives the final revision of every stream, which the completion times above
-confirm.
+below 100% is frame coalescing at work rather than data loss. transports composes a model's
+undelivered operations into one patch, and the autosync drain cadence stretches to match send
+capacity (`interval` is the floor, `max_interval` the ceiling). Every client still applies the
+queued changes and reaches the final revision of every stream, which the completion times above
+confirm. After writers have had a drain cycle, `max_queue` bounds queued frames per connection and
+`max_queue_bytes` bounds their encoded payload. One ready-to-send flush can transiently exceed those
+thresholds; a slow client cannot retain that backlog into the next cycle.
 
 ## Session budgets
 
