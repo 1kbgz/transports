@@ -32,7 +32,7 @@ from typing import Any
 
 from . import protocol
 from .backplane import Backplane
-from .hub import SHARED_ID_BASE, Hub
+from .hub import Hub
 from .server import Wire
 from .transports import diff as _diff
 
@@ -155,9 +155,11 @@ class RelayBroadcaster:
             return {}
         msg = protocol.decode(data, codec)
         origin = self.hub._conn_key.get(conn)
+        sid = msg.get("id", 0)
+        publish = msg.get("t") == "patch" and self.hub._shared_write_allowed(origin, sid)
         out = self.hub.recv(conn, data)  # apply + fan to this worker's clients
-        if msg.get("t") == "patch" and msg.get("id", 0) >= SHARED_ID_BASE:
-            payload = json.dumps({"t": "w", "sid": msg["id"], "patch": msg["patch"], "origin": origin}).encode()
+        if publish:
+            payload = json.dumps({"t": "w", "sid": sid, "patch": msg["patch"], "origin": origin}).encode()
             asyncio.create_task(self.backplane.publish(payload))  # broadcast the raw write to the others
         return out
 

@@ -85,7 +85,7 @@ def test_concurrent_cross_worker_edits_converge():
 
 # --- catch-up + durability (relay logic over a tiny in-process bus) ---
 
-from transports import WRITE, DeepLwwCrdt, Hub, RelayBroadcaster, autosync, protocol, register_codec, unregister_codec, ws_endpoint
+from transports import READ, WRITE, DeepLwwCrdt, Hub, RelayBroadcaster, autosync, protocol, register_codec, unregister_codec, ws_endpoint
 from transports.backplane import Backplane
 
 
@@ -109,6 +109,15 @@ class MemBackplane(Backplane):
         for p in self.bus.peers:
             if p is not self:
                 p._deliver(framed)
+
+
+class RecordingBackplane(MemBackplane):
+    def __init__(self):
+        super().__init__(_Bus())
+        self.published = []
+
+    async def publish(self, data):
+        self.published.append(json.loads(data))
 
 
 @pytest.mark.parametrize("sync_relay", [False, True], ids=["hub", "relay"])
@@ -213,14 +222,6 @@ def test_relay_keeps_inbound_codec_when_hub_drops_the_connection():
     def decode(wire):
         return json.loads(wire.removeprefix("custom:"))
 
-    class RecordingBackplane(MemBackplane):
-        def __init__(self):
-            super().__init__(_Bus())
-            self.published = []
-
-        async def publish(self, data):
-            self.published.append(json.loads(data))
-
     async def go():
         register_codec(codec, encode, decode)
         hub = Hub(key=lambda conn: "tenant")
@@ -262,6 +263,71 @@ def test_relay_keeps_inbound_codec_when_hub_drops_the_connection():
             assert len(backplane.published) == 1
         finally:
             unregister_codec(codec)
+
+    asyncio.run(go())
+
+
+@pytest.mark.parametrize("subscription", [READ, None], ids=["read-only", "unsubscribed"])
+def test_relay_does_not_publish_rejected_shared_write(subscription):
+    async def go():
+        hub = Hub(key=lambda conn: "tenant")
+        sid = hub.share({"Map": {"x": {"Int": 0}}}, "Doc")
+        if subscription is not None:
+            hub.subscribe("tenant", sid, subscription)
+        backplane = RecordingBackplane()
+        relay = RelayBroadcaster(hub, backplane)
+        conn = object()
+        relay.open(conn)
+        patch = protocol.patch_msg(sid, {"rev": 1, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 1}}}]})
+
+        out = relay.recv(conn, patch)
+        await asyncio.sleep(0)
+
+        assert json.loads(out[conn][0])["t"] == "reject"
+        assert hub._shared[sid].value["Map"]["x"] == {"Int": 0}
+        assert backplane.published == []
+
+    asyncio.run(go())
+
+
+def test_relay_does_not_publish_write_to_unknown_shared_model():
+    async def go():
+        hub = Hub(key=lambda conn: "tenant")
+        backplane = RecordingBackplane()
+        relay = RelayBroadcaster(hub, backplane)
+        conn = object()
+        relay.open(conn)
+        sid = 1 << 40
+        patch = protocol.patch_msg(sid, {"rev": 1, "ops": []})
+
+        out = relay.recv(conn, patch)
+        await asyncio.sleep(0)
+
+        assert json.loads(out[conn][0])["error"] == "unknown shared model"
+        assert backplane.published == []
+
+    asyncio.run(go())
+
+
+def test_relay_publishes_authorized_shared_write_without_local_delta():
+    async def go():
+        hub = Hub(key=lambda conn: "tenant")
+        sid = hub.share({"Map": {"x": {"Int": 0}}}, "Doc", merge=DeepLwwCrdt)
+        hub.subscribe("tenant", sid, WRITE)
+        backplane = RecordingBackplane()
+        relay = RelayBroadcaster(hub, backplane)
+        conn = object()
+        relay.open(conn)
+        op = {"Set": {"path": [{"Key": "x"}], "value": {"Int": 1}}}
+
+        relay.recv(conn, protocol.patch_msg(sid, {"rev": 2, "ops": [op]}))
+        await asyncio.sleep(0)
+        rev = hub._shared[sid].rev
+        relay.recv(conn, protocol.patch_msg(sid, {"rev": 1, "ops": [op]}))
+        await asyncio.sleep(0)
+
+        assert hub._shared[sid].rev == rev
+        assert [message["patch"]["rev"] for message in backplane.published] == [2, 1]
 
     asyncio.run(go())
 

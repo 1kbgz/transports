@@ -234,6 +234,10 @@ class Hub:
         self.tenant(tenant_key)  # ensure the tenant exists
         self._shared[sid].subs[tenant_key] = mode
 
+    def _shared_write_allowed(self, tenant_key: Any, sid: int) -> bool:
+        shared = self._shared.get(sid)
+        return shared is not None and shared.subs.get(tenant_key) == WRITE
+
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
@@ -323,7 +327,7 @@ class Hub:
             if sh is None:
                 reject = protocol.reject_msg(wire_id, 0, "unknown shared model")
                 return self._encode_many([conn], [reject])
-            if sh.subs.get(key) != WRITE:
+            if not self._shared_write_allowed(key, wire_id):
                 # a read-only (or unsubscribed) tenant's write is refused; tell the proposer why
                 reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription")
                 return self._encode_many([conn], [reject])
