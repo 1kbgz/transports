@@ -231,11 +231,10 @@ async def autosync(
     client. The async counterpart of `sync` — use this for socket backends (WebSocket/SSE) driven by an
     event loop, and `sync` for the synchronous ones (Jupyter comm/anywidget).
 
-    Each connection's undelivered state patches live in a per-model map, and **state coalesces**: a
-    newer revision of a model *replaces* that connection's undelivered one (state semantics —
-    clients need the newest revision, not the history), so a slow consumer's backlog is bounded
-    by its model count and it always receives fresh data. Non-coalescible messages (batch envelopes
-    and direct replies) accumulate under unique keys instead.
+    Each connection's undelivered state patches live in a per-model map, and **state coalesces**:
+    a newer revision is composed with that model's undelivered patch into one frame, so no delta is
+    lost while a slow consumer's backlog stays bounded by its model count. Non-coalescible messages
+    (batch envelopes and direct replies) accumulate under unique keys instead.
 
     Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of
     connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
@@ -288,6 +287,14 @@ async def autosync(
         for mid, wire in tagged:
             if coalesce and mid is not None:
                 key = (epoch, mid)
+                previous = undelivered.get(key)
+                if previous is not None:
+                    codec = server._codecs.get(conn, server.default_codec)
+                    older = protocol.decode(previous, codec)
+                    newer = protocol.decode(wire, codec)
+                    patch = dict(newer["patch"])
+                    patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
+                    wire = protocol.encode(protocol.patch_msg(mid, patch), codec)
             else:
                 key = (None, next(nonce))
                 epoch += 1
