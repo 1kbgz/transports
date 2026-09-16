@@ -422,7 +422,7 @@
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_flush_tagged</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">list</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">Wire</span><span class="p">]]]:</span>
 <span class="w">        </span><span class="sd">"""`flush`, with each message tagged by its model id (``None`` for a batch envelope) so</span>
-<span class="sd">        `autosync` can coalesce a connection's undelivered state to the newest revision per model."""</span>
+<span class="sd">        `autosync` can compose a connection's undelivered state per model."""</span>
         <span class="n">tagged</span> <span class="o">=</span> <span class="p">[(</span><span class="n">mid</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">))</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_session</span><span class="o">.</span><span class="n">drain</span><span class="p">()]</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="n">tagged</span> <span class="ow">or</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codecs</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">{}</span>
@@ -515,6 +515,7 @@
     <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span><span class="p">,</span>
     <span class="o">*</span><span class="p">,</span>
     <span class="n">max_queue</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1024</span><span class="p">,</span>
+    <span class="n">max_queue_bytes</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">16</span> <span class="o">*</span> <span class="mi">1024</span> <span class="o">*</span> <span class="mi">1024</span><span class="p">,</span>
     <span class="n">max_interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.25</span><span class="p">,</span>
     <span class="n">shards</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">32</span><span class="p">,</span>
     <span class="n">stall_timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.5</span><span class="p">,</span>
@@ -527,21 +528,24 @@
 
 <span class="sd">    Each connection's undelivered state patches live in a per-model map, and **state coalesces**:</span>
 <span class="sd">    a newer revision is composed with that model's undelivered patch into one frame, so no delta is</span>
-<span class="sd">    lost while a slow consumer's backlog stays bounded by its model count. Non-coalescible messages</span>
-<span class="sd">    (batch envelopes and direct replies) accumulate under unique keys instead.</span>
+<span class="sd">    lost while a slow consumer's frame count stays bounded by its model count. Composed operations</span>
+<span class="sd">    can still grow one frame, so ``max_queue_bytes`` also bounds each connection's queued encoded</span>
+<span class="sd">    payload. Non-coalescible messages (batch envelopes and direct replies) use unique keys.</span>
 
 <span class="sd">    Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of</span>
 <span class="sd">    connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x</span>
 <span class="sd">    CPU regression at 1000 connections: task-scheduling churn, and no drain-rate feedback). The</span>
 <span class="sd">    flush loop itself never awaits a socket. Direct replies from `ws_endpoint` enter the same queue,</span>
 <span class="sd">    preserving revision order without making the receive loop wait on every recipient. Two</span>
-<span class="sd">    slow-consumer policies bound the pathological cases: a connection still holding more than</span>
-<span class="sd">    ``max_queue`` undelivered messages from previous flushes — even after coalescing — is disconnected,</span>
-<span class="sd">    and a connection whose send makes no progress for ``stall_timeout`` seconds (a wedged socket, which</span>
-<span class="sd">    would stall its shard) is cut by a watchdog. A disconnected client's reconnect resumes from its</span>
-<span class="sd">    last revision via ``open(since=...)``.</span>
+<span class="sd">    slow-consumer policies bound the pathological cases: after writers have had a drain cycle, a</span>
+<span class="sd">    connection still holding more than ``max_queue`` undelivered messages or more than</span>
+<span class="sd">    ``max_queue_bytes`` of encoded payload is disconnected. This lets one ready-to-send flush exceed</span>
+<span class="sd">    either threshold without rejecting a healthy connection. A connection whose send makes no</span>
+<span class="sd">    progress for ``stall_timeout`` seconds (a wedged socket, which would stall its shard) is cut by a</span>
+<span class="sd">    watchdog. A disconnected client's reconnect resumes from its last revision via ``open(since=...)``.</span>
 <span class="sd">    """</span>
-    <span class="n">pending</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">Wire</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># per conn: model id (or unique key) -&gt; newest undelivered wire</span>
+    <span class="n">pending</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">[</span><span class="n">Wire</span><span class="p">,</span> <span class="nb">int</span><span class="p">]]]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># per conn: key -&gt; undelivered wire and encoded size</span>
+    <span class="n">queued_bytes</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
     <span class="n">epochs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>  <span class="c1"># barriers keep later coalesced state behind direct or batch frames</span>
     <span class="n">nonce</span> <span class="o">=</span> <span class="n">itertools</span><span class="o">.</span><span class="n">count</span><span class="p">()</span>  <span class="c1"># keys for non-coalescible messages</span>
 
@@ -560,11 +564,15 @@
     <span class="n">pool</span> <span class="o">=</span> <span class="p">[</span><span class="n">_Shard</span><span class="p">()</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="nb">max</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">shards</span><span class="p">))]</span>
     <span class="n">shard_of</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="n">Any</span><span class="p">,</span> <span class="n">_Shard</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
 
+    <span class="k">def</span><span class="w"> </span><span class="nf">wire_size</span><span class="p">(</span><span class="n">wire</span><span class="p">:</span> <span class="n">Wire</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="n">wire</span><span class="o">.</span><span class="n">encode</span><span class="p">())</span> <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">wire</span><span class="p">,</span> <span class="nb">str</span><span class="p">)</span> <span class="k">else</span> <span class="nb">len</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+
     <span class="k">def</span><span class="w"> </span><span class="nf">drop</span><span class="p">(</span><span class="n">conn</span><span class="p">:</span> <span class="n">Any</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">server</span><span class="o">.</span><span class="n">close</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
         <span class="n">undelivered</span> <span class="o">=</span> <span class="n">pending</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">undelivered</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">undelivered</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
+        <span class="n">queued_bytes</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">epochs</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="n">shard</span> <span class="o">=</span> <span class="n">shard_of</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">shard</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -587,7 +595,7 @@
                 <span class="k">if</span> <span class="n">previous</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
                     <span class="k">try</span><span class="p">:</span>
                         <span class="n">codec</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
-                        <span class="n">older</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">previous</span><span class="p">,</span> <span class="n">codec</span><span class="p">)</span>
+                        <span class="n">older</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">previous</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">codec</span><span class="p">)</span>
                         <span class="n">newer</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">wire</span><span class="p">,</span> <span class="n">codec</span><span class="p">)</span>
                         <span class="n">patch</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">newer</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])</span>
                         <span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">older</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">][</span><span class="s2">"ops"</span><span class="p">],</span> <span class="o">*</span><span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]]</span>
@@ -598,7 +606,14 @@
             <span class="k">else</span><span class="p">:</span>
                 <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="nb">next</span><span class="p">(</span><span class="n">nonce</span><span class="p">))</span>
                 <span class="n">epoch</span> <span class="o">+=</span> <span class="mi">1</span>
-            <span class="n">undelivered</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">wire</span>
+            <span class="n">previous</span> <span class="o">=</span> <span class="n">undelivered</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">size</span> <span class="o">=</span> <span class="n">wire_size</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
+                <span class="n">drop</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+                <span class="k">return</span>
+            <span class="n">undelivered</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span><span class="n">wire</span><span class="p">,</span> <span class="n">size</span><span class="p">)</span>
+            <span class="n">queued_bytes</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">queued_bytes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">previous</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">if</span> <span class="n">previous</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="mi">0</span><span class="p">)</span> <span class="o">+</span> <span class="n">size</span>
         <span class="n">epochs</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">=</span> <span class="n">epoch</span>
         <span class="n">shard</span> <span class="o">=</span> <span class="n">shard_of</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span>
         <span class="n">shard</span><span class="o">.</span><span class="n">busy</span> <span class="o">=</span> <span class="kc">True</span>
@@ -623,7 +638,8 @@
                             <span class="n">key</span> <span class="o">=</span> <span class="nb">next</span><span class="p">(</span><span class="nb">iter</span><span class="p">(</span><span class="n">undelivered</span><span class="p">))</span>
                             <span class="c1"># pop before the send: a revision arriving mid-send re-keys and</span>
                             <span class="c1"># is delivered on the next pass, preserving per-model ordering</span>
-                            <span class="n">wire</span> <span class="o">=</span> <span class="n">undelivered</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                            <span class="n">wire</span><span class="p">,</span> <span class="n">size</span> <span class="o">=</span> <span class="n">undelivered</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+                            <span class="n">queued_bytes</span><span class="p">[</span><span class="n">conn</span><span class="p">]</span> <span class="o">-=</span> <span class="n">size</span>
                             <span class="n">shard</span><span class="o">.</span><span class="n">current</span> <span class="o">=</span> <span class="n">conn</span>
                             <span class="k">await</span> <span class="n">_send</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">wire</span><span class="p">)</span>
                             <span class="n">shard</span><span class="o">.</span><span class="n">count</span> <span class="o">+=</span> <span class="mi">1</span>
@@ -687,8 +703,9 @@
             <span class="c1"># Enforce the bound on work left from the previous tick, after healthy writers had</span>
             <span class="c1"># a chance to drain. A single wide flush or an interleaved direct reply must not drop</span>
             <span class="c1"># a consumer before its writer gets scheduled.</span>
-            <span class="k">for</span> <span class="n">conn</span> <span class="ow">in</span> <span class="p">[</span><span class="n">c</span> <span class="k">for</span> <span class="n">c</span><span class="p">,</span> <span class="n">undelivered</span> <span class="ow">in</span> <span class="n">pending</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">undelivered</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_queue</span><span class="p">]:</span>
-                <span class="n">drop</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">undelivered</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">pending</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+                <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">undelivered</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_queue</span> <span class="ow">or</span> <span class="n">queued_bytes</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">max_queue_bytes</span><span class="p">:</span>
+                    <span class="n">drop</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">conn</span><span class="p">,</span> <span class="n">tagged</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">_flush_tagged</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
                 <span class="n">enqueue</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">tagged</span><span class="p">)</span>
             <span class="n">fanout_started</span> <span class="o">=</span> <span class="n">loop_time</span><span class="p">()</span>
