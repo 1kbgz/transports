@@ -1,10 +1,10 @@
 """`autosync` flow control: per-connection coalescing and the explicit slow-consumer policy.
 
 The flush loop never awaits a socket — each connection's undelivered messages live in a per-model
-map drained by its own writer task — so one backpressured client cannot stall the broadcast. State
-coalesces (new revisions compose into one undelivered patch), bounding a slow consumer's backlog by
-its model count; a connection whose backlog exceeds ``max_queue`` even after coalescing is
-disconnected (its reconnect resumes from its last revision via ``open(since=)``).
+map drained by a fixed writer shard — so one backpressured client cannot stall the broadcast. State
+coalesces (new revisions compose into one undelivered patch), bounding a slow consumer's frame count
+by its model count; ``max_queue_bytes`` also bounds growing composed payloads. A connection that
+exceeds either bound is disconnected (its reconnect resumes via ``open(since=)``).
 """
 
 from __future__ import annotations
@@ -26,6 +26,10 @@ class Pair(BaseModel):
     x: int = 0
     y: int = 0
     items: list[int] = []
+
+
+class Payload(BaseModel):
+    text: str = ""
 
 
 class FakeConn:
@@ -255,7 +259,7 @@ def test_stuck_state_consumer_coalesces_instead_of_disconnecting():
         sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001, max_queue=4))
         try:
             # the stuck consumer's writer is wedged in its first send, but its undelivered state
-            # coalesces to the newest revision per model — one model can never exceed the bound
+            # coalesces to one frame per model — one model cannot exceed the entry-count bound
             for expected in range(1, 21):
                 model.n = expected
                 await asyncio.sleep(0.005)
@@ -263,10 +267,71 @@ def test_stuck_state_consumer_coalesces_instead_of_disconnecting():
             # the fast consumer kept receiving throughout — the stuck one never blocked it
             assert len(fast.sent) >= 10
 
-            # bounded by coalescing, the stuck consumer stays connected (state semantics: it
-            # will receive the newest revision whenever it drains, not the history)
+            # bounded by coalescing, the stuck consumer stays connected; when it drains, one
+            # frame preserves the queued operations and advances it to the newest revision
             assert stuck in server._codecs
             assert fast in server._codecs
+        finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
+def test_stuck_hot_model_exceeding_the_byte_bound_is_disconnected(codec):
+    class StuckWireConn(StuckConn):
+        async def send_bytes(self, msg: bytes) -> None:
+            await asyncio.Event().wait()
+
+    async def scenario() -> None:
+        session = transports.Session()
+        model = Counter()
+        session.host(model)
+        server = transports.Server(session)
+        fast, stuck = FakeConn(), StuckWireConn()
+        server.open(fast, codec=codec)
+        server.open(stuck, codec=codec)
+
+        sync_task = asyncio.create_task(transports.autosync(server, interval=0.001, max_queue=1000, max_queue_bytes=512))
+        try:
+            for expected in range(1, 100):
+                model.n = expected
+                await asyncio.sleep(0.002)
+                if stuck not in server._codecs:
+                    break
+
+            assert stuck not in server._codecs
+            assert fast in server._codecs
+            assert fast.sent
+        finally:
+            sync_task.cancel()
+
+    asyncio.run(scenario())
+
+
+def test_byte_bound_allows_a_healthy_wide_flush_with_oversized_frames():
+    async def scenario() -> None:
+        session = transports.Session()
+        models = [Payload() for _ in range(6)]
+        for model in models:
+            session.host(model)
+        server = transports.Server(session)
+        conn = FakeConn()
+        server.open(conn)
+
+        sync_task = asyncio.create_task(transports.autosync(server, interval=0.001, max_queue_bytes=512))
+        try:
+            for model in models:
+                model.text = "x" * 1024
+            for _ in range(1000):
+                if len(conn.sent) == len(models):
+                    break
+                await asyncio.sleep(0.001)
+            await asyncio.sleep(0.005)
+
+            assert len(conn.sent) == len(models)
+            assert conn in server._codecs
+            assert not sync_task.done()
         finally:
             sync_task.cancel()
 
@@ -336,15 +401,14 @@ def test_coalescing_delivers_the_newest_revision():
 
         sync_task = asyncio.get_running_loop().create_task(transports.autosync(server, interval=0.001))
         try:
-            # revisions land while delivery is gated; each flush replaces the undelivered wire
+            # revisions land while delivery is gated; each flush composes into the undelivered wire
             for value in (1, 2, 3):
                 model.n = value
                 await asyncio.sleep(0.005)
             gated.gate.set()
             await asyncio.sleep(0.02)
 
-            # the client got the newest state, not the whole history: fewer sends than revisions,
-            # and the last delivered patch carries the final value
+            # fewer frames than revisions arrive, and the coalesced patch carries the final value
             assert 1 <= len(gated.sent) < 3
             ops = json.loads(gated.sent[-1])["patch"]["ops"]
             assert {"Set": {"path": [{"Key": "n"}], "value": {"Int": 3}}} in ops
@@ -461,6 +525,37 @@ def test_broken_custom_codec_drops_only_its_connection():
             assert len(broken.sent) == 1
         finally:
             broken.gate.set()
+            sync_task.cancel()
+            transports.unregister_codec(codec)
+
+    asyncio.run(scenario())
+
+
+def test_unsizable_custom_codec_drops_only_its_connection():
+    codec = "application/x-unsizable-autosync-test"
+
+    async def scenario() -> None:
+        transports.register_codec(codec, lambda _message: "\ud800", lambda _wire: {})
+        session = transports.Session()
+        model = Counter()
+        session.host(model)
+        server = transports.Server(session)
+        broken, healthy = FakeConn(), FakeConn()
+        server.open(broken, codec=codec)
+        server.open(healthy)
+        sync_task = asyncio.create_task(transports.autosync(server, interval=0.001))
+        try:
+            model.n = 1
+            for _ in range(1000):
+                if healthy.sent:
+                    break
+                await asyncio.sleep(0.001)
+
+            assert broken not in server._codecs
+            assert healthy in server._codecs
+            assert healthy.sent
+            assert not sync_task.done()
+        finally:
             sync_task.cancel()
             transports.unregister_codec(codec)
 
