@@ -3,7 +3,7 @@ import json
 
 from pydantic import BaseModel
 
-from transports import READ, WRITE, Client, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, ws_endpoint
+from transports import READ, WRITE, Client, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, protocol, register_codec, unregister_codec, ws_endpoint
 
 
 class Doc(BaseModel):
@@ -70,6 +70,54 @@ def test_private_edit_relays_only_within_tenant():
     assert ca2.value(1)["Map"]["x"] == {"Int": 7}
 
 
+def test_broken_custom_encoder_does_not_block_private_fanout():
+    codec = "application/x-broken-hub-private-test"
+    register_codec(codec, json.dumps, json.loads)
+    h = hub()
+    model = Doc()
+    h.tenant("t1").host(model)
+    broken, healthy = ("t1", "broken"), ("t1", "healthy")
+    h.open(broken, codec=codec)
+    h.open(healthy)
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    try:
+        model.x = 1
+        out = h.flush()
+        assert set(out) == {healthy}
+        assert broken not in h._codecs
+        assert json.loads(out[healthy][0])["patch"]["rev"] == 1
+    finally:
+        unregister_codec(codec)
+
+
+def test_broken_custom_encoder_does_not_leave_failed_hub_open_registered():
+    codec = "application/x-broken-hub-open-test"
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    h = hub()
+    h.tenant("t1").host(Doc())
+    conn = ("t1", "broken")
+    try:
+        try:
+            h.open(conn, codec=codec)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected encoder failure")
+        assert conn not in h._codecs
+        assert conn not in h._conn_key
+        assert conn not in h._conns_by_key.get("t1", ())
+    finally:
+        unregister_codec(codec)
+
+
 def test_private_invalid_edit_reverts_only_the_proposer():
     """An invalid edit to a private model is rejected; the hub re-sends the authoritative snapshot to the
     proposing connection alone (so its UI reverts) and relays nothing to the tenant's other connections."""
@@ -109,6 +157,34 @@ def test_shared_read_fanout_to_many_tenants():
         cl2.recv(m)
     assert cl1.value(sid)["Map"]["x"] == {"Int": 3}
     assert cl2.value(sid)["Map"]["x"] == {"Int": 3}
+
+
+def test_broken_custom_encoder_does_not_block_shared_fanout():
+    codec = "application/x-broken-hub-shared-test"
+    register_codec(codec, json.dumps, json.loads)
+    h = hub()
+    sid = h.share(Doc())
+    h.subscribe("broken", sid, WRITE)
+    h.subscribe("healthy", sid, READ)
+    broken, healthy = ("broken", "a"), ("healthy", "a")
+    h.open(broken, codec=codec)
+    h.open(healthy)
+    proposal = protocol.patch_msg(sid, {"rev": 2, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 2}}}]})
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    try:
+        h.set_shared(sid, Doc(x=1))
+        out = h.flush()
+        assert set(out) == {healthy}
+        assert broken not in h._codecs
+        assert json.loads(out[healthy][0])["patch"]["rev"] == 1
+        assert h.recv(broken, proposal) == {}
+        assert h._shared[sid].value["Map"]["x"] == {"Int": 1}
+    finally:
+        unregister_codec(codec)
 
 
 def test_read_only_subscriber_cannot_write():

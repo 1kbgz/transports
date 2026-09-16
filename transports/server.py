@@ -70,6 +70,24 @@ class Server:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
+    def _encode_many(self, conns: Any, msg_jsons: list[str]) -> dict[Any, list[Wire]]:
+        groups: dict[str, list[Any]] = {}
+        for conn in list(conns):
+            codec = self._codecs.get(conn)
+            if codec is not None:
+                groups.setdefault(codec, []).append(conn)
+        out: dict[Any, list[Wire]] = {}
+        for codec, codec_conns in groups.items():
+            try:
+                encoded = [protocol.encode(msg_json, codec) for msg_json in msg_jsons]
+            except Exception:  # noqa: BLE001
+                for conn in codec_conns:
+                    self.close(conn)
+                continue
+            for conn in codec_conns:
+                out[conn] = encoded
+        return out
+
     def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
         """Register a connection; return the messages that bring it up to date.
 
@@ -80,17 +98,21 @@ class Server:
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         if batch:
             self._batched.add(conn)
-        out: list[Wire] = []
-        for mid in self._session.ids():
-            client_rev = since.get(mid) if since else None
-            delta = self._session.since(mid, client_rev) if client_rev is not None else None
-            if delta is not None:
-                for patch in delta:
-                    out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
-            else:
-                snap = self._session.snapshot(mid)
-                out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
-        return out
+        try:
+            out: list[Wire] = []
+            for mid in self._session.ids():
+                client_rev = since.get(mid) if since else None
+                delta = self._session.since(mid, client_rev) if client_rev is not None else None
+                if delta is not None:
+                    for patch in delta:
+                        out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
+                else:
+                    snap = self._session.snapshot(mid)
+                    out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
+            return out
+        except Exception:
+            self.close(conn)
+            raise
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         """Handle an inbound message (text or binary frame); returns messages to send, keyed by conn.
@@ -100,7 +122,10 @@ class Server:
         connection's codec. Models are server-authoritative — a client's mirror updates when this echo
         arrives, not optimistically. Pending host patches are returned before the proposal reply.
         """
-        msg = protocol.decode(data, self._codecs.get(conn))
+        codec = self._codecs.get(conn)
+        if codec is None:
+            return {}
+        msg = protocol.decode(data, codec)
         if msg.get("t") == "patch":
             authoritative = self._session.submit(msg["id"], msg["patch"])
             if authoritative is None:
@@ -113,19 +138,14 @@ class Server:
                     snap = self._session.snapshot(msg["id"])
                 except KeyError:
                     reject = protocol.reject_msg(msg["id"], 0, error)
-                    direct = {conn: [self._encode_for(conn, reject)]}
+                    direct = self._encode_many([conn], [reject])
                 else:
                     revert = protocol.snapshot_msg(msg["id"], snap["type_name"], snap["rev"], snap["value"])
                     reject = protocol.reject_msg(msg["id"], snap["rev"], error)
-                    direct = {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
+                    direct = self._encode_many([conn], [revert, reject])
             else:
                 relay = protocol.patch_msg(msg["id"], authoritative)
-                encoded: dict[str, list[Wire]] = {}
-                direct = {}
-                for c, codec in self._codecs.items():
-                    if codec not in encoded:
-                        encoded[codec] = [protocol.encode(relay, codec)]
-                    direct[c] = encoded[codec]
+                direct = self._encode_many(self._codecs, [relay])
             out = {target: [wire for _, wire in tagged] for target, tagged in self._flush_tagged().items()}
             for target, wires in direct.items():
                 out.setdefault(target, []).extend(wires)
@@ -150,17 +170,22 @@ class Server:
         # a batch-negotiated connection gets the whole flush as one frame (one send instead of
         # one per message); a single-message flush skips the envelope either way
         batched = protocol.batch_msg([m for _, m in tagged]) if len(tagged) > 1 else None
-        encoded: dict[tuple[str, bool], list[tuple[int | None, Wire]]] = {}
+        groups: dict[tuple[str, bool], list[Any]] = {}
+        for conn, codec in list(self._codecs.items()):
+            groups.setdefault((codec, conn in self._batched), []).append(conn)
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
-        for conn, codec in self._codecs.items():
-            wants_batch = conn in self._batched
-            key = (codec, wants_batch)
-            if key not in encoded:
+        for (codec, wants_batch), codec_conns in groups.items():
+            try:
                 if wants_batch and batched is not None:
-                    encoded[key] = [(None, protocol.encode(batched, codec))]
+                    encoded = [(None, protocol.encode(batched, codec))]
                 else:
-                    encoded[key] = [(mid, protocol.encode(m, codec)) for mid, m in tagged]
-            out[conn] = encoded[key]
+                    encoded = [(mid, protocol.encode(m, codec)) for mid, m in tagged]
+            except Exception:  # noqa: BLE001
+                for conn in codec_conns:
+                    self.close(conn)
+                continue
+            for conn in codec_conns:
+                out[conn] = encoded
         return out
 
     def close(self, conn: Any) -> None:

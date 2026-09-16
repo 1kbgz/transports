@@ -237,6 +237,24 @@ class Hub:
     def _encode_for(self, conn: Any, msg_json: str) -> Wire:
         return protocol.encode(msg_json, self._codecs.get(conn, self.default_codec))
 
+    def _encode_many(self, conns: Any, msg_jsons: list[str]) -> dict[Any, list[Wire]]:
+        groups: dict[str, list[Any]] = {}
+        for conn in list(conns):
+            codec = self._codecs.get(conn)
+            if codec is not None:
+                groups.setdefault(codec, []).append(conn)
+        out: dict[Any, list[Wire]] = {}
+        for codec, codec_conns in groups.items():
+            try:
+                encoded = [protocol.encode(msg_json, codec) for msg_json in msg_jsons]
+            except Exception:  # noqa: BLE001
+                for conn in codec_conns:
+                    self.close(conn)
+                continue
+            for conn in codec_conns:
+                out[conn] = encoded
+        return out
+
     def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
         # `batch` is accepted for endpoint parity but not yet applied: Hub.flush interleaves
         # per-tenant and shared fan-outs, so its batching lands with that restructure.
@@ -256,21 +274,25 @@ class Hub:
         self._conn_key[conn] = key
         self._conns_by_key.setdefault(key, set()).add(conn)
         self._codecs[conn] = codec
-        sess = self.tenant(key)
-        out: list[Wire] = []
-        for mid in sess.ids():
-            client_rev = since.get(mid) if since else None
-            delta = sess.since(mid, client_rev) if client_rev is not None else None
-            if delta is not None:
-                for patch in delta:
-                    out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
-            else:
-                snap = sess.snapshot(mid)
-                out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
-        for sid, sh in self._shared.items():
-            if key in sh.subs:
-                out.append(self._encode_for(conn, protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)))
-        return out
+        try:
+            sess = self.tenant(key)
+            out: list[Wire] = []
+            for mid in sess.ids():
+                client_rev = since.get(mid) if since else None
+                delta = sess.since(mid, client_rev) if client_rev is not None else None
+                if delta is not None:
+                    for patch in delta:
+                        out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
+                else:
+                    snap = sess.snapshot(mid)
+                    out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
+            for sid, sh in self._shared.items():
+                if key in sh.subs:
+                    out.append(self._encode_for(conn, protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)))
+            return out
+        except Exception:
+            self.close(conn)
+            raise
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         """Handle an inbound patch; returns messages to send, keyed by connection.
@@ -281,7 +303,10 @@ class Hub:
         every subscriber connection. Both paths are server-authoritative (origin included), with
         pending host patches returned before the proposal reply.
         """
-        msg = protocol.decode(data, self._codecs.get(conn))
+        codec = self._codecs.get(conn)
+        if codec is None:
+            return {}
+        msg = protocol.decode(data, codec)
         if msg.get("t") != "patch":
             return {}
         wire_id = msg["id"]
@@ -297,11 +322,11 @@ class Hub:
             sh = self._shared.get(wire_id)
             if sh is None:
                 reject = protocol.reject_msg(wire_id, 0, "unknown shared model")
-                return {conn: [self._encode_for(conn, reject)]}
+                return self._encode_many([conn], [reject])
             if sh.subs.get(key) != WRITE:
                 # a read-only (or unsubscribed) tenant's write is refused; tell the proposer why
                 reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription")
-                return {conn: [self._encode_for(conn, reject)]}
+                return self._encode_many([conn], [reject])
             fan = self._write_shared(wire_id, msg["patch"], origin=key)
             direct = self._fanout(wire_id, fan) if fan else {}
             return finish(self._flush_shared_tagged(wire_id), direct)
@@ -318,14 +343,14 @@ class Hub:
                 snap = sess.snapshot(wire_id)
             except KeyError:
                 reject = protocol.reject_msg(wire_id, 0, error)
-                direct = {conn: [self._encode_for(conn, reject)]}
+                direct = self._encode_many([conn], [reject])
             else:
                 revert = protocol.snapshot_msg(wire_id, snap["type_name"], snap["rev"], snap["value"])
                 reject = protocol.reject_msg(wire_id, snap["rev"], error)
-                direct = {conn: [self._encode_for(conn, revert), self._encode_for(conn, reject)]}
+                direct = self._encode_many([conn], [revert, reject])
         else:
             relay = protocol.patch_msg(wire_id, authoritative)
-            direct = {c: [self._encode_for(c, relay)] for c in self._conns_by_key.get(key, ())}
+            direct = self._encode_many(self._conns_by_key.get(key, ()), [relay])
         return finish(self._flush_tenant_tagged(key), direct)
 
     def flush(self) -> dict[Any, list[Wire]]:
@@ -353,13 +378,21 @@ class Hub:
         if not drained or not conns:
             return {}
         msgs = [(mid, protocol.patch_msg(mid, patch)) for mid, patch in drained]
-        encoded: dict[str, list[tuple[int | None, Wire]]] = {}
+        groups: dict[str, list[Any]] = {}
+        for conn in list(conns):
+            codec = self._codecs.get(conn)
+            if codec is not None:
+                groups.setdefault(codec, []).append(conn)
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
-        for conn in conns:
-            codec = self._codecs.get(conn, self.default_codec)
-            if codec not in encoded:
-                encoded[codec] = [(mid, protocol.encode(msg, codec)) for mid, msg in msgs]
-            out[conn] = encoded[codec]
+        for codec, codec_conns in groups.items():
+            try:
+                encoded = [(mid, protocol.encode(msg, codec)) for mid, msg in msgs]
+            except Exception:  # noqa: BLE001
+                for conn in codec_conns:
+                    self.close(conn)
+                continue
+            for conn in codec_conns:
+                out[conn] = encoded
         return out
 
     def _flush_shared_tagged(self, only_sid: int | None = None) -> dict[Any, list[tuple[int | None, Wire]]]:
@@ -479,13 +512,7 @@ class Hub:
     def _fanout(self, sid: int, fan: dict) -> dict[Any, list[Wire]]:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
-        # encode once per codec, not once per connection (see Server.flush)
-        encoded: dict[str, list[Wire]] = {}
-        out: dict[Any, list[Wire]] = {}
+        conns: list[Any] = []
         for key in sh.subs:
-            for conn in self._conns_by_key.get(key, ()):
-                codec = self._codecs.get(conn, self.default_codec)
-                if codec not in encoded:
-                    encoded[codec] = [protocol.encode(msg, codec)]
-                out[conn] = encoded[codec]
-        return out
+            conns.extend(self._conns_by_key.get(key, ()))
+        return self._encode_many(conns, [msg])
