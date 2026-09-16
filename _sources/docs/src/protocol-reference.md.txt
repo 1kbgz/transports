@@ -152,6 +152,30 @@ A patch advances an existing mirror.
 }
 ```
 
+A client proposal may add an opaque string identifier:
+
+```json
+{
+  "t": "patch",
+  "id": 1,
+  "patch": {"rev": 0, "ops": []},
+  "proposal": "form-12"
+}
+```
+
+On acceptance, the server adds the same `proposal` to the authoritative patch sent to the origin.
+Other clients receive the patch without it. `Client.on_ack` / `Client.onAck` also fires when the
+patch revision is already mirrored.
+
+An accepted proposal that makes no authoritative change produces an origin-only acknowledgement:
+
+```json
+{"t": "ack", "id": 1, "rev": 4, "proposal": "form-12"}
+```
+
+An acknowledgement reports the server revision but does not change the client mirror or its
+accepted revision.
+
 Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.
 
@@ -177,13 +201,14 @@ the model's validation message where available, for example pydantic's.
   "t": "reject",
   "id": 1,
   "rev": 4,
+  "proposal": "form-12",
   "error": "1 validation error for Device\nbrightness\n  Input should be a valid integer ..."
 }
 ```
 
 A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
 `Client.on_reject` / `Client.onReject` so an app can show why the edit was refused instead of only
-reverting.
+reverting. If the proposal supplied an identifier, the reject carries it.
 
 ## Model ids
 

@@ -79,11 +79,22 @@ you do not handle it yourself:
 import { toValue } from "1kbgz/transports";
 
 const [id] = client.ids();
-client.propose(id, toValue({ tick: 10 })); // send(edit(id, value)) over the managed connection
+client.propose(id, toValue({ tick: 10 }), "tick-1");
 ```
 
 The local mirror updates when the server echoes the authoritative patch, or `onReject` fires with
-the reason the edit was refused. `client.send(frame)` sends any pre-built frame the same way. It is
+the reason the edit was refused. `edit` assigns a proposal identifier; pass one explicitly when an
+adapter needs to match pending state. `onAck` receives the authoritative patch carrying that
+identifier, and rejects include it in `onReject`. Use `proposeOps` on a managed connection, or
+`editOps` with a hand-rolled socket, to send explicit operations when a whole-value diff would be
+empty against the current mirror. Generated identifiers use the reserved `auto-N` form; explicit
+identifiers matching that form are rejected so the two sources cannot collide.
+
+Proposal correlation lasts for one live connection. If it drops, `onDisconnect` fires and pending
+optimistic proposals should be discarded. Resume replays authoritative state without old proposal
+identifiers; it does not resend those proposals. Python exposes the same hook as `on_disconnect`.
+
+`client.send(frame)` sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday's
 `connectStore(store, client, (f) => client.send(f), codec)`. Both return `false` and drop the frame
 when no managed connection is open. This matches a browser WebSocket's send on a closed socket, so
@@ -100,10 +111,14 @@ client = transports.Client()
 await client.connect("ws://127.0.0.1:8000/ws")
 ```
 
-Edits work the same as in JS. `await client.propose(mid, value)` (or `await client.send(frame)`)
-rides the active `connect()` or `run()` connection, native or Pyodide. It returns `False` and drops
-the frame when there is none, so check `client.connected` first when delivery matters. With a
-hand-rolled socket, send `client.edit(mid, value)` yourself.
+Edits work the same as in JS. `await client.propose(mid, value, "edit-1")` and
+`await client.propose_ops(mid, ops, "edit-2")` ride the active `connect()` or `run()` connection,
+native or Pyodide. They return `False` and drop the frame when there is none, so check
+`client.connected` first when delivery matters. With a hand-rolled socket, send
+`client.edit(mid, value)` or `client.edit_ops(mid, ops)` yourself.
+
+Python exposes the same correlation API as `edit(..., proposal=...)`, `edit_ops`, `on_ack`, and
+`on_reject`.
 
 ## Use MessagePack on a connection
 

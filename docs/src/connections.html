@@ -317,11 +317,20 @@ you do not handle it yourself:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">toValue</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
 
 <span class="kd">const</span><span class="w"> </span><span class="p">[</span><span class="nx">id</span><span class="p">]</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">ids</span><span class="p">();</span>
-<span class="nx">client</span><span class="p">.</span><span class="nx">propose</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}));</span><span class="w"> </span><span class="c1">// send(edit(id, value)) over the managed connection</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">propose</span><span class="p">(</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">toValue</span><span class="p">({</span><span class="w"> </span><span class="nx">tick</span><span class="o">:</span><span class="w"> </span><span class="kt">10</span><span class="w"> </span><span class="p">}),</span><span class="w"> </span><span class="s2">"tick-1"</span><span class="p">);</span>
 </pre></div>
 </div>
 <p>The local mirror updates when the server echoes the authoritative patch, or <code class="docutils literal notranslate"><span class="pre">onReject</span></code> fires with
-the reason the edit was refused. <code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way. It is
+the reason the edit was refused. <code class="docutils literal notranslate"><span class="pre">edit</span></code> assigns a proposal identifier; pass one explicitly when an
+adapter needs to match pending state. <code class="docutils literal notranslate"><span class="pre">onAck</span></code> receives the authoritative patch carrying that
+identifier, and rejects include it in <code class="docutils literal notranslate"><span class="pre">onReject</span></code>. Use <code class="docutils literal notranslate"><span class="pre">proposeOps</span></code> on a managed connection, or
+<code class="docutils literal notranslate"><span class="pre">editOps</span></code> with a hand-rolled socket, to send explicit operations when a whole-value diff would be
+empty against the current mirror. Generated identifiers use the reserved <code class="docutils literal notranslate"><span class="pre">auto-N</span></code> form; explicit
+identifiers matching that form are rejected so the two sources cannot collide.</p>
+<p>Proposal correlation lasts for one live connection. If it drops, <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> fires and pending
+optimistic proposals should be discarded. Resume replays authoritative state without old proposal
+identifiers; it does not resend those proposals. Python exposes the same hook as <code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday’s
 <code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame
 when no managed connection is open. This matches a browser WebSocket’s send on a closed socket, so
@@ -336,10 +345,13 @@ they are safe as fire-and-forget callbacks even across <code class="docutils lit
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Edits work the same as in JS. <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose(mid,</span> <span class="pre">value)</span></code> (or <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.send(frame)</span></code>)
-rides the active <code class="docutils literal notranslate"><span class="pre">connect()</span></code> or <code class="docutils literal notranslate"><span class="pre">run()</span></code> connection, native or Pyodide. It returns <code class="docutils literal notranslate"><span class="pre">False</span></code> and drops
-the frame when there is none, so check <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> first when delivery matters. With a
-hand-rolled socket, send <code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> yourself.</p>
+<p>Edits work the same as in JS. <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose(mid,</span> <span class="pre">value,</span> <span class="pre">&quot;edit-1&quot;)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose_ops(mid,</span> <span class="pre">ops,</span> <span class="pre">&quot;edit-2&quot;)</span></code> ride the active <code class="docutils literal notranslate"><span class="pre">connect()</span></code> or <code class="docutils literal notranslate"><span class="pre">run()</span></code> connection,
+native or Pyodide. They return <code class="docutils literal notranslate"><span class="pre">False</span></code> and drop the frame when there is none, so check
+<code class="docutils literal notranslate"><span class="pre">client.connected</span></code> first when delivery matters. With a hand-rolled socket, send
+<code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> or <code class="docutils literal notranslate"><span class="pre">client.edit_ops(mid,</span> <span class="pre">ops)</span></code> yourself.</p>
+<p>Python exposes the same correlation API as <code class="docutils literal notranslate"><span class="pre">edit(...,</span> <span class="pre">proposal=...)</span></code>, <code class="docutils literal notranslate"><span class="pre">edit_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">on_ack</span></code>, and
+<code class="docutils literal notranslate"><span class="pre">on_reject</span></code>.</p>
 </section>
 <section id="use-messagepack-on-a-connection">
 <h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>

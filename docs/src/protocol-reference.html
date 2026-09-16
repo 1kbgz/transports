@@ -427,6 +427,24 @@ an exact permutation and reconciliation exhausts the budget, diff falls back to 
 <span class="p">}</span>
 </pre></div>
 </div>
+<p>A client proposal may add an opaque string identifier:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"patch"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"patch"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span><span class="w"> </span><span class="nt">"ops"</span><span class="p">:</span><span class="w"> </span><span class="p">[]},</span>
+<span class="w">  </span><span class="nt">"proposal"</span><span class="p">:</span><span class="w"> </span><span class="s2">"form-12"</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>On acceptance, the server adds the same <code class="docutils literal notranslate"><span class="pre">proposal</span></code> to the authoritative patch sent to the origin.
+Other clients receive the patch without it. <code class="docutils literal notranslate"><span class="pre">Client.on_ack</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onAck</span></code> also fires when the
+patch revision is already mirrored.</p>
+<p>An accepted proposal that makes no authoritative change produces an origin-only acknowledgement:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ack"</span><span class="p">,</span><span class="w"> </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span><span class="w"> </span><span class="nt">"proposal"</span><span class="p">:</span><span class="w"> </span><span class="s2">"form-12"</span><span class="p">}</span>
+</pre></div>
+</div>
+<p>An acknowledgement reports the server revision but does not change the client mirror or its
+accepted revision.</p>
 <p>Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.</p>
 <p><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> (Python and JavaScript alike) returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted
@@ -449,13 +467,14 @@ the model’s validation message where available, for example pydantic’s.</p>
 <span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"reject"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"proposal"</span><span class="p">:</span><span class="w"> </span><span class="s2">"form-12"</span><span class="p">,</span>
 <span class="w">  </span><span class="nt">"error"</span><span class="p">:</span><span class="w"> </span><span class="s2">"1 validation error for Device\nbrightness\n  Input should be a valid integer ..."</span>
 <span class="p">}</span>
 </pre></div>
 </div>
 <p>A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
 <code class="docutils literal notranslate"><span class="pre">Client.on_reject</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onReject</span></code> so an app can show why the edit was refused instead of only
-reverting.</p>
+reverting. If the proposal supplied an identifier, the reject carries it.</p>
 </section>
 </section>
 <section id="model-ids">
