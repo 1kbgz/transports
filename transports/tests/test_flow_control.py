@@ -297,7 +297,10 @@ def test_stuck_consumer_exceeding_the_bound_is_disconnected():
             # and the flow keeps working after the disconnect
             before = len(fast.sent)
             models[0].n = 999
-            await asyncio.sleep(0.01)
+            for _ in range(1000):
+                if len(fast.sent) > before:
+                    break
+                await asyncio.sleep(0.001)
             assert len(fast.sent) > before
         finally:
             sync_task.cancel()
