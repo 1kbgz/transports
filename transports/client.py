@@ -9,6 +9,7 @@ network).
 import contextlib
 import inspect
 import json
+import re
 import sys
 import urllib.parse
 from collections.abc import Callable
@@ -32,7 +33,10 @@ class Client:
         self._type: dict[int, str] = {}
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
+        self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
+        self._disconnect_cbs: list[Callable[[], None]] = []
+        self._next_proposal = 1
         #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
         self._sender: Callable[[str | bytes], Any] | None = None
 
@@ -55,12 +59,16 @@ class Client:
             await result
         return True
 
-    async def propose(self, mid: int, new_value: Any) -> bool:
+    async def propose(self, mid: int, new_value: Any, proposal: str | None = None) -> bool:
         """Propose an edit over the active connection: ``send(edit(mid, new_value))``.
 
         Server-authoritative — the mirror updates when the authoritative patch echoes back (or
         `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""
-        return await self.send(self.edit(mid, new_value))
+        return await self.send(self.edit(mid, new_value, proposal))
+
+    async def propose_ops(self, mid: int, ops: list[dict], proposal: str | None = None) -> bool:
+        """Propose explicit patch operations over the active connection."""
+        return await self.send(self.edit_ops(mid, ops, proposal))
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired after each accepted snapshot or patch — the same change dict
@@ -77,6 +85,38 @@ class Client:
         self._reject_cbs.append(callback)
         return lambda: self._reject_cbs.remove(callback)
 
+    def on_ack(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Register a callback fired when the server accepts a tagged proposal.
+
+        The callback receives an authoritative patch or no-op acknowledgement, including its opaque
+        ``proposal`` identifier.
+        Returns an unsubscribe function.
+        """
+        self._ack_cbs.append(callback)
+        return lambda: self._ack_cbs.remove(callback)
+
+    def on_disconnect(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """Register a callback fired when an active managed WebSocket disconnects."""
+        self._disconnect_cbs.append(callback)
+        return lambda: self._disconnect_cbs.remove(callback)
+
+    def _disconnected(self) -> None:
+        for callback in list(self._disconnect_cbs):
+            callback()
+
+    def _acknowledge(self, msg: dict) -> None:
+        if "proposal" in msg:
+            for callback in list(self._ack_cbs):
+                callback(msg)
+
+    def _proposal_id(self, proposal: str | None) -> str:
+        if proposal is None:
+            proposal = f"auto-{self._next_proposal}"
+            self._next_proposal += 1
+        elif re.fullmatch(r"auto-[0-9]+", proposal):
+            raise ValueError("proposal identifiers matching 'auto-N' are reserved")
+        return proposal
+
     def _accepted(self, change: dict) -> dict:
         for callback in list(self._change_cbs):
             callback(change)
@@ -87,8 +127,8 @@ class Client:
 
         Returns the accepted change so reactive consumers can update only its paths —
         ``{"t": "snapshot", "id", "rev"}`` for a snapshot, the decoded patch message for a patch — or
-        ``None`` for a patch whose revision was already applied, a ``reject`` (dispatched to
-        `on_reject`), and an unrecognized message type, which is ignored so a newer server can add
+        ``None`` for a patch whose revision was already applied, an ``ack``, a ``reject`` (dispatched
+        to `on_reject`), and an unrecognized message type, which is ignored so a newer server can add
         message types without breaking older clients. A connection that negotiated ``?batch=1``
         may receive batch frames, which apply in order and return the accepted changes as a
         ``list``. Invalid frames raise without changing the mirror or its accepted revision."""
@@ -115,12 +155,18 @@ class Client:
             # rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a
             # patch the opening snapshot already captured, which the server then also broadcasts).
             if mid in self._rev and rev <= self._rev[mid]:
+                self._acknowledge(msg)
                 return None
             if mid not in self._values:
                 raise ValueError(f"patch received before snapshot for model {mid}")
             self._values[mid] = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
             self._rev[mid] = rev
-            return self._accepted(msg)
+            accepted = self._accepted(msg)
+            self._acknowledge(msg)
+            return accepted
+        elif t == "ack":
+            self._acknowledge(msg)
+            return None
         elif t == "reject":
             for callback in list(self._reject_cbs):
                 callback(msg)
@@ -139,7 +185,7 @@ class Client:
     def ids(self) -> list[int]:
         return list(self._values)
 
-    def edit(self, mid: int, new_value: Any) -> str | bytes:
+    def edit(self, mid: int, new_value: Any, proposal: str | None = None) -> str | bytes:
         """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
 
         Models are server-authoritative: the edit is a proposal, and the local mirror updates only
@@ -147,7 +193,17 @@ class Client:
         keeps `rev` owned by the server and avoids client/server `rev` divergence.
         """
         patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
-        return protocol.encode(protocol.patch_msg(mid, patch), self._codec)
+        return self.edit_ops(mid, patch["ops"], proposal)
+
+    def edit_ops(self, mid: int, ops: list[dict], proposal: str | None = None) -> str | bytes:
+        """Propose explicit patch operations, optionally under a caller-supplied identifier.
+
+        When ``proposal`` is omitted, a client-local monotonic identifier is assigned. Use this
+        form when a new optimistic value equals the current mirror and a whole-value diff would be
+        empty while an older proposal is still pending.
+        """
+        patch = {"rev": 0, "ops": ops}
+        return protocol.encode(protocol.patch_msg(mid, patch, self._proposal_id(proposal)), self._codec)
 
     def _connect_url(self, url: str) -> str:
         """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
@@ -170,12 +226,15 @@ class Client:
         import websockets
 
         async with websockets.connect(self._connect_url(url)) as ws:
-            self._sender = ws.send
+            sender = ws.send
+            self._sender = sender
             try:
                 async for frame in ws:
                     self.recv(frame)
             finally:
-                self._sender = None
+                if self._sender is sender:
+                    self._sender = None
+                    self._disconnected()
 
     async def _run_browser(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
         """`run` over the browser's native `WebSocket` (the Pyodide path): reconnect forever with
@@ -224,6 +283,8 @@ class Client:
         ws = WebSocket.new(self._connect_url(url))
         ws.binaryType = "arraybuffer"
         closed: asyncio.Future = asyncio.get_running_loop().create_future()
+        sender = lambda frame: self._send_browser(ws, frame)
+        opened = False
 
         def _on_message(event: Any) -> None:
             data = event.data
@@ -237,8 +298,10 @@ class Client:
                 closed.set_result(None)
 
         def _on_open(_event: Any) -> None:
+            nonlocal opened
             # arm the outbound channel only once the socket is open (send during CONNECTING throws)
-            self._sender = lambda frame: self._send_browser(ws, frame)
+            opened = True
+            self._sender = sender
 
         proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close), create_proxy(_on_close)]
         for name, proxy in zip(("message", "open", "close", "error"), proxies):
@@ -246,7 +309,10 @@ class Client:
         try:
             await closed
         finally:
-            self._sender = None
+            if self._sender is sender:
+                self._sender = None
+                if opened:
+                    self._disconnected()
             for proxy in proxies:
                 proxy.destroy()
 
@@ -279,7 +345,8 @@ class Client:
             pushed: set = set()
             try:
                 async with websockets.connect(self._connect_url(url)) as ws:
-                    self._sender = ws.send
+                    sender = ws.send
+                    self._sender = sender
                     try:
                         async for frame in ws:
                             self.recv(frame)
@@ -289,7 +356,9 @@ class Client:
                                         await ws.send(self.edit(mid, pre[mid]))
                                         pushed.add(mid)
                     finally:
-                        self._sender = None
+                        if self._sender is sender:
+                            self._sender = None
+                            self._disconnected()
             except (websockets.ConnectionClosed, OSError):
                 pass  # dropped — fall through to retry
             await asyncio.sleep(retry)

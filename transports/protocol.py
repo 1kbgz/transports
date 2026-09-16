@@ -4,13 +4,17 @@ WebSocket messages (and Jupyter comm messages) are self-delimiting, so the binar
 in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small
 JSON envelope carries the routing metadata around a model snapshot or a patch.
 
-Three message kinds:
+Four message kinds:
 
 - ``{"t": "snapshot", "id": <int>, "type": <str>, "rev": <int>, "value": <Value>}``
-- ``{"t": "patch", "id": <int>, "patch": {"rev": <int>, "ops": [...]}}``
-- ``{"t": "reject", "id": <int>, "rev": <int>, "error": <str>}`` — a proposed edit was refused;
-  sent to the proposing connection only, alongside the authoritative revert. ``rev`` is the
-  server's current revision for the model. Clients that predate a message kind ignore it.
+- ``{"t": "patch", "id": <int>, "patch": {"rev": <int>, "ops": [...]}, "proposal": <str>?}``
+- ``{"t": "ack", "id": <int>, "rev": <int>, "proposal": <str>}`` — an accepted proposal that
+  produced no authoritative patch; sent only to the origin and never changes its mirror.
+- ``{"t": "reject", "id": <int>, "rev": <int>, "error": <str>, "proposal": <str>?}`` — a
+  proposed edit was refused; sent to the proposing connection only, alongside the authoritative
+  revert. ``rev`` is the server's current revision for the model. ``proposal`` is an optional opaque
+  identifier returned only to the origin on acceptance or rejection. Clients that predate a field
+  or message kind ignore it.
 """
 
 import json
@@ -83,12 +87,22 @@ def snapshot_msg(model_id: int, type_name: str, rev: int, value: Any) -> str:
     return json.dumps({"t": "snapshot", "id": model_id, "type": type_name, "rev": rev, "value": value})
 
 
-def patch_msg(model_id: int, patch: dict) -> str:
-    return json.dumps({"t": "patch", "id": model_id, "patch": patch})
+def patch_msg(model_id: int, patch: dict, proposal: str | None = None) -> str:
+    msg = {"t": "patch", "id": model_id, "patch": patch}
+    if proposal is not None:
+        msg["proposal"] = proposal
+    return json.dumps(msg)
 
 
-def reject_msg(model_id: int, rev: int, error: str) -> str:
-    return json.dumps({"t": "reject", "id": model_id, "rev": rev, "error": error})
+def ack_msg(model_id: int, rev: int, proposal: str) -> str:
+    return json.dumps({"t": "ack", "id": model_id, "rev": rev, "proposal": proposal})
+
+
+def reject_msg(model_id: int, rev: int, error: str, proposal: str | None = None) -> str:
+    msg = {"t": "reject", "id": model_id, "rev": rev, "error": error}
+    if proposal is not None:
+        msg["proposal"] = proposal
+    return json.dumps(msg)
 
 
 def batch_msg(msg_jsons: list[str]) -> str:

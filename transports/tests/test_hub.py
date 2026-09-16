@@ -216,6 +216,8 @@ def test_shared_write_relays_to_other_writers():
     edit = cl1.edit(sid, {"Map": {"x": {"Int": 5}, "y": {"Int": 0}}})
     out = h.recv(c1, edit)
     assert set(out) == {c1, c2}  # shared models are server-authoritative: every subscriber, incl. origin
+    assert json.loads(out[c1][0])["proposal"] == "auto-1"
+    assert "proposal" not in json.loads(out[c2][0])
     for m in out[c2]:
         cl2.recv(m)
     assert cl2.value(sid)["Map"]["x"] == {"Int": 5}
@@ -261,6 +263,31 @@ def test_private_reply_only_drains_the_proposer_tenant():
     remaining = h.flush()
     assert set(remaining) == {conns["t2"]}
     assert json.loads(remaining[conns["t2"]][0])["patch"]["rev"] == 1
+
+
+def test_shared_noop_acknowledges_origin_without_fanout():
+    h = hub()
+    sid = h.share(Doc())
+    h.subscribe("t1", sid, WRITE)
+    h.subscribe("t2", sid, WRITE)
+    c1, c2 = ("t1", "a"), ("t2", "b")
+    cl1 = Client()
+    for msg in h.open(c1):
+        cl1.recv(msg)
+    h.open(c2)
+    acknowledgements = []
+    cl1.on_ack(acknowledgements.append)
+
+    frame = cl1.edit_ops(
+        sid,
+        [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 0}}}],
+        "same-value",
+    )
+    out = h.recv(c1, frame)
+    assert set(out) == {c1}
+    assert json.loads(out[c1][0]) == {"t": "ack", "id": sid, "rev": 0, "proposal": "same-value"}
+    cl1.recv(out[c1][0])
+    assert acknowledgements[0]["proposal"] == "same-value"
 
 
 def test_n_by_n_routes_each_connection_its_subscribed_set():

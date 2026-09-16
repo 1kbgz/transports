@@ -70,3 +70,37 @@ def test_client_raises_on_patch_before_snapshot():
         raise AssertionError("expected ValueError")
     except ValueError as e:
         assert "before snapshot" in str(e)
+
+
+def test_client_acknowledges_patches_and_ack_frames_without_fast_forwarding():
+    c = transports.Client()
+    c.recv(transports.protocol.snapshot_msg(1, "M", 3, {"Map": {"xs": {"List": []}}}))
+    acknowledgements = []
+    off = c.on_ack(acknowledgements.append)
+
+    assert c.recv(transports.protocol.patch_msg(1, {"rev": 3, "ops": []}, "edit-2")) is None
+    assert acknowledgements == [{"t": "patch", "id": 1, "patch": {"rev": 3, "ops": []}, "proposal": "edit-2"}]
+
+    assert c.recv(transports.protocol.ack_msg(1, 99, "edit-3")) is None
+    accepted = c.recv(transports.protocol.patch_msg(1, {"rev": 4, "ops": []}))
+    assert accepted == {"t": "patch", "id": 1, "patch": {"rev": 4, "ops": []}}
+    assert acknowledgements[-1] == {"t": "ack", "id": 1, "rev": 99, "proposal": "edit-3"}
+
+    off()
+    c.recv(transports.protocol.ack_msg(1, 4, "edit-4"))
+    assert len(acknowledgements) == 2
+
+
+def test_client_generated_proposal_ids_do_not_collide_with_caller_ids():
+    c = transports.Client()
+
+    explicit = transports.protocol.decode(c.edit_ops(1, [], "1"), "json")
+    generated = transports.protocol.decode(c.edit_ops(1, []), "json")
+
+    assert explicit["proposal"] == "1"
+    assert generated["proposal"] == "auto-1"
+    try:
+        c.edit_ops(1, [], "auto-2")
+        raise AssertionError("expected ValueError")
+    except ValueError as error:
+        assert "reserved" in str(error)

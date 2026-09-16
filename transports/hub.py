@@ -314,6 +314,7 @@ class Hub:
         if msg.get("t") != "patch":
             return {}
         wire_id = msg["id"]
+        proposal = msg.get("proposal")
         key = self._conn_key.get(conn)
 
         def finish(pending: dict[Any, list[tuple[int | None, Wire]]], direct: dict[Any, list[Wire]]) -> dict[Any, list[Wire]]:
@@ -325,15 +326,20 @@ class Hub:
         if wire_id >= SHARED_ID_BASE:
             sh = self._shared.get(wire_id)
             if sh is None:
-                reject = protocol.reject_msg(wire_id, 0, "unknown shared model")
+                reject = protocol.reject_msg(wire_id, 0, "unknown shared model", proposal)
                 return self._encode_many([conn], [reject])
             if not self._shared_write_allowed(key, wire_id):
                 # a read-only (or unsubscribed) tenant's write is refused; tell the proposer why
-                reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription")
+                reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription", proposal)
                 return self._encode_many([conn], [reject])
             fan = self._write_shared(wire_id, msg["patch"], origin=key)
-            direct = self._fanout(wire_id, fan) if fan else {}
-            return finish(self._flush_shared_tagged(wire_id), direct)
+            if fan:
+                direct = self._fanout(wire_id, fan, origin=conn, proposal=proposal)
+                return finish(self._flush_shared_tagged(wire_id), direct)
+            if proposal is not None:
+                direct = self._encode_many([conn], [protocol.ack_msg(wire_id, sh.rev, proposal)])
+                return finish(self._flush_shared_tagged(wire_id), direct)
+            return finish(self._flush_shared_tagged(wire_id), {})
         sess = self._tenants.get(key)
         if sess is None:
             return {}
@@ -346,15 +352,20 @@ class Hub:
             try:
                 snap = sess.snapshot(wire_id)
             except KeyError:
-                reject = protocol.reject_msg(wire_id, 0, error)
+                reject = protocol.reject_msg(wire_id, 0, error, proposal)
                 direct = self._encode_many([conn], [reject])
             else:
                 revert = protocol.snapshot_msg(wire_id, snap["type_name"], snap["rev"], snap["value"])
-                reject = protocol.reject_msg(wire_id, snap["rev"], error)
+                reject = protocol.reject_msg(wire_id, snap["rev"], error, proposal)
                 direct = self._encode_many([conn], [revert, reject])
         else:
             relay = protocol.patch_msg(wire_id, authoritative)
-            direct = self._encode_many(self._conns_by_key.get(key, ()), [relay])
+            conns = self._conns_by_key.get(key, ())
+            if proposal is None:
+                direct = self._encode_many(conns, [relay])
+            else:
+                direct = self._encode_many((target for target in conns if target != conn), [relay])
+                direct.update(self._encode_many([conn], [protocol.patch_msg(wire_id, authoritative, proposal)]))
         return finish(self._flush_tenant_tagged(key), direct)
 
     def flush(self) -> dict[Any, list[Wire]]:
@@ -513,10 +524,14 @@ class Hub:
             self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, fan, sh.merge.state())
         return fan
 
-    def _fanout(self, sid: int, fan: dict) -> dict[Any, list[Wire]]:
+    def _fanout(self, sid: int, fan: dict, *, origin: Any = None, proposal: str | None = None) -> dict[Any, list[Wire]]:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
         conns: list[Any] = []
         for key in sh.subs:
             conns.extend(self._conns_by_key.get(key, ()))
-        return self._encode_many(conns, [msg])
+        if proposal is None or origin is None:
+            return self._encode_many(conns, [msg])
+        out = self._encode_many((conn for conn in conns if conn != origin), [msg])
+        out.update(self._encode_many([origin], [protocol.patch_msg(sid, fan, proposal)]))
+        return out

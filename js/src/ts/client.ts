@@ -24,14 +24,23 @@ export type PatchOp =
   | { Move: { path: PathSeg[]; from: number; to: number } }
   | { Reorder: { path: PathSeg[]; order: number[] } };
 export type ModelPatch = { rev: number; ops: PatchOp[] };
-type PatchMsg = {
+export type PatchMsg = {
   t: "patch";
   id: number;
   patch: ModelPatch;
+  proposal?: string;
 };
+/** An accepted proposal that produced no authoritative patch. */
+export type AckMsg = { t: "ack"; id: number; rev: number; proposal: string };
 /** The server refused a proposed edit; `rev` is its current revision and `error` says why (the
  * model's validation message). Sent to the proposer only, after the authoritative revert. */
-export type RejectMsg = { t: "reject"; id: number; rev: number; error: string };
+export type RejectMsg = {
+  t: "reject";
+  id: number;
+  rev: number;
+  error: string;
+  proposal?: string;
+};
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
@@ -202,7 +211,10 @@ export class Client {
   private values = new Map<number, unknown>();
   private revs = new Map<number, number>();
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
+  private ackListeners: Array<(ack: PatchMsg | AckMsg) => void> = [];
   private rejectListeners: Array<(reject: RejectMsg) => void> = [];
+  private disconnectListeners: Array<() => void> = [];
+  private nextProposal = 1;
   // outbound channel of the active managed connection (set by connect()/run(), cleared on close)
   private sender: ((frame: string | Uint8Array) => void) | null = null;
 
@@ -230,8 +242,13 @@ export class Client {
   /** Propose an edit over the active connection: `send(edit(id, value))`. Server-authoritative —
    * the mirror updates when the authoritative patch echoes back (or `onReject` fires). Returns
    * `false` (dropped) when not connected. */
-  propose(id: number, value: unknown): boolean {
-    return this.send(this.edit(id, value));
+  propose(id: number, value: unknown, proposal?: string): boolean {
+    return this.send(this.edit(id, value, proposal));
+  }
+
+  /** Propose explicit patch operations over the active connection. */
+  proposeOps(id: number, ops: PatchOp[], proposal?: string): boolean {
+    return this.send(this.editOps(id, ops, proposal));
   }
 
   /** Register a listener fired when the server refuses a proposed edit, with the decoded `reject`
@@ -244,6 +261,29 @@ export class Client {
       const i = this.rejectListeners.indexOf(listener);
       if (i >= 0) this.rejectListeners.splice(i, 1);
     };
+  }
+
+  /** Register a listener fired when the server accepts a tagged proposal. Receives an authoritative
+   * patch or no-op acknowledgement carrying the same opaque proposal identifier. */
+  onAck(listener: (ack: PatchMsg | AckMsg) => void): () => void {
+    this.ackListeners.push(listener);
+    return () => {
+      const i = this.ackListeners.indexOf(listener);
+      if (i >= 0) this.ackListeners.splice(i, 1);
+    };
+  }
+
+  /** Register a listener fired when an active managed WebSocket disconnects. */
+  onDisconnect(listener: () => void): () => void {
+    this.disconnectListeners.push(listener);
+    return () => {
+      const i = this.disconnectListeners.indexOf(listener);
+      if (i >= 0) this.disconnectListeners.splice(i, 1);
+    };
+  }
+
+  private disconnected(): void {
+    for (const listener of [...this.disconnectListeners]) listener();
   }
 
   /** Register a listener fired after each accepted snapshot or patch — the same `ReceiveChange`
@@ -265,6 +305,18 @@ export class Client {
     return change;
   }
 
+  private acknowledge(msg: PatchMsg | AckMsg): void {
+    if (msg.proposal !== undefined)
+      for (const listener of [...this.ackListeners]) listener(msg);
+  }
+
+  private proposalId(proposal?: string): string {
+    if (proposal === undefined) return `auto-${this.nextProposal++}`;
+    if (/^auto-\d+$/.test(proposal))
+      throw new Error("proposal identifiers matching 'auto-N' are reserved");
+    return proposal;
+  }
+
   /** Apply an inbound snapshot or patch frame to the mirror.
    *
    * Decodes by the client's codec: a registered custom codec, else built-in JSON (text) / msgpack
@@ -277,9 +329,9 @@ export class Client {
    */
   recv(data: string | Uint8Array): ReceiveChange | ReceiveChange[] | undefined {
     const custom = codecFor(this.codec);
-    let msg: SnapshotMsg | PatchMsg | RejectMsg | BatchMsg;
+    let msg: SnapshotMsg | PatchMsg | AckMsg | RejectMsg | BatchMsg;
     if (custom) {
-      msg = custom.decode(data) as SnapshotMsg | PatchMsg | RejectMsg;
+      msg = custom.decode(data) as SnapshotMsg | PatchMsg | AckMsg | RejectMsg;
     } else if (typeof data === "string") {
       msg = JSON.parse(data);
     } else {
@@ -300,7 +352,7 @@ export class Client {
   }
 
   private apply(
-    msg: SnapshotMsg | PatchMsg | RejectMsg,
+    msg: SnapshotMsg | PatchMsg | AckMsg | RejectMsg,
   ): ReceiveChange | undefined {
     if (msg.t === "snapshot") {
       this.values.set(msg.id, msg.value);
@@ -310,13 +362,21 @@ export class Client {
       // rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. one
       // the opening snapshot already captured, which the server then also broadcasts).
       const seen = this.revs.get(msg.id);
-      if (seen !== undefined && msg.patch.rev <= seen) return undefined;
+      if (seen !== undefined && msg.patch.rev <= seen) {
+        this.acknowledge(msg);
+        return undefined;
+      }
       const current = this.values.get(msg.id);
       if (current === undefined)
         throw new Error(`patch received before snapshot for model ${msg.id}`);
       this.values.set(msg.id, applyPatch(current as Value, msg.patch));
       this.revs.set(msg.id, msg.patch.rev);
-      return this.accepted(msg);
+      const accepted = this.accepted(msg);
+      this.acknowledge(msg);
+      return accepted;
+    } else if (msg.t === "ack") {
+      this.acknowledge(msg);
+      return undefined;
     } else if (msg.t === "reject") {
       // the mirror is untouched: the server reverts the proposer with the snapshot sent alongside
       for (const listener of [...this.rejectListeners]) listener(msg);
@@ -341,11 +401,22 @@ export class Client {
    * Server-authoritative: the local mirror updates when the server echoes the authoritative patch
    * back via `recv`, not optimistically.
    */
-  edit(id: number, value: unknown): string | Uint8Array {
+  edit(id: number, value: unknown, proposal?: string): string | Uint8Array {
     const patch = JSON.parse(
       diff(JSON.stringify(this.values.get(id)), JSON.stringify(value)),
     );
-    const msg = { t: "patch", id, patch };
+    return this.editOps(id, patch.ops, proposal);
+  }
+
+  /** Propose explicit patch operations. This can express a value equal to the current mirror while
+   * an older optimistic proposal is pending. A client-local proposal id is assigned by default. */
+  editOps(id: number, ops: PatchOp[], proposal?: string): string | Uint8Array {
+    const msg = {
+      t: "patch",
+      id,
+      patch: { rev: 0, ops },
+      proposal: this.proposalId(proposal),
+    };
     const custom = codecFor(this.codec);
     if (custom) return custom.encode(msg);
     const s = JSON.stringify(msg);
@@ -382,7 +453,10 @@ export class Client {
       this.sender = sender; // arm only once open: send during CONNECTING throws in the DOM
     });
     ws.addEventListener("close", () => {
-      if (this.sender === sender) this.sender = null; // don't clobber a newer reconnect's channel
+      if (this.sender === sender) {
+        this.sender = null; // don't clobber a newer reconnect's channel
+        this.disconnected();
+      }
     });
     return ws;
   }
