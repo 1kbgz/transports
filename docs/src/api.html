@@ -586,11 +586,10 @@ over the relevant widgets.</p>
 <p>Run exactly one of these per <cite>Server</cite>/<cite>Hub</cite> (not per connection), so a single drain feeds every
 client. The async counterpart of <cite>sync</cite> — use this for socket backends (WebSocket/SSE) driven by an
 event loop, and <cite>sync</cite> for the synchronous ones (Jupyter comm/anywidget).</p>
-<p>Each connection’s undelivered state patches live in a per-model map, and <strong>state coalesces</strong>: a
-newer revision of a model <em>replaces</em> that connection’s undelivered one (state semantics —
-clients need the newest revision, not the history), so a slow consumer’s backlog is bounded
-by its model count and it always receives fresh data. Non-coalescible messages (batch envelopes
-and direct replies) accumulate under unique keys instead.</p>
+<p>Each connection’s undelivered state patches live in a per-model map, and <strong>state coalesces</strong>:
+a newer revision is composed with that model’s undelivered patch into one frame, so no delta is
+lost while a slow consumer’s backlog stays bounded by its model count. Non-coalescible messages
+(batch envelopes and direct replies) accumulate under unique keys instead.</p>
 <p>Delivery runs on a fixed pool of <code class="docutils literal notranslate"><span class="pre">shards</span></code> writer tasks, each serially draining its share of
 connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
 CPU regression at 1000 connections: task-scheduling churn, and no drain-rate feedback). The
