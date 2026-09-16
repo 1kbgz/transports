@@ -25,9 +25,10 @@ def test_session_patch_round_trip() -> None:
 
     server_device.enabled = True
     _, patch = server.drain()[0]
-    wire = encode(patch_msg(client_id, patch), "msgpack")
+    wire = encode(patch_msg(client_id, patch, "pyodide-1"), "msgpack")
     message = decode(wire, "msgpack")
 
+    assert message["proposal"] == "pyodide-1"
     assert client.apply_patch(message["id"], message["patch"])
     assert client_device.enabled is True
     assert client.snapshot(client_id)["rev"] == 1

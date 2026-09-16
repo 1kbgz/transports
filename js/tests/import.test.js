@@ -286,11 +286,20 @@ test("Client.send drops when unconnected; propose sends the edit frame", async (
   );
   const sent = [];
   c.send = (f) => sent.push(f) > 0; // stub the active-connection channel
-  expect(c.propose(1, { Map: { on: { Bool: true } } })).toBe(true);
-  expect(sent.length).toBe(1);
+  expect(c.propose(1, { Map: { on: { Bool: true } } }, "toggle-1")).toBe(true);
+  expect(
+    c.proposeOps(
+      1,
+      [{ Set: { path: [{ Key: "on" }], value: { Bool: false } } }],
+      "toggle-2",
+    ),
+  ).toBe(true);
+  expect(sent.length).toBe(2);
   const msg = JSON.parse(sent[0]);
   expect(msg.t).toBe("patch");
+  expect(msg.proposal).toBe("toggle-1");
   expect(msg.patch.ops[0].Set.value).toEqual({ Bool: true });
+  expect(JSON.parse(sent[1]).proposal).toBe("toggle-2");
 });
 
 test("Client.onReject surfaces a server rejection; the mirror is untouched", async () => {
@@ -317,6 +326,106 @@ test("Client.onReject surfaces a server rejection; the mirror is untouched", asy
   off();
   c.recv(JSON.stringify({ t: "reject", id: 1, rev: 3, error: "again" }));
   expect(rejections.length).toBe(1); // unsubscribed
+});
+
+test("Client correlates accepted and rejected proposals", async () => {
+  const c = new Client();
+  c.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 1,
+      type: "Device",
+      rev: 3,
+      value: { Map: { on: { Bool: false } } },
+    }),
+  );
+  const acknowledgements = [];
+  const rejections = [];
+  c.onAck((ack) => acknowledgements.push(ack));
+  c.onReject((reject) => rejections.push(reject));
+
+  expect(
+    c.recv(
+      JSON.stringify({
+        t: "ack",
+        id: 1,
+        rev: 99,
+        proposal: "toggle-1",
+      }),
+    ),
+  ).toBeUndefined();
+  c.recv(
+    JSON.stringify({
+      t: "reject",
+      id: 1,
+      rev: 3,
+      error: "invalid",
+      proposal: "toggle-2",
+    }),
+  );
+
+  expect(acknowledgements[0].proposal).toBe("toggle-1");
+  expect(c.value(1)).toEqual({ Map: { on: { Bool: false } } });
+  expect(rejections[0].proposal).toBe("toggle-2");
+});
+
+test("Client.editOps preserves an explicit proposal in msgpack", async () => {
+  const c = new Client("msgpack");
+  c.recv(
+    jsonToMsgpack(
+      JSON.stringify({
+        t: "snapshot",
+        id: 1,
+        type: "Device",
+        rev: 0,
+        value: { Map: { on: { Bool: false } } },
+      }),
+    ),
+  );
+
+  const frame = c.editOps(
+    1,
+    [{ Set: { path: [{ Key: "on" }], value: { Bool: true } } }],
+    "toggle-1",
+  );
+  expect(JSON.parse(msgpackToJson(frame)).proposal).toBe("toggle-1");
+});
+
+test("Client-generated proposal ids cannot collide with caller ids", async () => {
+  const c = new Client();
+  expect(JSON.parse(c.editOps(1, [], "1")).proposal).toBe("1");
+  expect(JSON.parse(c.editOps(1, [])).proposal).toBe("auto-1");
+  expect(() => c.editOps(1, [], "auto-2")).toThrow(/reserved/);
+});
+
+test("Client exposes managed connection loss", async () => {
+  const NativeWebSocket = globalThis.WebSocket;
+  class FakeSocket {
+    constructor() {
+      this.listeners = {};
+    }
+    addEventListener(name, listener) {
+      this.listeners[name] = listener;
+    }
+    send() {}
+    emit(name) {
+      this.listeners[name]({});
+    }
+  }
+  globalThis.WebSocket = FakeSocket;
+  try {
+    const c = new Client();
+    const disconnects = [];
+    c.onDisconnect(() => disconnects.push(true));
+    const socket = c.connect("ws://host/ws");
+    socket.emit("open");
+    expect(c.connected).toBe(true);
+    socket.emit("close");
+    expect(c.connected).toBe(false);
+    expect(disconnects).toEqual([true]);
+  } finally {
+    globalThis.WebSocket = NativeWebSocket;
+  }
 });
 
 test("Client patch application matches the wasm core apply", async () => {

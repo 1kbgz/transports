@@ -188,6 +188,50 @@ def test_unknown_client_edit_does_not_discard_pending_host_patch():
     assert server.flush() == {}
 
 
+def test_proposal_is_returned_only_to_origin_on_accept():
+    session = Session()
+    server = Server(session)
+    a, b = Client(), Client()
+    mid = session.host(Device(name="lamp"))
+    for msg in server.open("a"):
+        a.recv(msg)
+    for msg in server.open("b"):
+        b.recv(msg)
+    acknowledgements = []
+    a.on_ack(acknowledgements.append)
+
+    out = server.recv("a", a.edit(mid, to_value(Device(name="desk")), "rename-1"))
+    origin = json.loads(out["a"][0])
+    peer = json.loads(out["b"][0])
+    assert origin["proposal"] == "rename-1"
+    assert "proposal" not in peer
+    a.recv(out["a"][0])
+    assert acknowledgements == [origin]
+
+
+def test_rejection_returns_proposal_in_json_and_msgpack():
+    for codec in ("json", "msgpack"):
+        session = Session()
+        server = Server(session)
+        client = Client(codec=codec)
+        mid = session.host(Device(name="lamp"))
+        for msg in server.open("a", codec=codec):
+            client.recv(msg)
+        rejections = []
+        client.on_reject(rejections.append)
+
+        bad = client.edit_ops(
+            mid,
+            [{"Set": {"path": [{"Key": "on"}], "value": {"Str": "invalid"}}}],
+            "toggle-1",
+        )
+        out = server.recv("a", bad)["a"]
+        for msg in out:
+            client.recv(msg)
+        assert rejections[0]["proposal"] == "toggle-1"
+        assert client.model(mid, Device).on is False
+
+
 def test_flush_without_connections_is_empty():
     session = Session()
     server = Server(session)
@@ -375,20 +419,31 @@ def test_browser_websocket_path_mirrors_frames():
             server = Server(sess)
 
             client = Client(codec="msgpack")
+            acknowledgements = []
+            disconnects = []
+            client.on_ack(acknowledgements.append)
+            client.on_disconnect(lambda: disconnects.append(True))
             task = asyncio.ensure_future(client._connect_browser("ws://host/ws"))
             await asyncio.sleep(0)  # let the task build the socket + register listeners
             sock = FakeSocket.instances[-1]
             assert "codec=msgpack" in sock.url
+            sock.listeners["open"](FakeEvent(None))
+            assert client.connected
 
             for wire in server.open(("conn"), "msgpack"):  # binary frames, as the browser delivers them
                 sock.listeners["message"](FakeEvent(FakeBuffer(wire)))
             d.name = "beacon"
             for msgs in server.flush().values():
                 for wire in msgs:
-                    sock.listeners["message"](FakeEvent(FakeBuffer(wire)))
+                    message = protocol.decode(wire, "msgpack")
+                    tagged = protocol.encode(protocol.patch_msg(mid, message["patch"], "browser-1"), "msgpack")
+                    sock.listeners["message"](FakeEvent(FakeBuffer(tagged)))
             sock.listeners["close"](FakeEvent(None))
             await asyncio.wait_for(task, 1)
             assert client.model(mid, Device).name == "beacon"
+            assert acknowledgements[0]["proposal"] == "browser-1"
+            assert disconnects == [True]
+            assert not client.connected
 
         asyncio.run(run())
     finally:
@@ -419,11 +474,21 @@ def test_client_send_awaits_native_senders_and_drops_when_unconnected():
 
         client._sender = sender
         assert client.connected is True
-        assert await client.propose(1, to_value(Device(name="beacon"))) is True
-        assert len(sent) == 1
+        assert await client.propose(1, to_value(Device(name="beacon")), "rename-1") is True
+        assert (
+            await client.propose_ops(
+                1,
+                [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}],
+                "toggle-1",
+            )
+            is True
+        )
+        assert len(sent) == 2
         msg = json.loads(sent[0])
         assert msg["t"] == "patch"
+        assert msg["proposal"] == "rename-1"
         assert msg["patch"]["ops"][0]["Set"]["value"] == {"Str": "beacon"}
+        assert json.loads(sent[1])["proposal"] == "toggle-1"
 
     asyncio.run(run())
 
@@ -572,9 +637,18 @@ def test_starlette_connect_snapshot_and_relay():
         assert snap1["t"] == "snapshot" and snap1["id"] == mid and snap1["value"] == json.loads(json.dumps(to_value(d)))
         assert snap2["id"] == mid
 
-        # ws1 -> server -> relayed to ws2
-        ws1.send_text(protocol.patch_msg(mid, {"rev": 1, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]}))
+        # ws1 -> server -> relayed to ws2, with correlation returned only to ws1
+        ws1.send_text(
+            protocol.patch_msg(
+                mid,
+                {"rev": 1, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]},
+                "socket-1",
+            )
+        )
+        origin = json.loads(ws1.receive_text())
         relayed = json.loads(ws2.receive_text())
+        assert origin["proposal"] == "socket-1"
+        assert "proposal" not in relayed
         assert relayed["t"] == "patch" and relayed["id"] == mid
 
         client = Client()

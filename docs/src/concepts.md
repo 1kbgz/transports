@@ -42,6 +42,11 @@ proposed ops, assigns the next revision, refreshes its hosted Python object, and
 authoritative patch to every connection. The origin updates from that echo just like every other
 client.
 
+An optimistic adapter can tag each proposal with an opaque identifier. The server returns that tag
+only to the origin, on the authoritative patch, a no-op acknowledgement, or the rejection. This lets
+the adapter keep a newer local value visible while older replies arrive, then adopt validation
+coercions or roll back the rejected field when its matching proposal settles.
+
 This avoids two common sync problems. First, clients do not invent revisions that later conflict with
 the server's sequence. Second, the server's hosted object cannot become stale after it accepts a
 remote edit.

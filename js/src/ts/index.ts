@@ -51,7 +51,9 @@ export type { Value } from "./bridge";
 // WebSocket client that mirrors a remote Session.
 export { Client } from "./client";
 export type {
+  AckMsg,
   ModelPatch,
+  PatchMsg,
   PatchOp,
   PathSeg,
   ReceiveChange,

@@ -96,6 +96,7 @@ def test_starlette_websocket_direct_reply_queues_behind_an_inflight_patch():
             proposal = transports.protocol.patch_msg(
                 mid,
                 {"rev": 2, "ops": [{"Set": {"path": [{"Key": "n"}], "value": {"Int": 2}}}]},
+                "edit-1",
             )
             await conn.incoming.put({"text": proposal})
             await asyncio.wait_for(conn.proposal_taken.wait(), timeout=1)
@@ -111,7 +112,9 @@ def test_starlette_websocket_direct_reply_queues_behind_an_inflight_patch():
                     break
                 await asyncio.sleep(0.001)
 
-            assert target_revs == [1, 2, 3]
+            target = [message for frame in conn.sent if (message := json.loads(frame))["t"] == "patch" and message["id"] == mid]
+            assert [message["patch"]["rev"] for message in target] == [1, 2, 3]
+            assert [message.get("proposal") for message in target] == [None, "edit-1", None]
         finally:
             conn.gate.set()
             await conn.incoming.put({"type": "websocket.disconnect"})

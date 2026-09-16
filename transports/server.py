@@ -127,6 +127,7 @@ class Server:
             return {}
         msg = protocol.decode(data, codec)
         if msg.get("t") == "patch":
+            proposal = msg.get("proposal")
             authoritative = self._session.submit(msg["id"], msg["patch"])
             if authoritative is None:
                 # Rejected (invalid edit, or a malformed patch): re-send the authoritative state to the
@@ -137,15 +138,19 @@ class Server:
                 try:
                     snap = self._session.snapshot(msg["id"])
                 except KeyError:
-                    reject = protocol.reject_msg(msg["id"], 0, error)
+                    reject = protocol.reject_msg(msg["id"], 0, error, proposal)
                     direct = self._encode_many([conn], [reject])
                 else:
                     revert = protocol.snapshot_msg(msg["id"], snap["type_name"], snap["rev"], snap["value"])
-                    reject = protocol.reject_msg(msg["id"], snap["rev"], error)
+                    reject = protocol.reject_msg(msg["id"], snap["rev"], error, proposal)
                     direct = self._encode_many([conn], [revert, reject])
             else:
                 relay = protocol.patch_msg(msg["id"], authoritative)
-                direct = self._encode_many(self._codecs, [relay])
+                if proposal is None:
+                    direct = self._encode_many(self._codecs, [relay])
+                else:
+                    direct = self._encode_many((target for target in self._codecs if target != conn), [relay])
+                    direct.update(self._encode_many([conn], [protocol.patch_msg(msg["id"], authoritative, proposal)]))
             out = {target: [wire for _, wire in tagged] for target, tagged in self._flush_tagged().items()}
             for target, wires in direct.items():
                 out.setdefault(target, []).extend(wires)
