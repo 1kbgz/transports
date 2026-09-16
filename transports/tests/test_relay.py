@@ -111,7 +111,8 @@ class MemBackplane(Backplane):
                 p._deliver(framed)
 
 
-def test_websocket_relay_uses_hub_autosync_queue_for_direct_replies():
+@pytest.mark.parametrize("sync_relay", [False, True], ids=["hub", "relay"])
+def test_websocket_relay_autosync_orders_direct_replies(sync_relay):
     class GatedWebSocket:
         def __init__(self):
             self.query_params = {}
@@ -150,7 +151,7 @@ def test_websocket_relay_uses_hub_autosync_queue_for_direct_replies():
         relay = RelayBroadcaster(hub, MemBackplane(_Bus()))
         websocket = GatedWebSocket()
         endpoint = ws_endpoint(relay)
-        sync_task = asyncio.create_task(autosync(hub, interval=0.001))
+        sync_task = asyncio.create_task(autosync(relay if sync_relay else hub, interval=0.001))
         endpoint_task = asyncio.create_task(endpoint(websocket))
         try:
             await asyncio.wait_for(websocket.snapshot_ready.wait(), timeout=1)
@@ -183,6 +184,21 @@ def test_websocket_relay_uses_hub_autosync_queue_for_direct_replies():
             websocket.gate.set()
             await websocket.incoming.put({"type": "websocket.disconnect"})
             await endpoint_task
+            sync_task.cancel()
+
+    asyncio.run(go())
+
+
+def test_relay_and_hub_share_one_autosync_owner():
+    async def go():
+        hub = Hub(key=lambda conn: conn)
+        relay = RelayBroadcaster(hub, MemBackplane(_Bus()))
+        sync_task = asyncio.create_task(autosync(hub, interval=0.001))
+        try:
+            await asyncio.sleep(0)
+            with pytest.raises(RuntimeError, match="already running"):
+                await autosync(relay, interval=0.001)
+        finally:
             sync_task.cancel()
 
     asyncio.run(go())
