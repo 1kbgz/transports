@@ -22,14 +22,12 @@ from .session import Session
 
 Wire = str | bytes
 # `ws_endpoint` uses the active autosync queue for direct replies, so one writer orders every frame
-# for a connection. The server stays alive while autosync is registered, making its id stable here.
+# for a connection. A relay and its hub share one queue owner and one destructive flush loop.
 _AUTOSYNC_ENQUEUE: dict[int, Callable[[dict[Any, list[Wire]]], None]] = {}
 
 
 def _enqueue_if_autosync(server: "Broadcaster", messages: dict[Any, list[Wire]]) -> bool:
-    enqueue = _AUTOSYNC_ENQUEUE.get(id(server))
-    if enqueue is None:
-        enqueue = _AUTOSYNC_ENQUEUE.get(id(getattr(server, "hub", None)))
+    enqueue = _AUTOSYNC_ENQUEUE.get(id(getattr(server, "hub", server)))
     if enqueue is None:
         return False
     enqueue(messages)
@@ -41,6 +39,9 @@ class Broadcaster(Protocol):
 
     #: the codec a connection gets when it doesn't request one (the I/O adapters read this)
     default_codec: str
+
+    @property
+    def _codecs(self) -> dict[Any, str]: ...
 
     def open(self, conn: Any, codec: str = ..., since: dict[int, int] | None = ..., batch: bool = ...) -> list[Wire]: ...
 
@@ -356,7 +357,7 @@ async def autosync(
                     shard.wake.set()
                 seen[index] = (shard.current, shard.count)
 
-    queue_key = id(server)
+    queue_key = id(getattr(server, "hub", server))
     if queue_key in _AUTOSYNC_ENQUEUE:
         raise RuntimeError("autosync is already running for this server")
     _AUTOSYNC_ENQUEUE[queue_key] = enqueue_direct

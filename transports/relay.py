@@ -174,5 +174,12 @@ class RelayBroadcaster:
     def flush(self) -> dict[Any, list[Wire]]:
         return self.hub.flush()
 
+    @property
+    def _codecs(self) -> dict[Any, str]:
+        return self.hub._codecs
+
+    def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
+        return self.hub._flush_tagged()
+
     def close(self, conn: Any) -> None:
         self.hub.close(conn)
