@@ -404,6 +404,63 @@ def test_coalescing_preserves_ops_from_every_revision(codec):
     asyncio.run(scenario())
 
 
+def test_broken_custom_codec_drops_only_its_connection():
+    codec = "application/x-broken-autosync-test"
+
+    def decode(_wire):
+        raise ValueError("broken decoder")
+
+    class GatedConn(FakeConn):
+        def __init__(self) -> None:
+            super().__init__()
+            self.gate = asyncio.Event()
+            self.started = asyncio.Event()
+
+        async def send_text(self, msg: str) -> None:
+            self.started.set()
+            await self.gate.wait()
+            self.sent.append(msg)
+
+    async def scenario() -> None:
+        transports.register_codec(codec, json.dumps, decode)
+        session = transports.Session()
+        blocker = Counter()
+        session.host(blocker)
+        model = Counter()
+        mid = session.host(model)
+        server = transports.Server(session)
+        broken, healthy = GatedConn(), FakeConn()
+        server.open(broken, codec=codec)
+        server.open(healthy)
+        sync_task = asyncio.create_task(transports.autosync(server, interval=0.001))
+        try:
+            blocker.n = 1
+            model.n = 1
+            await asyncio.wait_for(broken.started.wait(), timeout=1)
+            model.n = 2
+            for _ in range(100):
+                revisions = [
+                    message["patch"]["rev"] for frame in healthy.sent if (message := json.loads(frame))["t"] == "patch" and message["id"] == mid
+                ]
+                if revisions == [1, 2]:
+                    break
+                await asyncio.sleep(0.001)
+
+            assert broken not in server._codecs
+            assert healthy in server._codecs
+            assert revisions == [1, 2]
+            assert not sync_task.done()
+            broken.gate.set()
+            await asyncio.sleep(0.01)
+            assert len(broken.sent) == 1
+        finally:
+            broken.gate.set()
+            sync_task.cancel()
+            transports.unregister_codec(codec)
+
+    asyncio.run(scenario())
+
+
 def test_flush_encodes_once_per_codec():
     session = transports.Session()
     model = Counter()

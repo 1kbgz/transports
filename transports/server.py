@@ -269,7 +269,9 @@ async def autosync(
 
     def drop(conn: Any) -> None:
         server.close(conn)
-        pending.pop(conn, None)
+        undelivered = pending.pop(conn, None)
+        if undelivered is not None:
+            undelivered.clear()
         epochs.pop(conn, None)
         shard = shard_of.pop(conn, None)
         if shard is not None:
@@ -290,12 +292,16 @@ async def autosync(
                 key = (epoch, mid)
                 previous = undelivered.get(key)
                 if previous is not None:
-                    codec = server._codecs.get(conn, server.default_codec)
-                    older = protocol.decode(previous, codec)
-                    newer = protocol.decode(wire, codec)
-                    patch = dict(newer["patch"])
-                    patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
-                    wire = protocol.encode(protocol.patch_msg(mid, patch), codec)
+                    try:
+                        codec = server._codecs.get(conn, server.default_codec)
+                        older = protocol.decode(previous, codec)
+                        newer = protocol.decode(wire, codec)
+                        patch = dict(newer["patch"])
+                        patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
+                        wire = protocol.encode(protocol.patch_msg(mid, patch), codec)
+                    except Exception:  # noqa: BLE001
+                        drop(conn)
+                        return
             else:
                 key = (None, next(nonce))
                 epoch += 1
