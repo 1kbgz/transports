@@ -85,7 +85,7 @@ def test_concurrent_cross_worker_edits_converge():
 
 # --- catch-up + durability (relay logic over a tiny in-process bus) ---
 
-from transports import WRITE, DeepLwwCrdt, Hub, RelayBroadcaster, autosync, ws_endpoint
+from transports import WRITE, DeepLwwCrdt, Hub, RelayBroadcaster, autosync, protocol, register_codec, unregister_codec, ws_endpoint
 from transports.backplane import Backplane
 
 
@@ -200,6 +200,68 @@ def test_relay_and_hub_share_one_autosync_owner():
                 await autosync(relay, interval=0.001)
         finally:
             sync_task.cancel()
+
+    asyncio.run(go())
+
+
+def test_relay_keeps_inbound_codec_when_hub_drops_the_connection():
+    codec = "application/x-relay-drop-test"
+
+    def encode(value):
+        return "custom:" + json.dumps(value)
+
+    def decode(wire):
+        return json.loads(wire.removeprefix("custom:"))
+
+    class RecordingBackplane(MemBackplane):
+        def __init__(self):
+            super().__init__(_Bus())
+            self.published = []
+
+        async def publish(self, data):
+            self.published.append(json.loads(data))
+
+    async def go():
+        register_codec(codec, encode, decode)
+        hub = Hub(key=lambda conn: "tenant")
+        sid = hub.share({"Map": {"x": {"Int": 0}}}, "Doc")
+        hub.subscribe("tenant", sid, WRITE)
+        backplane = RecordingBackplane()
+        relay = RelayBroadcaster(hub, backplane)
+        conn = object()
+        relay.open(conn, codec=codec)
+        wire = protocol.encode(
+            protocol.patch_msg(sid, {"rev": 1, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 1}}}]}),
+            codec,
+        )
+        dropped_wire = protocol.encode(
+            protocol.patch_msg(sid, {"rev": 2, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 2}}}]}),
+            codec,
+        )
+
+        def broken_encode(_value):
+            raise ValueError("broken encoder")
+
+        register_codec(codec, broken_encode, decode)
+        try:
+            assert relay.recv(conn, wire) == {}
+            await asyncio.sleep(0)
+            assert conn not in hub._codecs
+            assert hub._shared[sid].value["Map"]["x"] == {"Int": 1}
+            assert backplane.published == [
+                {
+                    "t": "w",
+                    "sid": sid,
+                    "patch": {"rev": 1, "ops": [{"Set": {"path": [{"Key": "x"}], "value": {"Int": 1}}}]},
+                    "origin": "tenant",
+                }
+            ]
+            assert relay.recv(conn, dropped_wire) == {}
+            await asyncio.sleep(0)
+            assert hub._shared[sid].value["Map"]["x"] == {"Int": 1}
+            assert len(backplane.published) == 1
+        finally:
+            unregister_codec(codec)
 
     asyncio.run(go())
 

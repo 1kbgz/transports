@@ -150,10 +150,13 @@ class RelayBroadcaster:
         return self.hub.open(conn, codec, since, batch=batch)
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
+        codec = self.hub._codecs.get(conn)
+        if codec is None:
+            return {}
+        msg = protocol.decode(data, codec)
+        origin = self.hub._conn_key.get(conn)
         out = self.hub.recv(conn, data)  # apply + fan to this worker's clients
-        msg = protocol.decode(data, self.hub._codecs.get(conn))
         if msg.get("t") == "patch" and msg.get("id", 0) >= SHARED_ID_BASE:
-            origin = self.hub._conn_key.get(conn)
             payload = json.dumps({"t": "w", "sid": msg["id"], "patch": msg["patch"], "origin": origin}).encode()
             asyncio.create_task(self.backplane.publish(payload))  # broadcast the raw write to the others
         return out

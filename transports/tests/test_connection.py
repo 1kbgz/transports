@@ -2,7 +2,7 @@ import json
 
 from pydantic import BaseModel
 
-from transports import Client, Server, Session, protocol, to_value, ws_endpoint
+from transports import Client, Server, Session, protocol, register_codec, to_value, unregister_codec, ws_endpoint
 
 
 class Device(BaseModel):
@@ -47,6 +47,87 @@ def test_flush_broadcasts_to_every_connection():
         b.recv(m)
     assert a.model(mid, Device).name == "desk"
     assert b.model(mid, Device).name == "desk"
+
+
+def test_broken_custom_encoder_does_not_block_host_flush():
+    codec = "application/x-broken-server-flush-test"
+    register_codec(codec, json.dumps, json.loads)
+    session = Session()
+    server = Server(session)
+    device = Device(name="lamp")
+    mid = session.host(device)
+    other = Device(name="other")
+    session.host(other)
+    broken, healthy = object(), object()
+    server.open(broken, codec=codec, batch=True)
+    server.open(healthy)
+    proposal = protocol.patch_msg(mid, {"rev": 2, "ops": [{"Set": {"path": [{"Key": "on"}], "value": {"Bool": True}}}]})
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    try:
+        device.name = "desk"
+        other.name = "changed"
+        out = server.flush()
+        assert set(out) == {healthy}
+        assert broken not in server._codecs
+        assert json.loads(out[healthy][0])["patch"]["rev"] == 1
+        assert server.recv(broken, proposal) == {}
+        assert device.on is False
+    finally:
+        unregister_codec(codec)
+
+
+def test_broken_custom_encoder_does_not_leave_failed_open_registered():
+    codec = "application/x-broken-server-open-test"
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    session = Session()
+    session.host(Device(name="lamp"))
+    server = Server(session)
+    conn = object()
+    try:
+        try:
+            server.open(conn, codec=codec)
+        except ValueError:
+            pass
+        else:
+            raise AssertionError("expected encoder failure")
+        assert conn not in server._codecs
+    finally:
+        unregister_codec(codec)
+
+
+def test_broken_custom_encoder_does_not_block_proposal_reply():
+    codec = "application/x-broken-server-reply-test"
+    register_codec(codec, json.dumps, json.loads)
+    session = Session()
+    server = Server(session)
+    client = Client()
+    device = Device(name="lamp")
+    mid = session.host(device)
+    broken, healthy = object(), object()
+    server.open(broken, codec=codec)
+    for frame in server.open(healthy):
+        client.recv(frame)
+
+    def encode(_value):
+        raise ValueError("broken encoder")
+
+    register_codec(codec, encode, json.loads)
+    try:
+        out = server.recv(healthy, client.edit(mid, to_value(Device(name="desk"))))
+        assert set(out) == {healthy}
+        assert broken not in server._codecs
+        client.recv(out[healthy][0])
+        assert client.model(mid, Device).name == "desk"
+    finally:
+        unregister_codec(codec)
 
 
 def test_client_edit_relays_to_other_clients():
