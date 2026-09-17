@@ -6,7 +6,7 @@
 <link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Wire protocol reference" href="protocol-reference.html">
 
     <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>API Reference - transports v0.8.4</title>
+        <title>API Reference - transports v0.8.5</title>
       <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
@@ -169,7 +169,7 @@
       </label>
     </div>
     <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.4</code></div></a>
+      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.5</code></div></a>
     </div>
     <div class="header-right">
       <div class="theme-toggle-container theme-toggle-header">
@@ -190,7 +190,7 @@
       
       <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
   
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.4</code></span>
+  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.8.5</code></span>
   
 </a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
   <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
@@ -529,6 +529,14 @@ may receive batch frames, which apply in order and return the accepted changes a
 <dt class="sig sig-object py" id="transports.Client.pending_proposals">
 <span class="sig-name descname"><span class="pre">pending_proposals</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.pending_proposals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.pending_proposals" title="Link to this definition">¶</a></dt>
 <dd><p>Identifiers for proposals that have not settled or been abandoned.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.abandon_proposal">
+<span class="sig-name descname"><span class="pre">abandon_proposal</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">proposal</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.abandon_proposal"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.abandon_proposal" title="Link to this definition">¶</a></dt>
+<dd><p>Stop tracking one proposal that the caller did not send.</p>
+<p>Returns whether the proposal was pending. This does not call <cite>on_abandon</cite>; those callbacks
+report proposals abandoned by a managed connection closing.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1104,6 +1112,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.model"><code class="docutils literal notranslate"><span class="pre">Client.model()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.pending_proposals"><code class="docutils literal notranslate"><span class="pre">Client.pending_proposals()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.abandon_proposal"><code class="docutils literal notranslate"><span class="pre">Client.abandon_proposal()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.edit"><code class="docutils literal notranslate"><span class="pre">Client.edit()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.edit_ops"><code class="docutils literal notranslate"><span class="pre">Client.edit_ops()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
@@ -1192,7 +1201,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
       
     </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=b41f4c93"></script>
+</div><script src="../../_static/documentation_options.js?v=1067c88a"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>

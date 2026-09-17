@@ -103,6 +103,11 @@ they are safe as fire-and-forget callbacks even across `run()` reconnect gaps. C
 `client.connected` (or the return value) when delivery matters. With a hand-rolled socket, send
 `client.edit(id, value)` yourself as before.
 
+If a hand-rolled sender fails after `edit` or `editOps` creates a proposal, call
+`client.abandonProposal(proposal)` to remove it from the JavaScript client's pending set. Python
+provides `client.abandon_proposal(proposal)`. The methods return whether the proposal was pending;
+they do not fire the disconnect-only `onAbandon` or `on_abandon` callbacks.
+
 ## Mirror the server in Python
 
 `Client.connect()` runs a receive loop until the WebSocket closes.
