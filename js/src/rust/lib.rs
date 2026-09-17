@@ -81,6 +81,67 @@ pub fn decode_message(data: &[u8], codec: &str) -> Result<String, JsError> {
     transports::decode_message(data, codec).map_err(|e| JsError::new(&e))
 }
 
+/// Shared revision and proposal reducer for a language-level client adapter.
+#[wasm_bindgen]
+pub struct ClientState {
+    inner: transports::ClientState,
+}
+
+#[wasm_bindgen]
+impl ClientState {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: transports::ClientState::new(),
+        }
+    }
+
+    pub fn prepare(&self, message_json: &str) -> Result<String, JsError> {
+        self.inner
+            .prepare_json(message_json)
+            .map_err(|e| JsError::new(&e))
+    }
+
+    pub fn commit(&mut self, effect_json: &str) -> Result<(), JsError> {
+        self.inner
+            .commit_json(effect_json)
+            .map_err(|e| JsError::new(&e))
+    }
+
+    pub fn proposal(
+        &mut self,
+        id: u64,
+        ops_json: &str,
+        proposal: Option<String>,
+    ) -> Result<String, JsError> {
+        self.inner
+            .proposal_json(id, ops_json, proposal.as_deref())
+            .map_err(|e| JsError::new(&e))
+    }
+
+    pub fn disconnect(&mut self) -> Result<String, JsError> {
+        self.inner.disconnect_json().map_err(|e| JsError::new(&e))
+    }
+
+    pub fn revisions(&self) -> Result<String, JsError> {
+        self.inner.revisions_json().map_err(|e| JsError::new(&e))
+    }
+
+    pub fn pending(&self) -> Result<String, JsError> {
+        self.inner.pending_json().map_err(|e| JsError::new(&e))
+    }
+
+    pub fn abandon(&mut self, proposal: &str) -> bool {
+        self.inner.abandon(proposal)
+    }
+}
+
+impl Default for ClientState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[wasm_bindgen]
 pub struct Store {

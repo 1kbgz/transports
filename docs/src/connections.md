@@ -90,9 +90,10 @@ identifier, and rejects include it in `onReject`. Use `proposeOps` on a managed 
 empty against the current mirror. Generated identifiers use the reserved `auto-N` form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.
 
-Proposal correlation lasts for one live connection. If it drops, `onDisconnect` fires and pending
-optimistic proposals should be discarded. Resume replays authoritative state without old proposal
-identifiers; it does not resend those proposals. Python exposes the same hook as `on_disconnect`.
+Proposal correlation lasts for one live connection. If it drops, `onAbandon` receives the unsettled
+proposal identifiers before `onDisconnect` fires. Python exposes the same hooks as `on_abandon` and
+`on_disconnect`. `pendingProposals()` / `pending_proposals()` returns the current set. Resume replays
+authoritative state without old proposal identifiers; it does not resend those proposals.
 
 `client.send(frame)` sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday's
@@ -198,9 +199,9 @@ The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON c
 ## Use anywidget custom messages
 
 For the common case, `transports.widget(server)` builds an `anywidget.AnyWidget` whose frontend
-ships inside the wheel. Display it and every hosted model mirrors live. The frontend emits
-`transports-change` / `transports-reject` DOM events and exposes a wasm-free `el.transports.edit`
-for proposals. See [Pyodide](pyodide.md) for details.
+ships inside the wheel. Display it and every hosted model mirrors live. The frontend loads the same
+WASM client state as the browser package, emits `transports-change` / `transports-reject` DOM events,
+and exposes `el.transports.edit` for proposals. See [Pyodide](pyodide.md) for details.
 
 ```python
 w = transports.widget(server)   # pip install anywidget

@@ -44,8 +44,8 @@ def widget(server: Broadcaster) -> Any:
     Builds an ``anywidget.AnyWidget`` whose frontend (shipped inside the wheel at
     ``transports/extension/cdn/widget.js``) opens the wire, renders a live view of each mirrored
     model, bubbles ``transports-change`` / ``transports-reject`` DOM events, and exposes
-    ``el.transports = {client, edit}`` for custom frontends. Mirroring and edits are pure TS — the
-    frontend never fetches wasm. Push kernel-side changes with ``transports.sync(server)``.
+    ``el.transports = {client, edit}`` for custom frontends. Its self-contained bundle embeds the
+    shared WASM client state. Push kernel-side changes with ``transports.sync(server)``.
 
     Lazy-imports ``anywidget`` (``pip install anywidget``); works under Jupyter and JupyterLite.
     """

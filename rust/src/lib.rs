@@ -14,6 +14,7 @@
 //! - [`bridge`] — the JSON string facade the bindings call.
 
 mod bridge;
+mod client;
 mod codec;
 mod diff;
 mod frame;
@@ -27,6 +28,7 @@ pub use bridge::{
     encode_json, encode_message, json_to_cbor, json_to_msgpack, msgpack_to_json,
     normalize_message_json, JsonStore,
 };
+pub use client::{ClientEffect, ClientState};
 pub use codec::{codec_for, CborCodec, Codec, CodecError, JsonCodec, MsgpackCodec};
 pub use diff::{apply, diff, Op, Patch, Path, PathSeg};
 pub use frame::{Frame, FrameError, FrameKind};

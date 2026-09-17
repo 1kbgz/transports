@@ -1,0 +1,103 @@
+{
+  "snapshot": {
+    "t": "snapshot",
+    "id": 7,
+    "type": "Counter",
+    "rev": 2,
+    "value": { "Map": { "count": { "Int": 1 } } }
+  },
+  "patch": {
+    "t": "patch",
+    "id": 7,
+    "patch": {
+      "rev": 3,
+      "ops": [
+        {
+          "Set": {
+            "path": [{ "Key": "count" }],
+            "value": { "Int": 2 }
+          }
+        }
+      ]
+    },
+    "proposal": "editor-1"
+  },
+  "ack": {
+    "t": "ack",
+    "id": 7,
+    "rev": 3,
+    "proposal": "editor-2"
+  },
+  "reject": {
+    "t": "reject",
+    "id": 7,
+    "rev": 3,
+    "error": "count must be positive",
+    "proposal": "editor-3"
+  },
+  "unknown": {
+    "t": "presence",
+    "id": 7,
+    "user": "Ada"
+  },
+  "batch": {
+    "t": "batch",
+    "msgs": [
+      {
+        "t": "snapshot",
+        "id": 8,
+        "type": "Counter",
+        "rev": 0,
+        "value": { "Map": { "count": { "Int": 5 } } }
+      },
+      {
+        "t": "patch",
+        "id": 8,
+        "patch": {
+          "rev": 1,
+          "ops": [
+            {
+              "Set": {
+                "path": [{ "Key": "count" }],
+                "value": { "Int": 6 }
+              }
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "effects": {
+    "snapshot": { "effect": "snapshot", "id": 7, "rev": 2 },
+    "patch": {
+      "effect": "patch",
+      "id": 7,
+      "rev": 3,
+      "proposal": "editor-1"
+    },
+    "stale_patch": {
+      "effect": "stale_patch",
+      "id": 7,
+      "rev": 3,
+      "proposal": "auto-1"
+    },
+    "ack": {
+      "effect": "acknowledgement",
+      "id": 7,
+      "rev": 3,
+      "proposal": "editor-2"
+    },
+    "reject": {
+      "effect": "rejection",
+      "id": 7,
+      "rev": 3,
+      "error": "count must be positive",
+      "proposal": "editor-3"
+    },
+    "unknown": { "effect": "ignore" },
+    "disconnect": {
+      "effect": "disconnect",
+      "proposals": ["editor-4"]
+    }
+  }
+}

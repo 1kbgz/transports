@@ -13,6 +13,7 @@ from .server import Server, autosync, sync, ws_endpoint
 from .session import Session
 from .sse import sse_endpoint
 from .transports import (  # compiled Rust extension (rust/python)
+    ClientState,
     Store,
     apply,
     cbor_to_json,
@@ -35,6 +36,7 @@ __all__ = [
     # cross-process backplane (multi-worker fan-out) + clustering
     "Backplane",
     "Client",
+    "ClientState",
     "DeepLwwCrdt",
     "Election",
     # multi-tenancy + sharing
