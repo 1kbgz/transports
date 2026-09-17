@@ -92,6 +92,57 @@ pub fn decode_message(data: &[u8], codec: &str) -> PyResult<String> {
     transports::decode_message(data, codec).map_err(PyValueError::new_err)
 }
 
+/// Shared revision and proposal reducer for a language-level client adapter.
+#[pyclass]
+pub struct ClientState {
+    inner: transports::ClientState,
+}
+
+#[pymethods]
+impl ClientState {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: transports::ClientState::new(),
+        }
+    }
+
+    fn prepare(&self, message_json: &str) -> PyResult<String> {
+        self.inner
+            .prepare_json(message_json)
+            .map_err(PyValueError::new_err)
+    }
+
+    fn commit(&mut self, effect_json: &str) -> PyResult<()> {
+        self.inner
+            .commit_json(effect_json)
+            .map_err(PyValueError::new_err)
+    }
+
+    #[pyo3(signature = (id, ops_json, proposal=None))]
+    fn proposal(&mut self, id: u64, ops_json: &str, proposal: Option<&str>) -> PyResult<String> {
+        self.inner
+            .proposal_json(id, ops_json, proposal)
+            .map_err(PyValueError::new_err)
+    }
+
+    fn disconnect(&mut self) -> PyResult<String> {
+        self.inner.disconnect_json().map_err(PyValueError::new_err)
+    }
+
+    fn revisions(&self) -> PyResult<String> {
+        self.inner.revisions_json().map_err(PyValueError::new_err)
+    }
+
+    fn pending(&self) -> Vec<String> {
+        self.inner.pending()
+    }
+
+    fn abandon(&mut self, proposal: &str) -> bool {
+        self.inner.abandon(proposal)
+    }
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

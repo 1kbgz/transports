@@ -56,6 +56,9 @@ export const decodeMessage = (bytes: Uint8Array, codec: string): string =>
 /** In-process model store: host / mutate → patch / apply / snapshot. */
 export const Store = wasm.Store;
 
+/** Shared revision and proposal reducer used by `Client`. */
+export const ClientState = wasm.ClientState;
+
 // Plain JS object <-> core `Value` bridge (the JS analog of the Python bridge).
 export { toValue, fromValue } from "./bridge";
 export type { Value } from "./bridge";

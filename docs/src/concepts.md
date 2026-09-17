@@ -51,9 +51,13 @@ This avoids two common sync problems. First, clients do not invent revisions tha
 the server's sequence. Second, the server's hosted object cannot become stale after it accepts a
 remote edit.
 
+Python and JavaScript use the same Rust reducer for revision checks, proposal identifiers,
+acknowledgements, rejections, and disconnect abandonment. Their adapters still own sockets,
+callbacks, Python model materialization, and JavaScript's immutable structural-sharing updates.
+
 ## Why transport-agnostic adapters?
 
-`Server` and `Hub` are synchronous protocol objects. Their methods accept opaque connection handles
+`Server` and `Hub` are synchronous Python protocol objects. Their methods accept opaque connection handles
 and return the messages each connection should receive. WebSocket, SSE, Jupyter comm, and anywidget
 support are thin adapters around that contract.
 

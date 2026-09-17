@@ -13,6 +13,7 @@ import {
   normalizeMessage,
   encodeMessage,
   decodeMessage,
+  ClientState,
   registerCodec,
   unregisterCodec,
   Client,
@@ -136,6 +137,85 @@ test("live message model and codecs are shared with Rust", async () => {
       JSON.parse(msg),
     );
   }
+});
+
+test("wasm binding matches the shared client-state trace", async () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/live_protocol.json", "utf8"),
+  );
+  const state = new ClientState();
+  const prepare = (message) =>
+    JSON.parse(state.prepare(JSON.stringify(message)));
+  const commit = (effect) => state.commit(JSON.stringify(effect));
+
+  let effect = prepare(fixture.snapshot);
+  expect(effect).toEqual(fixture.effects.snapshot);
+  commit(effect);
+  state.proposal(7n, "[]", "editor-1");
+  state.proposal(7n, "[]");
+
+  effect = prepare(fixture.patch);
+  expect(effect).toEqual(fixture.effects.patch);
+  commit(effect);
+  expect(JSON.parse(state.pending())).toEqual(["auto-1"]);
+
+  effect = prepare({ ...fixture.patch, proposal: "auto-1" });
+  expect(effect).toEqual(fixture.effects.stale_patch);
+  commit(effect);
+
+  for (const [proposal, message, expected] of [
+    ["editor-2", fixture.ack, fixture.effects.ack],
+    ["editor-3", fixture.reject, fixture.effects.reject],
+  ]) {
+    state.proposal(7n, "[]", proposal);
+    effect = prepare(message);
+    expect(effect).toEqual(expected);
+    commit(effect);
+  }
+
+  effect = prepare(fixture.unknown);
+  expect(effect).toEqual(fixture.effects.unknown);
+  commit(effect);
+  state.proposal(7n, "[]", "editor-4");
+  expect(JSON.parse(state.disconnect())).toEqual(fixture.effects.disconnect);
+  expect(JSON.parse(state.revisions())).toEqual({ 7: 3 });
+  expect(JSON.parse(state.pending())).toEqual([]);
+});
+
+test("wasm binding matches the shared message-codec trace", async () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/live_protocol.json", "utf8"),
+  );
+  for (const name of [
+    "snapshot",
+    "patch",
+    "ack",
+    "reject",
+    "batch",
+    "unknown",
+  ]) {
+    const message = JSON.stringify(fixture[name]);
+    for (const codec of ["json", "msgpack", "cbor"])
+      expect(
+        JSON.parse(decodeMessage(encodeMessage(message, codec), codec)),
+      ).toEqual(fixture[name]);
+    expect([...encodeMessage(message, "msgpack")]).toEqual([
+      ...jsonToMsgpack(message),
+    ]);
+    expect([...encodeMessage(message, "cbor")]).toEqual([
+      ...jsonToCbor(message),
+    ]);
+  }
+});
+
+test("Client applies the shared batch fixture in order", async () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/live_protocol.json", "utf8"),
+  );
+  const client = new Client();
+  const accepted = client.recv(JSON.stringify(fixture.batch));
+  expect(accepted.map((change) => change.t)).toEqual(["snapshot", "patch"]);
+  expect(client.value(8)).toEqual({ Map: { count: { Int: 6 } } });
 });
 
 test("Client mirrors a binary (cbor) snapshot then patch", async () => {
@@ -293,6 +373,8 @@ test("Client.send drops when unconnected; propose sends the edit frame", async (
   const c = new Client();
   expect(c.connected).toBe(false);
   expect(c.send("x")).toBe(false); // dropped, not thrown: safe as a fire-and-forget callback
+  expect(c.proposeOps(1, [], "dropped")).toBe(false);
+  expect(c.pendingProposals()).toEqual([]);
   c.recv(
     JSON.stringify({
       t: "snapshot",
@@ -434,13 +516,20 @@ test("Client exposes managed connection loss", async () => {
   try {
     const c = new Client();
     const disconnects = [];
+    const abandoned = [];
     c.onDisconnect(() => disconnects.push(true));
+    c.onAbandon((proposals) => abandoned.push(proposals));
+    c.editOps(1, [], "editor-1");
+    c.editOps(1, []);
+    expect(c.pendingProposals()).toEqual(["auto-1", "editor-1"]);
     const socket = c.connect("ws://host/ws");
     socket.emit("open");
     expect(c.connected).toBe(true);
     socket.emit("close");
     expect(c.connected).toBe(false);
     expect(disconnects).toEqual([true]);
+    expect(abandoned).toEqual([["auto-1", "editor-1"]]);
+    expect(c.pendingProposals()).toEqual([]);
   } finally {
     globalThis.WebSocket = NativeWebSocket;
   }

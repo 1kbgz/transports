@@ -1,11 +1,18 @@
 import { test, expect } from "@playwright/test";
 
-test("anywidget frontend mirrors, edits without wasm, and bubbles events", async ({
+test("anywidget frontend mirrors through shared wasm state and bubbles events", async ({
   page,
 }) => {
   await page.goto("http://127.0.0.1:3000/examples/index.html");
   const result = await page.evaluate(async () => {
-    const mod = await import("/js/dist/cdn/widget.js");
+    const source = await fetch("/js/dist/cdn/widget.js").then((response) =>
+      response.text(),
+    );
+    const url = URL.createObjectURL(
+      new Blob([source], { type: "text/javascript" }),
+    );
+    const mod = await import(url);
+    URL.revokeObjectURL(url);
     const handlers = {};
     const sent = [];
     const model = {
@@ -15,7 +22,7 @@ test("anywidget frontend mirrors, edits without wasm, and bubbles events", async
     const el = document.createElement("div");
     document.body.appendChild(el);
 
-    mod.default.initialize({ model });
+    await mod.default.initialize({ model });
     mod.default.render({ model, el });
 
     const changes = [];

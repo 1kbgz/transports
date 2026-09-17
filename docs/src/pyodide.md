@@ -65,11 +65,11 @@ after changing Python or Rust code.
 
 `transports.widget(server)` builds an [anywidget](https://anywidget.dev). Display it and every
 hosted model mirrors live in the notebook frontend, updating on each `transports.sync(server)`. The
-frontend ships inside the wheel (`transports/extension/cdn/widget.js`). Mirroring and edits are pure
-TypeScript, so it never fetches wasm. Custom frontends hook the bubbled `transports-change` /
-`transports-reject` DOM events or use `el.transports = {client, edit}`.
-`el.transports.edit(id, ["brightness"], 75)` sends a wasm-free server-authoritative proposal, and a
-value the model rejects surfaces inline through the `reject` frame.
+frontend ships inside the wheel (`transports/extension/cdn/widget.js`) and loads its packaged WASM
+client state. Custom frontends hook the bubbled `transports-change` / `transports-reject` DOM events
+or use `el.transports = {client, edit}`. `el.transports.edit(id, ["brightness"], 75)` sends a
+server-authoritative proposal, and a value the model rejects surfaces inline through the `reject`
+frame.
 
 ```python
 import transports

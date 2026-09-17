@@ -2,8 +2,8 @@
  *
  * anywidget loads this module (`_esm`); `initialize` opens the wire — a `Client` mirroring the
  * kernel's models over the widget's custom-message channel — and `render` shows a live view of every
- * mirrored model. The anywidget wire is JSON-only and mirroring is pure TS, so no wasm is fetched;
- * even edits skip `diff` by sending a single-`Set` proposal built from plain path segments.
+ * mirrored model. The anywidget wire is JSON-only; it loads the same Rust client state as the main
+ * browser package. Edits skip `diff` by sending a single-`Set` proposal from plain path segments.
  *
  * Consumers hook in through DOM events bubbled from the widget element — `transports-change`
  * (detail: the accepted `ReceiveChange`) and `transports-reject` (detail: the server's reject) — or
@@ -12,6 +12,8 @@
 import { fromValue, toValue } from "./bridge";
 import { Client } from "./client";
 import type { PathSeg, ReceiveChange, RejectMsg } from "./client";
+import init from "../../dist/pkg/transports";
+import wasm from "../../dist/pkg/transports_bg.wasm";
 
 type AnyModel = {
   on(event: string, callback: (...args: unknown[]) => void): void;
@@ -23,7 +25,7 @@ const clients = new WeakMap<AnyModel, Client>();
 function clientFor(model: AnyModel): Client {
   let client = clients.get(model);
   if (!client) {
-    const created = new Client(); // the anywidget wire carries JSON only
+    const created = new Client();
     clients.set(model, created);
     model.on("msg:custom", (content: unknown) => {
       const wire = (content as { wire?: string } | undefined)?.wire;
@@ -53,7 +55,8 @@ function sendEdit(
 }
 
 export default {
-  initialize({ model }: { model: AnyModel }) {
+  async initialize({ model }: { model: AnyModel }) {
+    await init({ module_or_path: wasm });
     clientFor(model);
   },
 

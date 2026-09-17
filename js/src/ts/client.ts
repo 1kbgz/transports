@@ -1,5 +1,10 @@
 import { codecFor } from "./codecs";
-import { decodeMessage, diff, encodeMessage } from "./index";
+import {
+  ClientState as WasmClientState,
+  decodeMessage,
+  diff,
+  encodeMessage,
+} from "./index";
 import type { Value } from "./bridge";
 
 type SnapshotMsg = {
@@ -39,6 +44,72 @@ export type RejectMsg = {
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
   | PatchMsg;
+
+type ClientEffect =
+  | { effect: "snapshot"; id: number; rev: number }
+  | {
+      effect: "patch" | "stale_patch";
+      id: number;
+      rev: number;
+      proposal?: string;
+    }
+  | {
+      effect: "acknowledgement";
+      id: number;
+      rev: number;
+      proposal: string;
+    }
+  | {
+      effect: "rejection";
+      id: number;
+      rev: number;
+      error: string;
+      proposal?: string;
+    }
+  | { effect: "ignore" }
+  | { effect: "disconnect"; proposals: string[] };
+
+interface ClientStateAdapter {
+  prepare(message: object): ClientEffect;
+  commit(effect: ClientEffect): void;
+  proposal(id: number, ops: PatchOp[], proposal?: string): string;
+  disconnect(): Extract<ClientEffect, { effect: "disconnect" }>;
+  revisions(): Record<string, number>;
+  pending(): string[];
+  abandon(proposal: string): boolean;
+}
+
+class SharedClientState implements ClientStateAdapter {
+  private inner = new WasmClientState();
+
+  prepare(message: object): ClientEffect {
+    return JSON.parse(this.inner.prepare(JSON.stringify(message)));
+  }
+
+  commit(effect: ClientEffect): void {
+    this.inner.commit(JSON.stringify(effect));
+  }
+
+  proposal(id: number, ops: PatchOp[], proposal?: string): string {
+    return this.inner.proposal(BigInt(id), JSON.stringify(ops), proposal);
+  }
+
+  disconnect(): Extract<ClientEffect, { effect: "disconnect" }> {
+    return JSON.parse(this.inner.disconnect());
+  }
+
+  revisions(): Record<string, number> {
+    return JSON.parse(this.inner.revisions());
+  }
+
+  pending(): string[] {
+    return JSON.parse(this.inner.pending());
+  }
+
+  abandon(proposal: string): boolean {
+    return this.inner.abandon(proposal);
+  }
+}
 
 function mapValue(value: Value | undefined): Record<string, Value> {
   if (
@@ -203,16 +274,18 @@ function applyPatch(value: Value, patch: ModelPatch): Value {
  */
 export class Client {
   private values = new Map<number, unknown>();
-  private revs = new Map<number, number>();
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
   private ackListeners: Array<(ack: PatchMsg | AckMsg) => void> = [];
   private rejectListeners: Array<(reject: RejectMsg) => void> = [];
+  private abandonListeners: Array<(proposals: string[]) => void> = [];
   private disconnectListeners: Array<() => void> = [];
-  private nextProposal = 1;
+  private state: ClientStateAdapter;
   // outbound channel of the active managed connection (set by connect()/run(), cleared on close)
   private sender: ((frame: string | Uint8Array) => void) | null = null;
 
-  constructor(private codec: string = "json") {}
+  constructor(private codec: string = "json") {
+    this.state = new SharedClientState();
+  }
 
   /** Whether a managed connection (`connect()`/`run()`) is open right now. */
   get connected(): boolean {
@@ -237,12 +310,30 @@ export class Client {
    * the mirror updates when the authoritative patch echoes back (or `onReject` fires). Returns
    * `false` (dropped) when not connected. */
   propose(id: number, value: unknown, proposal?: string): boolean {
-    return this.send(this.edit(id, value, proposal));
+    return this.sendProposal(this.edit(id, value, proposal));
   }
 
   /** Propose explicit patch operations over the active connection. */
   proposeOps(id: number, ops: PatchOp[], proposal?: string): boolean {
-    return this.send(this.editOps(id, ops, proposal));
+    return this.sendProposal(this.editOps(id, ops, proposal));
+  }
+
+  private sendProposal(frame: string | Uint8Array): boolean {
+    const custom = codecFor(this.codec);
+    const message = custom
+      ? (custom.decode(frame) as PatchMsg)
+      : JSON.parse(
+          typeof frame === "string" ? frame : decodeMessage(frame, this.codec),
+        );
+    try {
+      const sent = this.send(frame);
+      if (!sent && message.proposal !== undefined)
+        this.state.abandon(message.proposal);
+      return sent;
+    } catch (error) {
+      if (message.proposal !== undefined) this.state.abandon(message.proposal);
+      throw error;
+    }
   }
 
   /** Register a listener fired when the server refuses a proposed edit, with the decoded `reject`
@@ -276,7 +367,19 @@ export class Client {
     };
   }
 
+  /** Register a listener fired with unsettled proposal identifiers on disconnect. */
+  onAbandon(listener: (proposals: string[]) => void): () => void {
+    this.abandonListeners.push(listener);
+    return () => {
+      const i = this.abandonListeners.indexOf(listener);
+      if (i >= 0) this.abandonListeners.splice(i, 1);
+    };
+  }
+
   private disconnected(): void {
+    const { proposals } = this.state.disconnect();
+    if (proposals.length)
+      for (const listener of [...this.abandonListeners]) listener(proposals);
     for (const listener of [...this.disconnectListeners]) listener();
   }
 
@@ -302,13 +405,6 @@ export class Client {
   private acknowledge(msg: PatchMsg | AckMsg): void {
     if (msg.proposal !== undefined)
       for (const listener of [...this.ackListeners]) listener(msg);
-  }
-
-  private proposalId(proposal?: string): string {
-    if (proposal === undefined) return `auto-${this.nextProposal++}`;
-    if (/^auto-\d+$/.test(proposal))
-      throw new Error("proposal identifiers matching 'auto-N' are reserved");
-    return proposal;
   }
 
   /** Apply an inbound snapshot or patch frame to the mirror.
@@ -346,36 +442,41 @@ export class Client {
   private apply(
     msg: SnapshotMsg | PatchMsg | AckMsg | RejectMsg,
   ): ReceiveChange | undefined {
-    if (msg.t === "snapshot") {
-      this.values.set(msg.id, msg.value);
-      this.revs.set(msg.id, msg.rev);
-      return this.accepted({ t: "snapshot", id: msg.id, rev: msg.rev });
-    } else if (msg.t === "patch") {
-      // rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. one
-      // the opening snapshot already captured, which the server then also broadcasts).
-      const seen = this.revs.get(msg.id);
-      if (seen !== undefined && msg.patch.rev <= seen) {
-        this.acknowledge(msg);
-        return undefined;
-      }
-      const current = this.values.get(msg.id);
+    const effect = this.state.prepare(msg);
+    if (effect.effect === "snapshot") {
+      const snapshot = msg as SnapshotMsg;
+      this.values.set(snapshot.id, snapshot.value);
+      this.state.commit(effect);
+      return this.accepted({
+        t: "snapshot",
+        id: snapshot.id,
+        rev: snapshot.rev,
+      });
+    } else if (effect.effect === "patch") {
+      const patch = msg as PatchMsg;
+      const current = this.values.get(patch.id);
       if (current === undefined)
-        throw new Error(`patch received before snapshot for model ${msg.id}`);
-      this.values.set(msg.id, applyPatch(current as Value, msg.patch));
-      this.revs.set(msg.id, msg.patch.rev);
-      const accepted = this.accepted(msg);
-      this.acknowledge(msg);
+        throw new Error(`patch received before snapshot for model ${patch.id}`);
+      const value = applyPatch(current as Value, patch.patch);
+      this.state.commit(effect);
+      this.values.set(patch.id, value);
+      const accepted = this.accepted(patch);
+      this.acknowledge(patch);
       return accepted;
-    } else if (msg.t === "ack") {
-      this.acknowledge(msg);
+    } else if (effect.effect === "stale_patch") {
+      this.state.commit(effect);
+      this.acknowledge(msg as PatchMsg);
       return undefined;
-    } else if (msg.t === "reject") {
-      // the mirror is untouched: the server reverts the proposer with the snapshot sent alongside
-      for (const listener of [...this.rejectListeners]) listener(msg);
+    } else if (effect.effect === "acknowledgement") {
+      this.state.commit(effect);
+      this.acknowledge(msg as AckMsg);
+      return undefined;
+    } else if (effect.effect === "rejection") {
+      this.state.commit(effect);
+      const rejection = msg as RejectMsg;
+      for (const listener of [...this.rejectListeners]) listener(rejection);
       return undefined;
     }
-    // an unrecognized message type is ignored (not an error): the server may be newer than this
-    // client and send types it predates (e.g. a future presence frame)
     return undefined;
   }
 
@@ -386,6 +487,11 @@ export class Client {
 
   ids(): number[] {
     return [...this.values.keys()];
+  }
+
+  /** Identifiers for proposals that have not settled or been abandoned. */
+  pendingProposals(): string[] {
+    return this.state.pending();
   }
 
   /** Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
@@ -403,17 +509,17 @@ export class Client {
   /** Propose explicit patch operations. This can express a value equal to the current mirror while
    * an older optimistic proposal is pending. A client-local proposal id is assigned by default. */
   editOps(id: number, ops: PatchOp[], proposal?: string): string | Uint8Array {
-    const msg = {
-      t: "patch",
-      id,
-      patch: { rev: 0, ops },
-      proposal: this.proposalId(proposal),
-    };
-    const custom = codecFor(this.codec);
-    if (custom) return custom.encode(msg);
-    const s = JSON.stringify(msg);
-    if (this.codec !== "json") return encodeMessage(s, this.codec);
-    return s;
+    const message = this.state.proposal(id, ops, proposal);
+    const decoded = JSON.parse(message) as PatchMsg;
+    try {
+      const custom = codecFor(this.codec);
+      if (custom) return custom.encode(decoded);
+      if (this.codec !== "json") return encodeMessage(message, this.codec);
+      return message;
+    } catch (error) {
+      if (decoded.proposal !== undefined) this.state.abandon(decoded.proposal);
+      throw error;
+    }
   }
 
   /** Connect to a transports server and mirror it. Returns the `WebSocket`.
@@ -424,10 +530,9 @@ export class Client {
   connect(url: string): WebSocket {
     const sep = url.includes("?") ? "&" : "?";
     let params = `codec=${this.codec}`;
-    if (this.revs.size) {
-      const since = encodeURIComponent(
-        JSON.stringify(Object.fromEntries(this.revs)),
-      );
+    const revisions = this.state.revisions();
+    if (Object.keys(revisions).length) {
+      const since = encodeURIComponent(JSON.stringify(revisions));
       params += `&since=${since}`;
     }
     const ws = new WebSocket(`${url}${sep}${params}`);

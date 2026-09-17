@@ -18,6 +18,7 @@ const BUNDLES = [
   {
     // the anywidget frontend: self-contained ESM served from inside the wheel (extension/cdn)
     entryPoints: ["src/ts/widget.ts"],
+    loader: { ".wasm": "binary" },
     outfile: "dist/cdn/widget.js",
   },
 ];

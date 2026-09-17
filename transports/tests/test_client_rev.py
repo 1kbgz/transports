@@ -1,3 +1,5 @@
+import asyncio
+
 from pydantic import BaseModel
 
 import transports
@@ -104,3 +106,26 @@ def test_client_generated_proposal_ids_do_not_collide_with_caller_ids():
         raise AssertionError("expected ValueError")
     except ValueError as error:
         assert "reserved" in str(error)
+
+
+def test_client_tracks_settles_and_abandons_proposals():
+    c = transports.Client()
+    c.recv(transports.protocol.snapshot_msg(1, "M", 3, {"Map": {"xs": {"List": []}}}))
+    abandoned = []
+    c.on_abandon(abandoned.append)
+
+    c.edit_ops(1, [], "editor-1")
+    c.edit_ops(1, [])
+    assert c.pending_proposals() == ["auto-1", "editor-1"]
+
+    c.recv(transports.protocol.ack_msg(1, 3, "editor-1"))
+    assert c.pending_proposals() == ["auto-1"]
+    c._disconnected()
+    assert abandoned == [["auto-1"]]
+    assert c.pending_proposals() == []
+
+
+def test_dropped_managed_proposal_is_not_left_pending():
+    c = transports.Client()
+    assert asyncio.run(c.propose_ops(1, [], "dropped")) is False
+    assert c.pending_proposals() == []

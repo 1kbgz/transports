@@ -9,7 +9,6 @@ network).
 import contextlib
 import inspect
 import json
-import re
 import sys
 import urllib.parse
 from collections.abc import Callable
@@ -17,7 +16,7 @@ from typing import Any
 
 from . import protocol
 from ._bridge import M, from_value
-from .transports import apply as _apply, diff as _diff
+from .transports import ClientState as _ClientState, apply as _apply, diff as _diff
 
 
 class Client:
@@ -29,14 +28,14 @@ class Client:
 
     def __init__(self, codec: str = protocol.JSON) -> None:
         self._values: dict[int, Any] = {}
-        self._rev: dict[int, int] = {}
         self._type: dict[int, str] = {}
+        self._state = _ClientState()
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
         self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
+        self._abandon_cbs: list[Callable[[list[str]], None]] = []
         self._disconnect_cbs: list[Callable[[], None]] = []
-        self._next_proposal = 1
         #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
         self._sender: Callable[[str | bytes], Any] | None = None
 
@@ -44,6 +43,11 @@ class Client:
     def connected(self) -> bool:
         """Whether a managed connection (`connect` / `run`) is open right now."""
         return self._sender is not None
+
+    @property
+    def _rev(self) -> dict[int, int]:
+        """Compatibility view of revisions now owned by the shared core."""
+        return {int(mid): rev for mid, rev in json.loads(self._state.revisions()).items()}
 
     async def send(self, frame: str | bytes) -> bool:
         """Send a frame over the active managed connection (`connect` / `run`).
@@ -64,11 +68,24 @@ class Client:
 
         Server-authoritative — the mirror updates when the authoritative patch echoes back (or
         `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""
-        return await self.send(self.edit(mid, new_value, proposal))
+        frame = self.edit(mid, new_value, proposal)
+        return await self._send_proposal(frame)
 
     async def propose_ops(self, mid: int, ops: list[dict], proposal: str | None = None) -> bool:
         """Propose explicit patch operations over the active connection."""
-        return await self.send(self.edit_ops(mid, ops, proposal))
+        frame = self.edit_ops(mid, ops, proposal)
+        return await self._send_proposal(frame)
+
+    async def _send_proposal(self, frame: str | bytes) -> bool:
+        proposal = protocol.decode(frame, self._codec)["proposal"]
+        try:
+            sent = await self.send(frame)
+        except Exception:
+            self._state.abandon(proposal)
+            raise
+        if not sent:
+            self._state.abandon(proposal)
+        return sent
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired after each accepted snapshot or patch — the same change dict
@@ -100,7 +117,16 @@ class Client:
         self._disconnect_cbs.append(callback)
         return lambda: self._disconnect_cbs.remove(callback)
 
+    def on_abandon(self, callback: Callable[[list[str]], None]) -> Callable[[], None]:
+        """Register a callback fired with unsettled proposal identifiers on disconnect."""
+        self._abandon_cbs.append(callback)
+        return lambda: self._abandon_cbs.remove(callback)
+
     def _disconnected(self) -> None:
+        abandoned = json.loads(self._state.disconnect())["proposals"]
+        if abandoned:
+            for callback in list(self._abandon_cbs):
+                callback(abandoned)
         for callback in list(self._disconnect_cbs):
             callback()
 
@@ -108,14 +134,6 @@ class Client:
         if "proposal" in msg:
             for callback in list(self._ack_cbs):
                 callback(msg)
-
-    def _proposal_id(self, proposal: str | None) -> str:
-        if proposal is None:
-            proposal = f"auto-{self._next_proposal}"
-            self._next_proposal += 1
-        elif re.fullmatch(r"auto-[0-9]+", proposal):
-            raise ValueError("proposal identifiers matching 'auto-N' are reserved")
-        return proposal
 
     def _accepted(self, change: dict) -> dict:
         for callback in list(self._change_cbs):
@@ -142,32 +160,29 @@ class Client:
         return self._recv_msg(msg)
 
     def _recv_msg(self, msg: dict) -> dict | None:
-        t = msg.get("t")
-        if t == "snapshot":
+        effect_json = self._state.prepare(json.dumps(msg))
+        effect = json.loads(effect_json)
+        kind = effect["effect"]
+        if kind == "snapshot":
             mid: int = msg["id"]
             self._values[mid] = msg["value"]
             self._type[mid] = msg["type"]
-            self._rev[mid] = msg["rev"]
+            self._state.commit(effect_json)
             return self._accepted({"t": "snapshot", "id": mid, "rev": msg["rev"]})
-        elif t == "patch":
+        elif kind == "patch":
             mid = msg["id"]
-            rev = msg["patch"]["rev"]
-            # rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a
-            # patch the opening snapshot already captured, which the server then also broadcasts).
-            if mid in self._rev and rev <= self._rev[mid]:
-                self._acknowledge(msg)
-                return None
-            if mid not in self._values:
-                raise ValueError(f"patch received before snapshot for model {mid}")
-            self._values[mid] = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
-            self._rev[mid] = rev
+            value = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
+            self._state.commit(effect_json)
+            self._values[mid] = value
             accepted = self._accepted(msg)
             self._acknowledge(msg)
             return accepted
-        elif t == "ack":
+        elif kind == "stale_patch" or kind == "acknowledgement":
+            self._state.commit(effect_json)
             self._acknowledge(msg)
             return None
-        elif t == "reject":
+        elif kind == "rejection":
+            self._state.commit(effect_json)
             for callback in list(self._reject_cbs):
                 callback(msg)
             return None
@@ -184,6 +199,10 @@ class Client:
 
     def ids(self) -> list[int]:
         return list(self._values)
+
+    def pending_proposals(self) -> list[str]:
+        """Identifiers for proposals that have not settled or been abandoned."""
+        return self._state.pending()
 
     def edit(self, mid: int, new_value: Any, proposal: str | None = None) -> str | bytes:
         """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
@@ -202,16 +221,21 @@ class Client:
         form when a new optimistic value equals the current mirror and a whole-value diff would be
         empty while an older proposal is still pending.
         """
-        patch = {"rev": 0, "ops": ops}
-        return protocol.encode(protocol.patch_msg(mid, patch, self._proposal_id(proposal)), self._codec)
+        message = self._state.proposal(mid, json.dumps(ops), proposal)
+        try:
+            return protocol.encode(message, self._codec)
+        except Exception:
+            self._state.abandon(json.loads(message)["proposal"])
+            raise
 
     def _connect_url(self, url: str) -> str:
         """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
         mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""
         sep = "&" if "?" in url else "?"
         params = f"codec={self._codec}"
-        if self._rev:
-            params += "&since=" + urllib.parse.quote(json.dumps(self._rev))
+        revisions = self._state.revisions()
+        if revisions != "{}":
+            params += "&since=" + urllib.parse.quote(revisions)
         return f"{url}{sep}{params}"
 
     async def connect(self, url: str) -> None:
