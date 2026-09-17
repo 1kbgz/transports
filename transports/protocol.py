@@ -22,12 +22,11 @@ from collections.abc import Callable
 from typing import Any
 
 from .transports import (
-    cbor_to_json as _cbor_to_json,
     decode_as as _core_decode_as,
+    decode_message as _decode_message,
     encode_as as _core_encode_as,
-    json_to_cbor as _json_to_cbor,
-    json_to_msgpack as _json_to_msgpack,
-    msgpack_to_json as _msgpack_to_json,
+    encode_message as _encode_message,
+    normalize_message as _normalize_message,
 )
 
 #: Canonical codec names. A connection negotiates one of these (e.g. via a ``?codec=`` query param);
@@ -123,9 +122,10 @@ def encode(msg_json: str, codec: str = JSON) -> str | bytes:
     if c in _CODECS:
         return _CODECS[c][0](json.loads(msg_json))
     if c == MSGPACK:
-        return _json_to_msgpack(msg_json)
+        return _encode_message(msg_json, c)
     if c == CBOR:
-        return _json_to_cbor(msg_json)
+        return _encode_message(msg_json, c)
+    _normalize_message(msg_json)
     return msg_json
 
 
@@ -140,12 +140,13 @@ def decode(data: str | bytes, codec: str | None = None) -> dict:
         if c in _CODECS:
             return _CODECS[c][1](data)
         if c == JSON:
-            return json.loads(data)
+            raw = data.encode() if isinstance(data, str) else bytes(data)
+            return json.loads(_decode_message(raw, c))
         if c == CBOR:
-            return json.loads(_cbor_to_json(bytes(data)))
+            return json.loads(_decode_message(bytes(data), c))
     if isinstance(data, (bytes, bytearray)):
-        return json.loads(_msgpack_to_json(bytes(data)))
-    return json.loads(data)
+        return json.loads(_decode_message(bytes(data), MSGPACK))
+    return json.loads(_normalize_message(data))
 
 
 def encode_as(value_json: str, content_type: str) -> bytes:
