@@ -303,11 +303,11 @@ after changing Python or Rust code.</p>
 <h2>Use the Jupyter widget<a class="headerlink" href="#use-the-jupyter-widget" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds an <a class="reference external" href="https://anywidget.dev">anywidget</a>. Display it and every
 hosted model mirrors live in the notebook frontend, updating on each <code class="docutils literal notranslate"><span class="pre">transports.sync(server)</span></code>. The
-frontend ships inside the wheel (<code class="docutils literal notranslate"><span class="pre">transports/extension/cdn/widget.js</span></code>). Mirroring and edits are pure
-TypeScript, so it never fetches wasm. Custom frontends hook the bubbled <code class="docutils literal notranslate"><span class="pre">transports-change</span></code> /
-<code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events or use <code class="docutils literal notranslate"><span class="pre">el.transports</span> <span class="pre">=</span> <span class="pre">{client,</span> <span class="pre">edit}</span></code>.
-<code class="docutils literal notranslate"><span class="pre">el.transports.edit(id,</span> <span class="pre">[&quot;brightness&quot;],</span> <span class="pre">75)</span></code> sends a wasm-free server-authoritative proposal, and a
-value the model rejects surfaces inline through the <code class="docutils literal notranslate"><span class="pre">reject</span></code> frame.</p>
+frontend ships inside the wheel (<code class="docutils literal notranslate"><span class="pre">transports/extension/cdn/widget.js</span></code>) and loads its packaged WASM
+client state. Custom frontends hook the bubbled <code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events
+or use <code class="docutils literal notranslate"><span class="pre">el.transports</span> <span class="pre">=</span> <span class="pre">{client,</span> <span class="pre">edit}</span></code>. <code class="docutils literal notranslate"><span class="pre">el.transports.edit(id,</span> <span class="pre">[&quot;brightness&quot;],</span> <span class="pre">75)</span></code> sends a
+server-authoritative proposal, and a value the model rejects surfaces inline through the <code class="docutils literal notranslate"><span class="pre">reject</span></code>
+frame.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 
 <span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>

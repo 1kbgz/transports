@@ -252,7 +252,6 @@
 <span class="kn">import</span><span class="w"> </span><span class="nn">contextlib</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">inspect</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">sys</span>
 <span class="kn">import</span><span class="w"> </span><span class="nn">urllib.parse</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
@@ -260,7 +259,7 @@
 
 <span class="kn">from</span><span class="w"> </span><span class="nn">.</span><span class="w"> </span><span class="kn">import</span> <span class="n">protocol</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">._bridge</span><span class="w"> </span><span class="kn">import</span> <span class="n">M</span><span class="p">,</span> <span class="n">from_value</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">apply</span> <span class="k">as</span> <span class="n">_apply</span><span class="p">,</span> <span class="n">diff</span> <span class="k">as</span> <span class="n">_diff</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.transports</span><span class="w"> </span><span class="kn">import</span> <span class="n">ClientState</span> <span class="k">as</span> <span class="n">_ClientState</span><span class="p">,</span> <span class="n">apply</span> <span class="k">as</span> <span class="n">_apply</span><span class="p">,</span> <span class="n">diff</span> <span class="k">as</span> <span class="n">_diff</span>
 
 
 <div class="viewcode-block" id="Client">
@@ -274,14 +273,14 @@
 
     <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">codec</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Any</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_state</span> <span class="o">=</span> <span class="n">_ClientState</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ack_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_next_proposal</span> <span class="o">=</span> <span class="mi">1</span>
         <span class="c1">#: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
 
@@ -289,6 +288,11 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">connected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Whether a managed connection (`connect` / `run`) is open right now."""</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_rev</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Compatibility view of revisions now owned by the shared core."""</span>
+        <span class="k">return</span> <span class="p">{</span><span class="nb">int</span><span class="p">(</span><span class="n">mid</span><span class="p">):</span> <span class="n">rev</span> <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">rev</span> <span class="ow">in</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">revisions</span><span class="p">())</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
 
 <div class="viewcode-block" id="Client.send">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.send">[docs]</a>
@@ -314,15 +318,28 @@
 
 <span class="sd">        Server-authoritative — the mirror updates when the authoritative patch echoes back (or</span>
 <span class="sd">        `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""</span>
-        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">new_value</span><span class="p">,</span> <span class="n">proposal</span><span class="p">))</span></div>
+        <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">edit</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">new_value</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_proposal</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Client.propose_ops">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.propose_ops">[docs]</a>
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">propose_ops</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Propose explicit patch operations over the active connection."""</span>
-        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">edit_ops</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">ops</span><span class="p">,</span> <span class="n">proposal</span><span class="p">))</span></div>
+        <span class="n">frame</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">edit_ops</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">ops</span><span class="p">,</span> <span class="n">proposal</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">_send_proposal</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
+
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_send_proposal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="n">proposal</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)[</span><span class="s2">"proposal"</span><span class="p">]</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">sent</span> <span class="o">=</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">abandon</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">sent</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">abandon</span><span class="p">(</span><span class="n">proposal</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">sent</span>
 
 <div class="viewcode-block" id="Client.on_change">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_change">[docs]</a>
@@ -366,7 +383,19 @@
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Client.on_abandon">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_abandon">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_abandon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Register a callback fired with unsettled proposal identifiers on disconnect."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
+
+
     <span class="k">def</span><span class="w"> </span><span class="nf">_disconnected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">abandoned</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">disconnect</span><span class="p">())[</span><span class="s2">"proposals"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">abandoned</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="p">):</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">abandoned</span><span class="p">)</span>
         <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="p">):</span>
             <span class="n">callback</span><span class="p">()</span>
 
@@ -374,14 +403,6 @@
         <span class="k">if</span> <span class="s2">"proposal"</span> <span class="ow">in</span> <span class="n">msg</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_ack_cbs</span><span class="p">):</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-
-    <span class="k">def</span><span class="w"> </span><span class="nf">_proposal_id</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">proposal</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"auto-</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_next_proposal</span><span class="si">}</span><span class="s2">"</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_next_proposal</span> <span class="o">+=</span> <span class="mi">1</span>
-        <span class="k">elif</span> <span class="n">re</span><span class="o">.</span><span class="n">fullmatch</span><span class="p">(</span><span class="sa">r</span><span class="s2">"auto-[0-9]+"</span><span class="p">,</span> <span class="n">proposal</span><span class="p">):</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">"proposal identifiers matching 'auto-N' are reserved"</span><span class="p">)</span>
-        <span class="k">return</span> <span class="n">proposal</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_accepted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">change</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
         <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="p">):</span>
@@ -411,32 +432,29 @@
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_recv_msg</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">msg</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
-        <span class="n">t</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"snapshot"</span><span class="p">:</span>
+        <span class="n">effect_json</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">prepare</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">))</span>
+        <span class="n">effect</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">effect_json</span><span class="p">)</span>
+        <span class="n">kind</span> <span class="o">=</span> <span class="n">effect</span><span class="p">[</span><span class="s2">"effect"</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"snapshot"</span><span class="p">:</span>
             <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"value"</span><span class="p">]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_type</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"type"</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">commit</span><span class="p">(</span><span class="n">effect_json</span><span class="p">)</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted</span><span class="p">({</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"snapshot"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">mid</span><span class="p">,</span> <span class="s2">"rev"</span><span class="p">:</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"rev"</span><span class="p">]})</span>
-        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"patch"</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"patch"</span><span class="p">:</span>
             <span class="n">mid</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
-            <span class="n">rev</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">][</span><span class="s2">"rev"</span><span class="p">]</span>
-            <span class="c1"># rev is the model's sequence number; ignore a patch already reflected in the mirror (e.g. a</span>
-            <span class="c1"># patch the opening snapshot already captured, which the server then also broadcasts).</span>
-            <span class="k">if</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span> <span class="ow">and</span> <span class="n">rev</span> <span class="o">&lt;=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]:</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_acknowledge</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
-                <span class="k">return</span> <span class="kc">None</span>
-            <span class="k">if</span> <span class="n">mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">:</span>
-                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"patch received before snapshot for model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])))</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">rev</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])))</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">commit</span><span class="p">(</span><span class="n">effect_json</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">value</span>
             <span class="n">accepted</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_accepted</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_acknowledge</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">accepted</span>
-        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"ack"</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"stale_patch"</span> <span class="ow">or</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"acknowledgement"</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">commit</span><span class="p">(</span><span class="n">effect_json</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_acknowledge</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
-        <span class="k">elif</span> <span class="n">t</span> <span class="o">==</span> <span class="s2">"reject"</span><span class="p">:</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"rejection"</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">commit</span><span class="p">(</span><span class="n">effect_json</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">):</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
@@ -463,6 +481,13 @@
         <span class="k">return</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Client.pending_proposals">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.pending_proposals">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">pending_proposals</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Identifiers for proposals that have not settled or been abandoned."""</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">pending</span><span class="p">()</span></div>
+
+
 <div class="viewcode-block" id="Client.edit">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.edit">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">edit</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">new_value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">:</span>
@@ -485,8 +510,12 @@
 <span class="sd">        form when a new optimistic value equals the current mirror and a whole-value diff would be</span>
 <span class="sd">        empty while an older proposal is still pending.</span>
 <span class="sd">        """</span>
-        <span class="n">patch</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"rev"</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">"ops"</span><span class="p">:</span> <span class="n">ops</span><span class="p">}</span>
-        <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_proposal_id</span><span class="p">(</span><span class="n">proposal</span><span class="p">)),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span></div>
+        <span class="n">message</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">proposal</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">ops</span><span class="p">),</span> <span class="n">proposal</span><span class="p">)</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">message</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)</span>
+        <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">abandon</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">message</span><span class="p">)[</span><span class="s2">"proposal"</span><span class="p">])</span>
+            <span class="k">raise</span></div>
 
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_connect_url</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">url</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -494,8 +523,9 @@
 <span class="sd">        mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""</span>
         <span class="n">sep</span> <span class="o">=</span> <span class="s2">"&amp;"</span> <span class="k">if</span> <span class="s2">"?"</span> <span class="ow">in</span> <span class="n">url</span> <span class="k">else</span> <span class="s2">"?"</span>
         <span class="n">params</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">"codec=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="si">}</span><span class="s2">"</span>
-        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">:</span>
-            <span class="n">params</span> <span class="o">+=</span> <span class="s2">"&amp;since="</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_rev</span><span class="p">))</span>
+        <span class="n">revisions</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">revisions</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">revisions</span> <span class="o">!=</span> <span class="s2">"</span><span class="si">{}</span><span class="s2">"</span><span class="p">:</span>
+            <span class="n">params</span> <span class="o">+=</span> <span class="s2">"&amp;since="</span> <span class="o">+</span> <span class="n">urllib</span><span class="o">.</span><span class="n">parse</span><span class="o">.</span><span class="n">quote</span><span class="p">(</span><span class="n">revisions</span><span class="p">)</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">url</span><span class="si">}{</span><span class="n">sep</span><span class="si">}{</span><span class="n">params</span><span class="si">}</span><span class="s2">"</span>
 
 <div class="viewcode-block" id="Client.connect">

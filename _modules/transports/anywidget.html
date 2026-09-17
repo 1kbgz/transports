@@ -287,8 +287,8 @@
 <span class="sd">    Builds an ``anywidget.AnyWidget`` whose frontend (shipped inside the wheel at</span>
 <span class="sd">    ``transports/extension/cdn/widget.js``) opens the wire, renders a live view of each mirrored</span>
 <span class="sd">    model, bubbles ``transports-change`` / ``transports-reject`` DOM events, and exposes</span>
-<span class="sd">    ``el.transports = {client, edit}`` for custom frontends. Mirroring and edits are pure TS — the</span>
-<span class="sd">    frontend never fetches wasm. Push kernel-side changes with ``transports.sync(server)``.</span>
+<span class="sd">    ``el.transports = {client, edit}`` for custom frontends. Its self-contained bundle embeds the</span>
+<span class="sd">    shared WASM client state. Push kernel-side changes with ``transports.sync(server)``.</span>
 
 <span class="sd">    Lazy-imports ``anywidget`` (``pip install anywidget``); works under Jupyter and JupyterLite.</span>
 <span class="sd">    """</span>

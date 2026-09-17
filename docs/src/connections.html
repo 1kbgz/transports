@@ -327,9 +327,10 @@ identifier, and rejects include it in <code class="docutils literal notranslate"
 <code class="docutils literal notranslate"><span class="pre">editOps</span></code> with a hand-rolled socket, to send explicit operations when a whole-value diff would be
 empty against the current mirror. Generated identifiers use the reserved <code class="docutils literal notranslate"><span class="pre">auto-N</span></code> form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.</p>
-<p>Proposal correlation lasts for one live connection. If it drops, <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> fires and pending
-optimistic proposals should be discarded. Resume replays authoritative state without old proposal
-identifiers; it does not resend those proposals. Python exposes the same hook as <code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>.</p>
+<p>Proposal correlation lasts for one live connection. If it drops, <code class="docutils literal notranslate"><span class="pre">onAbandon</span></code> receives the unsettled
+proposal identifiers before <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> fires. Python exposes the same hooks as <code class="docutils literal notranslate"><span class="pre">on_abandon</span></code> and
+<code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>. <code class="docutils literal notranslate"><span class="pre">pendingProposals()</span></code> / <code class="docutils literal notranslate"><span class="pre">pending_proposals()</span></code> returns the current set. Resume replays
+authoritative state without old proposal identifiers; it does not resend those proposals.</p>
 <p><code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday’s
 <code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame
@@ -418,9 +419,9 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <section id="use-anywidget-custom-messages">
 <h2>Use anywidget custom messages<a class="headerlink" href="#use-anywidget-custom-messages" title="Link to this heading">¶</a></h2>
 <p>For the common case, <code class="docutils literal notranslate"><span class="pre">transports.widget(server)</span></code> builds an <code class="docutils literal notranslate"><span class="pre">anywidget.AnyWidget</span></code> whose frontend
-ships inside the wheel. Display it and every hosted model mirrors live. The frontend emits
-<code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events and exposes a wasm-free <code class="docutils literal notranslate"><span class="pre">el.transports.edit</span></code>
-for proposals. See <a class="reference internal" href="pyodide.html"><span class="std std-doc">Pyodide</span></a> for details.</p>
+ships inside the wheel. Display it and every hosted model mirrors live. The frontend loads the same
+WASM client state as the browser package, emits <code class="docutils literal notranslate"><span class="pre">transports-change</span></code> / <code class="docutils literal notranslate"><span class="pre">transports-reject</span></code> DOM events,
+and exposes <code class="docutils literal notranslate"><span class="pre">el.transports.edit</span></code> for proposals. See <a class="reference internal" href="pyodide.html"><span class="std std-doc">Pyodide</span></a> for details.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">w</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">widget</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>   <span class="c1"># pip install anywidget</span>
 <span class="n">w</span>                               <span class="c1"># display; then mutate models + transports.sync(server)</span>
 </pre></div>
