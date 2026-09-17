@@ -125,6 +125,18 @@ def test_client_tracks_settles_and_abandons_proposals():
     assert c.pending_proposals() == []
 
 
+def test_client_can_abandon_one_unsent_proposal():
+    c = transports.Client()
+    abandoned = []
+    c.on_abandon(abandoned.append)
+    c.edit_ops(1, [], "sent-elsewhere")
+
+    assert c.abandon_proposal("missing") is False
+    assert c.abandon_proposal("sent-elsewhere") is True
+    assert c.pending_proposals() == []
+    assert abandoned == []
+
+
 def test_dropped_managed_proposal_is_not_left_pending():
     c = transports.Client()
     assert asyncio.run(c.propose_ops(1, [], "dropped")) is False
