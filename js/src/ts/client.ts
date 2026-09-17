@@ -1,11 +1,5 @@
 import { codecFor } from "./codecs";
-import {
-  cborToJson,
-  diff,
-  jsonToCbor,
-  jsonToMsgpack,
-  msgpackToJson,
-} from "./index";
+import { decodeMessage, diff, encodeMessage } from "./index";
 import type { Value } from "./bridge";
 
 type SnapshotMsg = {
@@ -336,9 +330,7 @@ export class Client {
       msg = JSON.parse(data);
     } else {
       // binary frame: disambiguate by the connection's codec (msgpack vs cbor)
-      msg = JSON.parse(
-        this.codec === "cbor" ? cborToJson(data) : msgpackToJson(data),
-      );
+      msg = JSON.parse(decodeMessage(data, this.codec));
     }
     if (msg.t === "batch") {
       // a negotiated batch frame (the connection asked with ?batch=1): apply each message in
@@ -420,8 +412,7 @@ export class Client {
     const custom = codecFor(this.codec);
     if (custom) return custom.encode(msg);
     const s = JSON.stringify(msg);
-    if (this.codec === "msgpack") return jsonToMsgpack(s);
-    if (this.codec === "cbor") return jsonToCbor(s);
+    if (this.codec !== "json") return encodeMessage(s, this.codec);
     return s;
   }
 

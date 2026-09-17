@@ -10,6 +10,9 @@ import {
   msgpackToJson,
   jsonToCbor,
   cborToJson,
+  normalizeMessage,
+  encodeMessage,
+  decodeMessage,
   registerCodec,
   unregisterCodec,
   Client,
@@ -118,6 +121,21 @@ test("whole-message json<->cbor round-trips", async () => {
   const cb = jsonToCbor(msg);
   expect(cb instanceof Uint8Array).toBe(true);
   expect(JSON.parse(cborToJson(cb))).toEqual(JSON.parse(msg));
+});
+
+test("live message model and codecs are shared with Rust", async () => {
+  const msg = JSON.stringify({
+    t: "ack",
+    id: 7,
+    rev: 3,
+    proposal: "editor-1",
+  });
+  expect(JSON.parse(normalizeMessage(msg))).toEqual(JSON.parse(msg));
+  for (const codec of ["json", "msgpack", "cbor"]) {
+    expect(JSON.parse(decodeMessage(encodeMessage(msg, codec), codec))).toEqual(
+      JSON.parse(msg),
+    );
+  }
 });
 
 test("Client mirrors a binary (cbor) snapshot then patch", async () => {

@@ -24,6 +24,15 @@ def json_to_msgpack(json: str) -> bytes:
 def msgpack_to_json(data: bytes) -> str:
     """Convert MessagePack bytes back to a JSON document."""
 
+def normalize_message(json: str) -> str:
+    """Parse and serialize one typed live protocol message as compact JSON."""
+
+def encode_message(json: str, codec: str) -> bytes:
+    """Encode one JSON live protocol message with a built-in connection codec."""
+
+def decode_message(data: bytes, codec: str) -> str:
+    """Decode one built-in connection-codec payload as typed live protocol message JSON."""
+
 class Store:
     """In-process model store: host / mutate -> patch / apply / snapshot."""
 

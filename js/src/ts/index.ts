@@ -41,6 +41,18 @@ export const jsonToCbor = (json: string): Uint8Array => wasm.json_to_cbor(json);
 export const cborToJson = (bytes: Uint8Array): string =>
   wasm.cbor_to_json(bytes);
 
+/** Parse and serialize one typed live protocol message as compact JSON. */
+export const normalizeMessage = (json: string): string =>
+  wasm.normalize_message(json);
+
+/** Encode one JSON live protocol message with a built-in connection codec. */
+export const encodeMessage = (json: string, codec: string): Uint8Array =>
+  wasm.encode_message(json, codec);
+
+/** Decode one built-in connection-codec payload as typed live protocol message JSON. */
+export const decodeMessage = (bytes: Uint8Array, codec: string): string =>
+  wasm.decode_message(bytes, codec);
+
 /** In-process model store: host / mutate → patch / apply / snapshot. */
 export const Store = wasm.Store;
 

@@ -7,6 +7,7 @@
 
 use crate::codec::{codec_for, Codec, JsonCodec};
 use crate::diff::{apply, diff, Patch};
+use crate::message::Message;
 use crate::store::Store;
 use crate::value::{ModelId, Value};
 
@@ -79,6 +80,21 @@ pub fn json_to_cbor(json: &str) -> Result<Vec<u8>, String> {
 pub fn cbor_to_json(bytes: &[u8]) -> Result<String, String> {
     let v: serde_json::Value = ciborium::from_reader(bytes).map_err(|e| e.to_string())?;
     serde_json::to_string(&v).map_err(|e| e.to_string())
+}
+
+/// Parse and serialize one typed live protocol message as compact JSON.
+pub fn normalize_message_json(json: &str) -> Result<String, String> {
+    Message::from_json(json)?.to_json()
+}
+
+/// Encode one JSON live protocol message with a built-in connection codec.
+pub fn encode_message(json: &str, codec: &str) -> Result<Vec<u8>, String> {
+    Message::from_json(json)?.encode(codec)
+}
+
+/// Decode one built-in connection-codec payload as a typed live protocol message and return JSON.
+pub fn decode_message(bytes: &[u8], codec: &str) -> Result<String, String> {
+    Message::decode(bytes, codec)?.to_json()
 }
 
 /// A string-in/string-out facade over [`Store`] for the bindings.
@@ -160,6 +176,29 @@ mod bridge_tests {
         assert_eq!(
             back,
             serde_json::from_str::<serde_json::Value>(json).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_message_codec_facade() {
+        let json = r#"{"t":"ack","id":1,"rev":2,"proposal":"auto-1"}"#;
+        assert_eq!(normalize_message_json(json).unwrap(), json);
+        for codec in ["json", "msgpack", "cbor"] {
+            let bytes = encode_message(json, codec).unwrap();
+            assert_eq!(decode_message(&bytes, codec).unwrap(), json);
+        }
+    }
+
+    #[test]
+    fn test_message_binary_encoding_matches_existing_wire_bytes() {
+        let json = r#"{"t":"patch","id":1,"patch":{"rev":2,"ops":[]},"proposal":"editor-2"}"#;
+        assert_eq!(
+            encode_message(json, "msgpack").unwrap(),
+            json_to_msgpack(json).unwrap()
+        );
+        assert_eq!(
+            encode_message(json, "cbor").unwrap(),
+            json_to_cbor(json).unwrap()
         );
     }
 

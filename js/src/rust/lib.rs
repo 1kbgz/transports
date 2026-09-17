@@ -63,6 +63,24 @@ pub fn cbor_to_json(data: &[u8]) -> Result<String, JsError> {
     transports::cbor_to_json(data).map_err(|e| JsError::new(&e))
 }
 
+/// Parse and serialize one typed live protocol message as compact JSON.
+#[wasm_bindgen]
+pub fn normalize_message(json: &str) -> Result<String, JsError> {
+    transports::normalize_message_json(json).map_err(|e| JsError::new(&e))
+}
+
+/// Encode one JSON live protocol message with a built-in connection codec.
+#[wasm_bindgen]
+pub fn encode_message(json: &str, codec: &str) -> Result<Vec<u8>, JsError> {
+    transports::encode_message(json, codec).map_err(|e| JsError::new(&e))
+}
+
+/// Decode one built-in connection-codec payload as a typed live protocol message JSON string.
+#[wasm_bindgen]
+pub fn decode_message(data: &[u8], codec: &str) -> Result<String, JsError> {
+    transports::decode_message(data, codec).map_err(|e| JsError::new(&e))
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[wasm_bindgen]
 pub struct Store {

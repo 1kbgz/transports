@@ -69,6 +69,29 @@ pub fn cbor_to_json(data: &[u8]) -> PyResult<String> {
     transports::cbor_to_json(data).map_err(PyValueError::new_err)
 }
 
+/// Parse and serialize one typed live protocol message as compact JSON.
+#[pyfunction]
+pub fn normalize_message(json: &str) -> PyResult<String> {
+    transports::normalize_message_json(json).map_err(PyValueError::new_err)
+}
+
+/// Encode one JSON live protocol message with a built-in connection codec.
+#[pyfunction]
+pub fn encode_message<'py>(
+    py: Python<'py>,
+    json: &str,
+    codec: &str,
+) -> PyResult<Bound<'py, PyBytes>> {
+    let bytes = transports::encode_message(json, codec).map_err(PyValueError::new_err)?;
+    Ok(PyBytes::new(py, &bytes))
+}
+
+/// Decode one built-in connection-codec payload as a typed live protocol message JSON string.
+#[pyfunction]
+pub fn decode_message(data: &[u8], codec: &str) -> PyResult<String> {
+    transports::decode_message(data, codec).map_err(PyValueError::new_err)
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

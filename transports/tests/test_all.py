@@ -1,6 +1,6 @@
 import json
 
-from transports import Store, apply, decode, diff, encode
+from transports import Store, apply, decode, decode_message, diff, encode, encode_message, normalize_message
 
 # A model is a `Value`; on the wire that is the externally-tagged enum, e.g. a map of fields is
 # {"Map": {"on": {"Bool": false}}}. The pydantic/msgspec bridge will hide this; the tests
@@ -76,6 +76,13 @@ def test_encode_decode():
     blob = encode(model)
     assert isinstance(blob, bytes)
     assert json.loads(decode(blob)) == json.loads(model)
+
+
+def test_live_message_model_and_codecs_are_shared_with_rust():
+    message = json.dumps({"t": "ack", "id": 7, "rev": 3, "proposal": "editor-1"})
+    assert json.loads(normalize_message(message)) == json.loads(message)
+    for codec in ("json", "msgpack", "cbor"):
+        assert json.loads(decode_message(encode_message(message, codec), codec)) == json.loads(message)
 
 
 def test_store_mutate_is_incremental():

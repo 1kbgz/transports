@@ -17,11 +17,14 @@ from .transports import (  # compiled Rust extension (rust/python)
     apply,
     cbor_to_json,
     decode,
+    decode_message,
     diff,
     encode,
+    encode_message,
     json_to_cbor,
     json_to_msgpack,
     msgpack_to_json,
+    normalize_message,
 )
 
 __version__ = "0.8.3"
@@ -57,13 +60,16 @@ __all__ = [
     "cbor_to_json",
     "decode",
     "decode_as",
+    "decode_message",
     "diff",
     "encode",
     "encode_as",
+    "encode_message",
     "from_value",
     "json_to_cbor",
     "json_to_msgpack",
     "msgpack_to_json",
+    "normalize_message",
     "protocol",
     # custom wire codecs
     "register_codec",
