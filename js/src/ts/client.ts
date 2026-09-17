@@ -328,10 +328,11 @@ export class Client {
     try {
       const sent = this.send(frame);
       if (!sent && message.proposal !== undefined)
-        this.state.abandon(message.proposal);
+        this.abandonProposal(message.proposal);
       return sent;
     } catch (error) {
-      if (message.proposal !== undefined) this.state.abandon(message.proposal);
+      if (message.proposal !== undefined)
+        this.abandonProposal(message.proposal);
       throw error;
     }
   }
@@ -494,6 +495,15 @@ export class Client {
     return this.state.pending();
   }
 
+  /** Stop tracking one proposal that the caller did not send.
+   *
+   * Returns whether the proposal was pending. This does not call `onAbandon`; those listeners report
+   * proposals abandoned by a managed connection closing.
+   */
+  abandonProposal(proposal: string): boolean {
+    return this.state.abandon(proposal);
+  }
+
   /** Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
    *
    * Server-authoritative: the local mirror updates when the server echoes the authoritative patch
@@ -517,7 +527,8 @@ export class Client {
       if (this.codec !== "json") return encodeMessage(message, this.codec);
       return message;
     } catch (error) {
-      if (decoded.proposal !== undefined) this.state.abandon(decoded.proposal);
+      if (decoded.proposal !== undefined)
+        this.abandonProposal(decoded.proposal);
       throw error;
     }
   }

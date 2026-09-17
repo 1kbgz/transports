@@ -81,10 +81,10 @@ class Client:
         try:
             sent = await self.send(frame)
         except Exception:
-            self._state.abandon(proposal)
+            self.abandon_proposal(proposal)
             raise
         if not sent:
-            self._state.abandon(proposal)
+            self.abandon_proposal(proposal)
         return sent
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
@@ -204,6 +204,14 @@ class Client:
         """Identifiers for proposals that have not settled or been abandoned."""
         return self._state.pending()
 
+    def abandon_proposal(self, proposal: str) -> bool:
+        """Stop tracking one proposal that the caller did not send.
+
+        Returns whether the proposal was pending. This does not call `on_abandon`; those callbacks
+        report proposals abandoned by a managed connection closing.
+        """
+        return self._state.abandon(proposal)
+
     def edit(self, mid: int, new_value: Any, proposal: str | None = None) -> str | bytes:
         """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
 
@@ -225,7 +233,7 @@ class Client:
         try:
             return protocol.encode(message, self._codec)
         except Exception:
-            self._state.abandon(json.loads(message)["proposal"])
+            self.abandon_proposal(json.loads(message)["proposal"])
             raise
 
     def _connect_url(self, url: str) -> str:

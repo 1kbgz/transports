@@ -498,6 +498,18 @@ test("Client-generated proposal ids cannot collide with caller ids", async () =>
   expect(() => c.editOps(1, [], "auto-2")).toThrow(/reserved/);
 });
 
+test("Client can abandon one unsent proposal", async () => {
+  const c = new Client();
+  const abandoned = [];
+  c.onAbandon((proposals) => abandoned.push(proposals));
+  c.editOps(1, [], "sent-elsewhere");
+
+  expect(c.abandonProposal("missing")).toBe(false);
+  expect(c.abandonProposal("sent-elsewhere")).toBe(true);
+  expect(c.pendingProposals()).toEqual([]);
+  expect(abandoned).toEqual([]);
+});
+
 test("Client exposes managed connection loss", async () => {
   const NativeWebSocket = globalThis.WebSocket;
   class FakeSocket {
