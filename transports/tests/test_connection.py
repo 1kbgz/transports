@@ -548,12 +548,15 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
             server = Server(sess)
 
             client = Client()
+            connections = []
+            unsubscribe = client.on_connect(lambda: connections.append(client.connected))
             task = asyncio.ensure_future(client._run_browser("ws://host/ws", authority="client", retry=0.01))
             await asyncio.sleep(0)
             first = FakeSocket.instances[-1]
             assert client.connected is False  # the channel arms only on the socket's open event
             first.listeners["open"](FakeEvent(None))
             assert client.connected is True
+            assert connections == [True]
             for wire in server.open("c1"):
                 first.listeners["message"](FakeEvent(wire))
             assert client.model(mid, Device).name == "lamp"
@@ -568,6 +571,7 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
             assert "since=" in second.url  # resume: the server replays only the delta
 
             second.listeners["open"](FakeEvent(None))
+            assert connections == [True, True]  # open is observable even before resume sends a frame
             for wire in server.open("c2"):
                 second.listeners["message"](FakeEvent(wire))
             # client authority: once the server (re)snapshots, the pre-drop state is pushed back
@@ -584,6 +588,7 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
                 pass
             assert client.connected is False  # the drop cleared the channel
             assert await client.send("x") is False  # dropped, matching a closed browser socket
+            unsubscribe()
 
             # binary frames go through pyodide.ffi.to_js on the way out
             Client._send_browser(second, b"\x01")

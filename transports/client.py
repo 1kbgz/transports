@@ -35,6 +35,7 @@ class Client:
         self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
         self._abandon_cbs: list[Callable[[list[str]], None]] = []
+        self._connect_cbs: list[Callable[[], None]] = []
         self._disconnect_cbs: list[Callable[[], None]] = []
         #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
         self._sender: Callable[[str | bytes], Any] | None = None
@@ -117,10 +118,20 @@ class Client:
         self._disconnect_cbs.append(callback)
         return lambda: self._disconnect_cbs.remove(callback)
 
+    def on_connect(self, callback: Callable[[], None]) -> Callable[[], None]:
+        """Register a callback fired when a managed WebSocket opens, including reconnects."""
+        self._connect_cbs.append(callback)
+        return lambda: self._connect_cbs.remove(callback)
+
     def on_abandon(self, callback: Callable[[list[str]], None]) -> Callable[[], None]:
         """Register a callback fired with unsettled proposal identifiers on disconnect."""
         self._abandon_cbs.append(callback)
         return lambda: self._abandon_cbs.remove(callback)
+
+    def _connected(self, sender: Callable[[str | bytes], Any]) -> None:
+        self._sender = sender
+        for callback in list(self._connect_cbs):
+            callback()
 
     def _disconnected(self) -> None:
         abandoned = json.loads(self._state.disconnect())["proposals"]
@@ -259,8 +270,8 @@ class Client:
 
         async with websockets.connect(self._connect_url(url)) as ws:
             sender = ws.send
-            self._sender = sender
             try:
+                self._connected(sender)
                 async for frame in ws:
                     self.recv(frame)
             finally:
@@ -333,7 +344,7 @@ class Client:
             nonlocal opened
             # arm the outbound channel only once the socket is open (send during CONNECTING throws)
             opened = True
-            self._sender = sender
+            self._connected(sender)
 
         proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close), create_proxy(_on_close)]
         for name, proxy in zip(("message", "open", "close", "error"), proxies):
@@ -378,8 +389,8 @@ class Client:
             try:
                 async with websockets.connect(self._connect_url(url)) as ws:
                     sender = ws.send
-                    self._sender = sender
                     try:
+                        self._connected(sender)
                         async for frame in ws:
                             self.recv(frame)
                             if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back

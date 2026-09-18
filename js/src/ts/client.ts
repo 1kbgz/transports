@@ -278,6 +278,7 @@ export class Client {
   private ackListeners: Array<(ack: PatchMsg | AckMsg) => void> = [];
   private rejectListeners: Array<(reject: RejectMsg) => void> = [];
   private abandonListeners: Array<(proposals: string[]) => void> = [];
+  private connectListeners: Array<() => void> = [];
   private disconnectListeners: Array<() => void> = [];
   private state: ClientStateAdapter;
   // outbound channel of the active managed connection (set by connect()/run(), cleared on close)
@@ -368,6 +369,15 @@ export class Client {
     };
   }
 
+  /** Register a listener fired when a managed WebSocket opens, including reconnects. */
+  onConnect(listener: () => void): () => void {
+    this.connectListeners.push(listener);
+    return () => {
+      const i = this.connectListeners.indexOf(listener);
+      if (i >= 0) this.connectListeners.splice(i, 1);
+    };
+  }
+
   /** Register a listener fired with unsettled proposal identifiers on disconnect. */
   onAbandon(listener: (proposals: string[]) => void): () => void {
     this.abandonListeners.push(listener);
@@ -375,6 +385,11 @@ export class Client {
       const i = this.abandonListeners.indexOf(listener);
       if (i >= 0) this.abandonListeners.splice(i, 1);
     };
+  }
+
+  private opened(sender: (frame: string | Uint8Array) => void): void {
+    this.sender = sender;
+    for (const listener of [...this.connectListeners]) listener();
   }
 
   private disconnected(): void {
@@ -557,7 +572,7 @@ export class Client {
     const sender = (frame: string | Uint8Array) =>
       ws.send(frame as string | Uint8Array<ArrayBuffer>);
     ws.addEventListener("open", () => {
-      this.sender = sender; // arm only once open: send during CONNECTING throws in the DOM
+      this.opened(sender); // arm only once open: send during CONNECTING throws in the DOM
     });
     ws.addEventListener("close", () => {
       if (this.sender === sender) {

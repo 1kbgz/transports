@@ -3,9 +3,10 @@ the **server** (client adopts the restarted server's state: refetch-on-reconnect
 pushes its last-known state back, rectifying a server that came back stale/empty)."""
 
 import asyncio
+import contextlib
 import socket
 
-from transports import Client, DeepLwwCrdt, Hub
+from transports import Client, DeepLwwCrdt, Hub, protocol
 from transports.hub import WRITE
 
 
@@ -56,9 +57,12 @@ def test_server_authoritative_reconnect_adopts_restarted_state():
         stop1 = asyncio.Event()
         s1 = asyncio.create_task(_serve(hub1, sid, port, stop1))
         client = Client()
+        connections = []
+        client.on_connect(lambda: connections.append(client.connected))
         runner = asyncio.create_task(client.run(f"ws://127.0.0.1:{port}/", authority="server", retry=0.2))
 
         assert await _until(lambda: sid in client.ids() and client.value(sid) == {"Map": {"a": {"Int": 1}}})
+        assert connections == [True]
         stop1.set()
         await s1
 
@@ -68,6 +72,7 @@ def test_server_authoritative_reconnect_adopts_restarted_state():
         stop2 = asyncio.Event()
         s2 = asyncio.create_task(_serve(hub2, sid, port, stop2))
         assert await _until(lambda: client.value(sid) == {"Map": {"b": {"Int": 2}}}), "did not adopt server"
+        assert connections == [True, True]
         runner.cancel()
         stop2.set()
         await s2
@@ -98,5 +103,42 @@ def test_client_authoritative_reconnect_rectifies_a_stale_server():
         runner.cancel()
         stop2.set()
         await s2
+
+    asyncio.run(go())
+
+
+def test_native_run_reports_reconnect_without_an_inbound_frame():
+    async def go():
+        import websockets
+
+        port = _free_port()
+        attempts = 0
+        paths = []
+        release = asyncio.Event()
+
+        async def handler(ws):
+            nonlocal attempts
+            attempts += 1
+            paths.append(ws.request.path)
+            if attempts == 1:
+                await ws.close()
+            else:
+                await release.wait()
+
+        client = Client()
+        client.recv(protocol.snapshot_msg(1, "Doc", 0, {"Map": {"a": {"Int": 1}}}))
+        connections = []
+        client.on_connect(lambda: connections.append(client.connected))
+
+        async with websockets.serve(handler, "127.0.0.1", port):
+            runner = asyncio.create_task(client.run(f"ws://127.0.0.1:{port}/", retry=0.01))
+            assert await _until(lambda: len(connections) == 2)
+            assert connections == [True, True]
+            assert len(paths) == 2 and all("since=" in path for path in paths)
+            assert client.value(1) == {"Map": {"a": {"Int": 1}}}
+            runner.cancel()
+            release.set()
+            with contextlib.suppress(asyncio.CancelledError):
+                await runner
 
     asyncio.run(go())

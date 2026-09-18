@@ -100,6 +100,8 @@ def test_browser_sse_path_mirrors_events():
             server = Server(session)
 
             client = Client()
+            connections = []
+            client.on_connect(lambda: connections.append(True))
             task = asyncio.ensure_future(client._connect_sse_browser("http://host/sse"))
             await asyncio.sleep(0)  # let the task build the source + register listeners
             source = FakeSource.instances[-1]
@@ -114,6 +116,8 @@ def test_browser_sse_path_mirrors_events():
             await asyncio.wait_for(task, 1)
             assert client.model(mid, Device).on is True
             assert source.closed
+            assert connections == []
+            assert client.connected is False
 
         asyncio.run(run())
     finally:
