@@ -90,10 +90,16 @@ identifier, and rejects include it in `onReject`. Use `proposeOps` on a managed 
 empty against the current mirror. Generated identifiers use the reserved `auto-N` form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.
 
+`onConnect` fires whenever a managed WebSocket opens, including each `run()` reconnect. It fires
+after `client.connected` becomes true and does not depend on the server sending a snapshot or patch.
+Use it with `onDisconnect` when an adapter needs connection status. Python names the hooks
+`on_connect` and `on_disconnect`. These hooks do not apply to receive-only `connectSSE` /
+`connect_sse` streams.
+
 Proposal correlation lasts for one live connection. If it drops, `onAbandon` receives the unsettled
-proposal identifiers before `onDisconnect` fires. Python exposes the same hooks as `on_abandon` and
-`on_disconnect`. `pendingProposals()` / `pending_proposals()` returns the current set. Resume replays
-authoritative state without old proposal identifiers; it does not resend those proposals.
+proposal identifiers before `onDisconnect` fires. Python exposes the same hook as `on_abandon`.
+`pendingProposals()` / `pending_proposals()` returns the current set. Resume replays authoritative
+state without old proposal identifiers; it does not resend those proposals.
 
 `client.send(frame)` sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday's

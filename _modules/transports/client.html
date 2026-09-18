@@ -280,6 +280,7 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_ack_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="c1">#: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">Any</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
@@ -383,6 +384,14 @@
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Client.on_connect">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_connect">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_connect</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Register a callback fired when a managed WebSocket opens, including reconnects."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_connect_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_connect_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="Client.on_abandon">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_abandon">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">on_abandon</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
@@ -390,6 +399,11 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_connected</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">sender</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">],</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">sender</span>
+        <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_cbs</span><span class="p">):</span>
+            <span class="n">callback</span><span class="p">()</span>
 
     <span class="k">def</span><span class="w"> </span><span class="nf">_disconnected</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">abandoned</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_state</span><span class="o">.</span><span class="n">disconnect</span><span class="p">())[</span><span class="s2">"proposals"</span><span class="p">]</span>
@@ -554,8 +568,8 @@
 
         <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
             <span class="n">sender</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">sender</span>
             <span class="k">try</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
                 <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
                     <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
             <span class="k">finally</span><span class="p">:</span>
@@ -629,7 +643,7 @@
             <span class="k">nonlocal</span> <span class="n">opened</span>
             <span class="c1"># arm the outbound channel only once the socket is open (send during CONNECTING throws)</span>
             <span class="n">opened</span> <span class="o">=</span> <span class="kc">True</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">sender</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
 
         <span class="n">proxies</span> <span class="o">=</span> <span class="p">[</span><span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_message</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_open</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">),</span> <span class="n">create_proxy</span><span class="p">(</span><span class="n">_on_close</span><span class="p">)]</span>
         <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">proxy</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">((</span><span class="s2">"message"</span><span class="p">,</span> <span class="s2">"open"</span><span class="p">,</span> <span class="s2">"close"</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">),</span> <span class="n">proxies</span><span class="p">):</span>
@@ -676,8 +690,8 @@
             <span class="k">try</span><span class="p">:</span>
                 <span class="k">async</span> <span class="k">with</span> <span class="n">websockets</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_connect_url</span><span class="p">(</span><span class="n">url</span><span class="p">))</span> <span class="k">as</span> <span class="n">ws</span><span class="p">:</span>
                     <span class="n">sender</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">send</span>
-                    <span class="bp">self</span><span class="o">.</span><span class="n">_sender</span> <span class="o">=</span> <span class="n">sender</span>
                     <span class="k">try</span><span class="p">:</span>
+                        <span class="bp">self</span><span class="o">.</span><span class="n">_connected</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
                         <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">ws</span><span class="p">:</span>
                             <span class="bp">self</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
                             <span class="k">if</span> <span class="n">pre</span><span class="p">:</span>  <span class="c1"># rectify: once the server has (re)snapshotted a model, push our copy back</span>

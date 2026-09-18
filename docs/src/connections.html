@@ -327,10 +327,15 @@ identifier, and rejects include it in <code class="docutils literal notranslate"
 <code class="docutils literal notranslate"><span class="pre">editOps</span></code> with a hand-rolled socket, to send explicit operations when a whole-value diff would be
 empty against the current mirror. Generated identifiers use the reserved <code class="docutils literal notranslate"><span class="pre">auto-N</span></code> form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.</p>
+<p><code class="docutils literal notranslate"><span class="pre">onConnect</span></code> fires whenever a managed WebSocket opens, including each <code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect. It fires
+after <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> becomes true and does not depend on the server sending a snapshot or patch.
+Use it with <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> when an adapter needs connection status. Python names the hooks
+<code class="docutils literal notranslate"><span class="pre">on_connect</span></code> and <code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>. These hooks do not apply to receive-only <code class="docutils literal notranslate"><span class="pre">connectSSE</span></code> /
+<code class="docutils literal notranslate"><span class="pre">connect_sse</span></code> streams.</p>
 <p>Proposal correlation lasts for one live connection. If it drops, <code class="docutils literal notranslate"><span class="pre">onAbandon</span></code> receives the unsettled
-proposal identifiers before <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> fires. Python exposes the same hooks as <code class="docutils literal notranslate"><span class="pre">on_abandon</span></code> and
-<code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>. <code class="docutils literal notranslate"><span class="pre">pendingProposals()</span></code> / <code class="docutils literal notranslate"><span class="pre">pending_proposals()</span></code> returns the current set. Resume replays
-authoritative state without old proposal identifiers; it does not resend those proposals.</p>
+proposal identifiers before <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> fires. Python exposes the same hook as <code class="docutils literal notranslate"><span class="pre">on_abandon</span></code>.
+<code class="docutils literal notranslate"><span class="pre">pendingProposals()</span></code> / <code class="docutils literal notranslate"><span class="pre">pending_proposals()</span></code> returns the current set. Resume replays authoritative
+state without old proposal identifiers; it does not resend those proposals.</p>
 <p><code class="docutils literal notranslate"><span class="pre">client.send(frame)</span></code> sends any pre-built frame the same way. It is
 what an adapter hands its send callback, for example spaday’s
 <code class="docutils literal notranslate"><span class="pre">connectStore(store,</span> <span class="pre">client,</span> <span class="pre">(f)</span> <span class="pre">=&gt;</span> <span class="pre">client.send(f),</span> <span class="pre">codec)</span></code>. Both return <code class="docutils literal notranslate"><span class="pre">false</span></code> and drop the frame
