@@ -1,6 +1,6 @@
 [package]
 name = "transports"
-version = "0.8.5"
+version = "0.8.6"
 authors = ["1kbgz <dev@1kbgz.com>"]
 edition = "2021"
 license = "Apache-2.0"
