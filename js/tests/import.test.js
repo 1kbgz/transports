@@ -510,7 +510,7 @@ test("Client can abandon one unsent proposal", async () => {
   expect(abandoned).toEqual([]);
 });
 
-test("Client exposes managed connection loss", async () => {
+test("Client exposes managed connection lifecycle", async () => {
   const NativeWebSocket = globalThis.WebSocket;
   class FakeSocket {
     constructor() {
@@ -527,8 +527,10 @@ test("Client exposes managed connection loss", async () => {
   globalThis.WebSocket = FakeSocket;
   try {
     const c = new Client();
+    const connections = [];
     const disconnects = [];
     const abandoned = [];
+    const unsubscribe = c.onConnect(() => connections.push(c.connected));
     c.onDisconnect(() => disconnects.push(true));
     c.onAbandon((proposals) => abandoned.push(proposals));
     c.editOps(1, [], "editor-1");
@@ -537,13 +539,82 @@ test("Client exposes managed connection loss", async () => {
     const socket = c.connect("ws://host/ws");
     socket.emit("open");
     expect(c.connected).toBe(true);
+    expect(connections).toEqual([true]);
     socket.emit("close");
     expect(c.connected).toBe(false);
     expect(disconnects).toEqual([true]);
     expect(abandoned).toEqual([["auto-1", "editor-1"]]);
     expect(c.pendingProposals()).toEqual([]);
+
+    const resumed = c.connect("ws://host/ws");
+    resumed.emit("open");
+    expect(connections).toEqual([true, true]);
+    unsubscribe();
+    resumed.emit("close");
+
+    const ignored = c.connect("ws://host/ws");
+    ignored.emit("open");
+    expect(connections).toEqual([true, true]);
   } finally {
     globalThis.WebSocket = NativeWebSocket;
+  }
+});
+
+test("Client.run reports every reconnect without waiting for a frame", async () => {
+  const NativeWebSocket = globalThis.WebSocket;
+  const sockets = [];
+  class FakeSocket {
+    constructor() {
+      this.listeners = {};
+      sockets.push(this);
+    }
+    addEventListener(name, listener) {
+      (this.listeners[name] ??= []).push(listener);
+    }
+    send() {}
+    close() {
+      this.emit("close");
+    }
+    emit(name) {
+      for (const listener of this.listeners[name] ?? []) listener({});
+    }
+  }
+  globalThis.WebSocket = FakeSocket;
+  try {
+    const c = new Client();
+    const connections = [];
+    c.onConnect(() => connections.push(c.connected));
+    const runner = c.run("ws://host/ws", { retry: 0 });
+
+    sockets[0].emit("open");
+    expect(connections).toEqual([true]);
+    sockets[0].emit("close");
+    await expect.poll(() => sockets.length).toBe(2);
+    sockets[1].emit("open");
+    expect(connections).toEqual([true, true]);
+
+    runner.stop();
+    sockets[1].emit("close");
+  } finally {
+    globalThis.WebSocket = NativeWebSocket;
+  }
+});
+
+test("Client connection listeners ignore receive-only SSE", async () => {
+  const NativeEventSource = globalThis.EventSource;
+  class FakeSource {
+    addEventListener() {}
+  }
+  globalThis.EventSource = FakeSource;
+  try {
+    const c = new Client();
+    const connections = [];
+    c.onConnect(() => connections.push(true));
+    c.connectSSE("http://host/sse");
+    expect(connections).toEqual([]);
+    expect(c.connected).toBe(false);
+  } finally {
+    globalThis.EventSource = NativeEventSource;
   }
 });
 
