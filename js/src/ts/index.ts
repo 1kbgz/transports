@@ -12,6 +12,100 @@ export const diff = (oldModel: string, newModel: string): string =>
 export const apply = (model: string, patch: string): string =>
   wasm.apply(model, patch);
 
+export type RegisterPolicy = { kind: "register" };
+export type MapPolicy = {
+  kind: "map";
+  fields?: Record<string, CrdtPolicy>;
+  values?: CrdtPolicy;
+};
+export type SetPolicy = {
+  kind: "set";
+  keys?: string[][];
+  element?: CrdtPolicy;
+};
+export type SequencePolicy = {
+  kind: "sequence";
+  materialization?: "list" | "string";
+  element?: CrdtPolicy;
+};
+export type CrdtPolicy =
+  | RegisterPolicy
+  | MapPolicy
+  | SetPolicy
+  | SequencePolicy;
+export type CrdtSpecValue = { version?: number; root: CrdtPolicy };
+export type CanonicalCrdtSpec = { version: number; root: CrdtPolicy };
+
+/** Validated, canonical merge semantics for one model. */
+export class CrdtSpec {
+  private canonical!: string;
+
+  constructor(root: CrdtPolicy, version?: number) {
+    const value: CrdtSpecValue = { root };
+    if (version !== undefined) value.version = version;
+    this.canonical = wasm.normalize_crdt_spec(JSON.stringify(value));
+  }
+
+  private static fromCanonical(canonical: string): CrdtSpec {
+    const spec = Object.create(CrdtSpec.prototype) as CrdtSpec;
+    spec.canonical = canonical;
+    return spec;
+  }
+
+  static fromObject(value: CrdtSpecValue): CrdtSpec {
+    return CrdtSpec.fromCanonical(
+      wasm.normalize_crdt_spec(JSON.stringify(value)),
+    );
+  }
+
+  static fromJson(value: string): CrdtSpec {
+    return CrdtSpec.fromCanonical(wasm.normalize_crdt_spec(value));
+  }
+
+  toObject(): CanonicalCrdtSpec {
+    return JSON.parse(this.canonical);
+  }
+
+  toJson(): string {
+    return this.canonical;
+  }
+
+  toJSON(): CanonicalCrdtSpec {
+    return this.toObject();
+  }
+
+  get hash(): string {
+    return wasm.crdt_spec_hash(this.canonical);
+  }
+
+  requireHash(peerHash: string): void {
+    wasm.require_crdt_spec_hash(this.canonical, peerHash);
+  }
+
+  equals(other: CrdtSpec): boolean {
+    return this.canonical === other.canonical;
+  }
+}
+
+const crdtSpecJson = (spec: CrdtSpecValue | CrdtSpec): string =>
+  spec instanceof CrdtSpec ? spec.toJson() : JSON.stringify(spec);
+
+/** Validate and return the canonical representation of a CRDT specification. */
+export const normalizeCrdtSpec = (
+  spec: CrdtSpecValue | CrdtSpec,
+): CanonicalCrdtSpec =>
+  JSON.parse(wasm.normalize_crdt_spec(crdtSpecJson(spec)));
+
+/** SHA-256 of the canonical CRDT specification. */
+export const crdtSpecHash = (spec: CrdtSpecValue | CrdtSpec): string =>
+  wasm.crdt_spec_hash(crdtSpecJson(spec));
+
+/** Throw when a peer uses different merge semantics. */
+export const requireCrdtSpecHash = (
+  spec: CrdtSpecValue | CrdtSpec,
+  peerHash: string,
+): void => wasm.require_crdt_spec_hash(crdtSpecJson(spec), peerHash);
+
 /** Encode a JSON-encoded model to codec bytes. */
 export const encode = (model: string): Uint8Array => wasm.encode(model);
 

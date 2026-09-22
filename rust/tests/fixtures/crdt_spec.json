@@ -1,0 +1,21 @@
+{
+  "spec": {
+    "root": {
+      "kind": "map",
+      "fields": {
+        "rows": {
+          "kind": "set",
+          "keys": [["id"]],
+          "element": {
+            "kind": "map",
+            "fields": {"title": {"kind": "register"}}
+          }
+        },
+        "document": {"kind": "sequence", "materialization": "string"}
+      },
+      "values": {"kind": "register"}
+    }
+  },
+  "canonical": "{\"version\":1,\"root\":{\"kind\":\"map\",\"fields\":{\"document\":{\"kind\":\"sequence\",\"materialization\":\"string\",\"element\":{\"kind\":\"register\"}},\"rows\":{\"kind\":\"set\",\"keys\":[[\"id\"]],\"element\":{\"kind\":\"map\",\"fields\":{\"title\":{\"kind\":\"register\"}},\"values\":{\"kind\":\"register\"}}}},\"values\":{\"kind\":\"register\"}}}",
+  "hash": "sha256:f815cfaa863569eaa91307396b6d43d5e5cd9a83e13816a02c88c3a77e0a5bcb"
+}

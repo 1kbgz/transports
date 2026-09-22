@@ -17,6 +17,10 @@ import {
   registerCodec,
   unregisterCodec,
   Client,
+  normalizeCrdtSpec,
+  crdtSpecHash,
+  requireCrdtSpecHash,
+  CrdtSpec,
 } from "../src/ts/index";
 import { initSync } from "../dist/pkg/transports";
 import fs from "fs";
@@ -41,6 +45,49 @@ test("diff/apply via the wasm core", async () => {
   const b = JSON.stringify(toValue({ on: true }));
   const patch = diff(a, b);
   expect(JSON.parse(apply(a, patch))).toEqual(JSON.parse(b));
+});
+
+test("wasm binding matches the shared CRDT spec fixture", async () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/crdt_spec.json", "utf8"),
+  );
+
+  expect(JSON.stringify(normalizeCrdtSpec(fixture.spec))).toBe(
+    fixture.canonical,
+  );
+  expect(crdtSpecHash(fixture.spec)).toBe(fixture.hash);
+  expect(() => requireCrdtSpecHash(fixture.spec, fixture.hash)).not.toThrow();
+  expect(() => requireCrdtSpecHash(fixture.spec, "sha256:other")).toThrow(
+    /incompatible CRDT spec/,
+  );
+
+  const spec = CrdtSpec.fromObject(fixture.spec);
+  expect(spec.toJson()).toBe(fixture.canonical);
+  expect(spec.toObject()).toEqual(JSON.parse(fixture.canonical));
+  expect(spec.hash).toBe(fixture.hash);
+  expect(spec.equals(CrdtSpec.fromJson(spec.toJson()))).toBe(true);
+  expect(JSON.stringify(spec)).toBe(fixture.canonical);
+
+  const element = { kind: "map", fields: { meta: { kind: "map" } } };
+  const first = new CrdtSpec({
+    kind: "set",
+    keys: [["tenant"], ["meta", "id"]],
+    element,
+  });
+  const reversed = new CrdtSpec({
+    kind: "set",
+    keys: [["meta", "id"], ["tenant"]],
+    element,
+  });
+  expect(first.equals(reversed)).toBe(true);
+  expect(first.hash).toBe(reversed.hash);
+});
+
+test("CRDT spec rejects unknown policies and register fields", async () => {
+  expect(() => CrdtSpec.fromObject({ root: { kind: "unknown" } })).toThrow();
+  expect(() =>
+    CrdtSpec.fromObject({ root: { kind: "register", fields: {} } }),
+  ).toThrow(/unknown field/);
 });
 
 test("wasm core emits and applies sequence moves", async () => {

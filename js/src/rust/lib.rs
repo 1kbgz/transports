@@ -15,6 +15,24 @@ pub fn apply(value: &str, patch: &str) -> Result<String, JsError> {
     transports::apply_json(value, patch).map_err(|e| JsError::new(&e))
 }
 
+/// Parse, validate, and deterministically serialize a CRDT specification.
+#[wasm_bindgen]
+pub fn normalize_crdt_spec(json: &str) -> Result<String, JsError> {
+    transports::normalize_crdt_spec_json(json).map_err(|e| JsError::new(&e))
+}
+
+/// Return the deterministic SHA-256 hash of a CRDT specification.
+#[wasm_bindgen]
+pub fn crdt_spec_hash(json: &str) -> Result<String, JsError> {
+    transports::crdt_spec_hash_json(json).map_err(|e| JsError::new(&e))
+}
+
+/// Reject a peer hash that does not match the local CRDT specification.
+#[wasm_bindgen]
+pub fn require_crdt_spec_hash(json: &str, peer_hash: &str) -> Result<(), JsError> {
+    transports::require_crdt_spec_hash_json(json, peer_hash).map_err(|e| JsError::new(&e))
+}
+
 /// Encode a JSON-encoded model to codec bytes (a `Uint8Array` in JS).
 #[wasm_bindgen]
 pub fn encode(value: &str) -> Result<Vec<u8>, JsError> {

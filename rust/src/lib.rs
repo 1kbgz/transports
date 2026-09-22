@@ -16,6 +16,7 @@
 mod bridge;
 mod client;
 mod codec;
+mod crdt;
 mod diff;
 mod frame;
 mod message;
@@ -24,12 +25,14 @@ mod store;
 mod value;
 
 pub use bridge::{
-    apply_json, cbor_to_json, decode_as, decode_json, decode_message, diff_json, encode_as,
-    encode_json, encode_message, json_to_cbor, json_to_msgpack, msgpack_to_json,
-    normalize_message_json, JsonStore,
+    apply_json, cbor_to_json, crdt_spec_hash_json, decode_as, decode_json, decode_message,
+    diff_json, encode_as, encode_json, encode_message, json_to_cbor, json_to_msgpack,
+    msgpack_to_json, normalize_crdt_spec_json, normalize_message_json, require_crdt_spec_hash_json,
+    JsonStore,
 };
 pub use client::{ClientEffect, ClientState};
 pub use codec::{codec_for, CborCodec, Codec, CodecError, JsonCodec, MsgpackCodec};
+pub use crdt::{CrdtPolicy, CrdtSpec, SequenceMaterialization};
 pub use diff::{apply, diff, Op, Patch, Path, PathSeg};
 pub use frame::{Frame, FrameError, FrameKind};
 pub use message::Message;

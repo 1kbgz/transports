@@ -17,6 +17,24 @@ pub fn apply(value: &str, patch: &str) -> PyResult<String> {
     transports::apply_json(value, patch).map_err(PyValueError::new_err)
 }
 
+/// Parse, validate, and deterministically serialize a CRDT specification.
+#[pyfunction]
+pub fn normalize_crdt_spec(json: &str) -> PyResult<String> {
+    transports::normalize_crdt_spec_json(json).map_err(PyValueError::new_err)
+}
+
+/// Return the deterministic SHA-256 hash of a CRDT specification.
+#[pyfunction]
+pub fn crdt_spec_hash(json: &str) -> PyResult<String> {
+    transports::crdt_spec_hash_json(json).map_err(PyValueError::new_err)
+}
+
+/// Reject a peer hash that does not match the local CRDT specification.
+#[pyfunction]
+pub fn require_crdt_spec_hash(json: &str, peer_hash: &str) -> PyResult<()> {
+    transports::require_crdt_spec_hash_json(json, peer_hash).map_err(PyValueError::new_err)
+}
+
 /// Encode a JSON-encoded model to codec bytes.
 #[pyfunction]
 pub fn encode<'py>(py: Python<'py>, value: &str) -> PyResult<Bound<'py, PyBytes>> {

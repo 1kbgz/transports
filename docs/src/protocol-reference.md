@@ -24,6 +24,57 @@ Example:
 {"Map": {"name": {"Str": "lamp"}, "on": {"Bool": true}}}
 ```
 
+## CRDT specification
+
+A `CrdtSpec` assigns merge semantics to the model's `Value` tree. The current format version is
+`1`. Specifications are validated and serialized canonically in the shared Rust core, then hashed
+with SHA-256. A replica must reject a different hash instead of joining a model with incompatible
+semantics.
+
+| Policy   | Required shape                                                                   | Meaning                                                                                                                                                          |
+| -------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Register | `{"kind": "register"}`                                                           | One deterministic last-writer-wins value.                                                                                                                        |
+| Map      | `{"kind": "map", "fields": {...}, "values": policy?}`                            | Recursively merge named fields; `values` supplies the policy for other keys.                                                                                     |
+| Set      | `{"kind": "set", "keys": [["id"]], "element": policy}`                          | Add-wins observed-remove members. Each entry in `keys` is a field path; several paths form a composite key. An empty list identifies members by whole value.     |
+| Sequence | `{"kind": "sequence", "materialization": "list" or "string", "element": policy}` | Stable-ID ordered elements. IDs are CRDT metadata, not positional indexes.                                                                                       |
+
+Map `values` and `element` default to a register. Sequence materialization defaults to `list`;
+`string` sequences require register elements because each element materializes as one Unicode scalar
+value. UI adapters convert between those element offsets and runtime-specific string indexes.
+Every set key path must be unique, non-empty, and resolve through the element's map policies to a
+register. Composite path order does not affect identity; canonical serialization sorts the paths.
+
+Version 1 fixes conflict behavior rather than adding policy-specific knobs: registers use causal
+last-writer-wins ordered by counter and replica identifier; sets are add-wins; concurrent updates
+keep a map entry over a removal; and concurrent sequence inserts are ordered by their stable causal
+identifiers. Changing those rules requires a new specification version and therefore a different
+compatibility hash.
+
+```json
+{
+  "version": 1,
+  "root": {
+    "kind": "map",
+    "fields": {
+      "document": {"kind": "sequence", "materialization": "string"},
+      "rows": {
+        "kind": "set",
+        "keys": [["id"]],
+        "element": {
+          "kind": "map",
+          "fields": {"title": {"kind": "register"}}
+        }
+      }
+    },
+    "values": {"kind": "register"}
+  }
+}
+```
+
+Python and JavaScript expose matching `CrdtSpec` value objects. JavaScript also exports
+`normalizeCrdtSpec`, `crdtSpecHash`, and `requireCrdtSpecHash` helpers for plain object literals. Both
+bindings call the same core and produce the same canonical JSON and hash.
+
 ## Path segments
 
 Patch operations address values by paths from the model root.
