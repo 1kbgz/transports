@@ -4,17 +4,23 @@ WebSocket messages (and Jupyter comm messages) are self-delimiting, so the binar
 in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small
 JSON envelope carries the routing metadata around a model snapshot or a patch.
 
-Four message kinds:
+Six message kinds:
 
 - ``{"t": "snapshot", "id": <int>, "type": <str>, "rev": <int>, "value": <Value>}``
 - ``{"t": "patch", "id": <int>, "patch": {"rev": <int>, "ops": [...]}, "proposal": <str>?}``
 - ``{"t": "ack", "id": <int>, "rev": <int>, "proposal": <str>}`` — an accepted proposal that
   produced no authoritative patch; sent only to the origin and never changes its mirror.
-- ``{"t": "reject", "id": <int>, "rev": <int>, "error": <str>, "proposal": <str>?}`` — a
-  proposed edit was refused; sent to the proposing connection only, alongside the authoritative
-  revert. ``rev`` is the server's current revision for the model. ``proposal`` is an optional opaque
-  identifier returned only to the origin on acceptance or rejection. Clients that predate a field
-  or message kind ignore it.
+- ``{"t": "reject", "id": <int>, "rev": <int>, "error": <str>, "proposal": <str>?,
+  "crdt_ops": [...]?}`` — a proposed edit was refused; sent to the proposing connection only,
+  alongside the authoritative revert. ``rev`` is the server's current revision for the model.
+  ``proposal`` is an optional opaque identifier returned only to the origin on acceptance or
+  rejection. ``crdt_ops`` lets an optimistic CRDT client settle the refused causal dots before the
+  revert. Clients that predate a field or message kind ignore it.
+- ``{"t": "crdt_snapshot", ..., "spec": <CrdtSpec>, "state": <CrdtState>}`` — a materialized
+  value plus reducer state for a joining or reconnecting replica.
+- ``{"t": "crdt", "id": <int>, "rev": <int>, "ops": [...], "effect": {...}?}`` — causally
+  identified CRDT operations. Client proposals use revision zero; authoritative echoes carry the
+  shared model revision. Senders may include the optional materialized effect as a cache.
 """
 
 import json
@@ -86,8 +92,38 @@ def snapshot_msg(model_id: int, type_name: str, rev: int, value: Any) -> str:
     return json.dumps({"t": "snapshot", "id": model_id, "type": type_name, "rev": rev, "value": value})
 
 
+def crdt_snapshot_msg(model_id: int, type_name: str, rev: int, value: Any, spec: dict, state: dict) -> str:
+    return json.dumps(
+        {
+            "t": "crdt_snapshot",
+            "id": model_id,
+            "type": type_name,
+            "rev": rev,
+            "value": value,
+            "spec": spec,
+            "state": state,
+        }
+    )
+
+
 def patch_msg(model_id: int, patch: dict, proposal: str | None = None) -> str:
     msg = {"t": "patch", "id": model_id, "patch": patch}
+    if proposal is not None:
+        msg["proposal"] = proposal
+    return json.dumps(msg)
+
+
+def crdt_msg(
+    model_id: int,
+    ops: list[dict],
+    *,
+    rev: int = 0,
+    effect: dict | None = None,
+    proposal: str | None = None,
+) -> str:
+    msg = {"t": "crdt", "id": model_id, "rev": rev, "ops": ops}
+    if effect is not None:
+        msg["effect"] = effect
     if proposal is not None:
         msg["proposal"] = proposal
     return json.dumps(msg)
@@ -97,10 +133,18 @@ def ack_msg(model_id: int, rev: int, proposal: str) -> str:
     return json.dumps({"t": "ack", "id": model_id, "rev": rev, "proposal": proposal})
 
 
-def reject_msg(model_id: int, rev: int, error: str, proposal: str | None = None) -> str:
+def reject_msg(
+    model_id: int,
+    rev: int,
+    error: str,
+    proposal: str | None = None,
+    crdt_ops: list[dict] | None = None,
+) -> str:
     msg = {"t": "reject", "id": model_id, "rev": rev, "error": error}
     if proposal is not None:
         msg["proposal"] = proposal
+    if crdt_ops is not None:
+        msg["crdt_ops"] = crdt_ops
     return json.dumps(msg)
 
 

@@ -1,9 +1,16 @@
 import { codecFor } from "./codecs";
 import {
   ClientState as WasmClientState,
+  CrdtDocument,
+  CrdtSpec,
   decodeMessage,
   diff,
   encodeMessage,
+  toValue,
+  type CrdtEffect,
+  type CrdtMutation,
+  type CrdtOp,
+  type Dot,
 } from "./index";
 import type { Value } from "./bridge";
 
@@ -13,6 +20,15 @@ type SnapshotMsg = {
   type: string;
   rev: number;
   value: unknown;
+};
+type CrdtSnapshotMsg = {
+  t: "crdt_snapshot";
+  id: number;
+  type: string;
+  rev: number;
+  value: unknown;
+  spec: Parameters<typeof CrdtSpec.fromObject>[0];
+  state: Record<string, unknown>;
 };
 export type PathSeg = { Key: string } | { Index: number };
 export type PatchOp =
@@ -29,6 +45,14 @@ export type PatchMsg = {
   patch: ModelPatch;
   proposal?: string;
 };
+export type CrdtMsg = {
+  t: "crdt";
+  id: number;
+  rev: number;
+  ops: CrdtOp[];
+  effect?: CrdtEffect;
+  proposal?: string;
+};
 /** An accepted proposal that produced no authoritative patch. */
 export type AckMsg = { t: "ack"; id: number; rev: number; proposal: string };
 /** The server refused a proposed edit; `rev` is its current revision and `error` says why (the
@@ -39,16 +63,26 @@ export type RejectMsg = {
   rev: number;
   error: string;
   proposal?: string;
+  crdt_ops?: CrdtOp[];
 };
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
-  | PatchMsg;
+  | { t: "crdt_snapshot"; id: number; rev: number }
+  | PatchMsg
+  | CrdtMsg;
 
 type ClientEffect =
   | { effect: "snapshot"; id: number; rev: number }
+  | { effect: "crdt_snapshot"; id: number; rev: number }
   | {
       effect: "patch" | "stale_patch";
+      id: number;
+      rev: number;
+      proposal?: string;
+    }
+  | {
+      effect: "crdt";
       id: number;
       rev: number;
       proposal?: string;
@@ -126,7 +160,7 @@ function mapValue(value: Value | undefined): Record<string, Value> {
 
 interface BatchMsg {
   t: "batch";
-  msgs: (SnapshotMsg | PatchMsg | RejectMsg)[];
+  msgs: (SnapshotMsg | CrdtSnapshotMsg | PatchMsg | CrdtMsg | RejectMsg)[];
 }
 
 function listValue(value: Value | undefined): Value[] {
@@ -142,6 +176,10 @@ function listValue(value: Value | undefined): Value[] {
 
 function validIndex(index: number): boolean {
   return Number.isSafeInteger(index) && index >= 0;
+}
+
+function dotKey(dot: Dot): string {
+  return JSON.stringify([dot.counter, dot.replica]);
 }
 
 function updateAt(
@@ -274,8 +312,11 @@ function applyPatch(value: Value, patch: ModelPatch): Value {
  */
 export class Client {
   private values = new Map<number, unknown>();
+  private crdt = new Map<number, CrdtDocument>();
+  private crdtOutbox: Array<{ id: number; ops: CrdtOp[] }> = [];
+  private replica: string;
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
-  private ackListeners: Array<(ack: PatchMsg | AckMsg) => void> = [];
+  private ackListeners: Array<(ack: PatchMsg | CrdtMsg | AckMsg) => void> = [];
   private rejectListeners: Array<(reject: RejectMsg) => void> = [];
   private abandonListeners: Array<(proposals: string[]) => void> = [];
   private connectListeners: Array<() => void> = [];
@@ -286,6 +327,9 @@ export class Client {
 
   constructor(private codec: string = "json") {
     this.state = new SharedClientState();
+    const random =
+      globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16).slice(2);
+    this.replica = `client-${random}`;
   }
 
   /** Whether a managed connection (`connect()`/`run()`) is open right now. */
@@ -317,6 +361,13 @@ export class Client {
   /** Propose explicit patch operations over the active connection. */
   proposeOps(id: number, ops: PatchOp[], proposal?: string): boolean {
     return this.sendProposal(this.editOps(id, ops, proposal));
+  }
+
+  /** Apply local CRDT mutations immediately and retain their operations until the server echoes
+   * them. A disconnected edit remains queued for the next managed connection. */
+  proposeCrdt(id: number, mutations: CrdtMutation[]): boolean {
+    const frame = this.editCrdt(id, mutations);
+    return this.send(frame);
   }
 
   private sendProposal(frame: string | Uint8Array): boolean {
@@ -352,7 +403,7 @@ export class Client {
 
   /** Register a listener fired when the server accepts a tagged proposal. Receives an authoritative
    * patch or no-op acknowledgement carrying the same opaque proposal identifier. */
-  onAck(listener: (ack: PatchMsg | AckMsg) => void): () => void {
+  onAck(listener: (ack: PatchMsg | CrdtMsg | AckMsg) => void): () => void {
     this.ackListeners.push(listener);
     return () => {
       const i = this.ackListeners.indexOf(listener);
@@ -389,7 +440,32 @@ export class Client {
 
   private opened(sender: (frame: string | Uint8Array) => void): void {
     this.sender = sender;
+    this.flushCrdtOutbox();
     for (const listener of [...this.connectListeners]) listener();
+  }
+
+  private flushCrdtOutbox(): void {
+    if (!this.sender) return;
+    for (const pending of this.crdtOutbox)
+      this.sender(
+        this.encode({ t: "crdt", id: pending.id, rev: 0, ops: pending.ops }),
+      );
+  }
+
+  private settleCrdtOps(id: number, ops: CrdtOp[]): void {
+    const echoed = new Set(ops.map((op) => dotKey(op.dot)));
+    this.crdtOutbox = this.crdtOutbox.flatMap((pending) => {
+      if (pending.id !== id) return [pending];
+      const remaining = pending.ops.filter((op) => !echoed.has(dotKey(op.dot)));
+      return remaining.length ? [{ id, ops: remaining }] : [];
+    });
+  }
+
+  private encode(message: object): string | Uint8Array {
+    const custom = codecFor(this.codec);
+    if (custom) return custom.encode(message);
+    const json = JSON.stringify(message);
+    return this.codec === "json" ? json : encodeMessage(json, this.codec);
   }
 
   private disconnected(): void {
@@ -418,7 +494,7 @@ export class Client {
     return change;
   }
 
-  private acknowledge(msg: PatchMsg | AckMsg): void {
+  private acknowledge(msg: PatchMsg | CrdtMsg | AckMsg): void {
     if (msg.proposal !== undefined)
       for (const listener of [...this.ackListeners]) listener(msg);
   }
@@ -435,9 +511,22 @@ export class Client {
    */
   recv(data: string | Uint8Array): ReceiveChange | ReceiveChange[] | undefined {
     const custom = codecFor(this.codec);
-    let msg: SnapshotMsg | PatchMsg | AckMsg | RejectMsg | BatchMsg;
+    let msg:
+      | SnapshotMsg
+      | CrdtSnapshotMsg
+      | PatchMsg
+      | CrdtMsg
+      | AckMsg
+      | RejectMsg
+      | BatchMsg;
     if (custom) {
-      msg = custom.decode(data) as SnapshotMsg | PatchMsg | AckMsg | RejectMsg;
+      msg = custom.decode(data) as
+        | SnapshotMsg
+        | CrdtSnapshotMsg
+        | PatchMsg
+        | CrdtMsg
+        | AckMsg
+        | RejectMsg;
     } else if (typeof data === "string") {
       msg = JSON.parse(data);
     } else {
@@ -456,15 +545,42 @@ export class Client {
   }
 
   private apply(
-    msg: SnapshotMsg | PatchMsg | AckMsg | RejectMsg,
+    msg:
+      | SnapshotMsg
+      | CrdtSnapshotMsg
+      | PatchMsg
+      | CrdtMsg
+      | AckMsg
+      | RejectMsg,
   ): ReceiveChange | undefined {
     const effect = this.state.prepare(msg);
     if (effect.effect === "snapshot") {
       const snapshot = msg as SnapshotMsg;
+      this.crdt.delete(snapshot.id);
+      this.crdtOutbox = this.crdtOutbox.filter(
+        (pending) => pending.id !== snapshot.id,
+      );
       this.values.set(snapshot.id, snapshot.value);
       this.state.commit(effect);
       return this.accepted({
         t: "snapshot",
+        id: snapshot.id,
+        rev: snapshot.rev,
+      });
+    } else if (effect.effect === "crdt_snapshot") {
+      const snapshot = msg as CrdtSnapshotMsg;
+      const document = CrdtDocument.fromState(
+        CrdtSpec.fromObject(snapshot.spec),
+        snapshot.state,
+        this.replica,
+      );
+      for (const pending of this.crdtOutbox)
+        if (pending.id === snapshot.id) document.apply(pending.ops);
+      this.crdt.set(snapshot.id, document);
+      this.values.set(snapshot.id, toValue(document.value));
+      this.state.commit(effect);
+      return this.accepted({
+        t: "crdt_snapshot",
         id: snapshot.id,
         rev: snapshot.rev,
       });
@@ -479,6 +595,20 @@ export class Client {
       const accepted = this.accepted(patch);
       this.acknowledge(patch);
       return accepted;
+    } else if (effect.effect === "crdt") {
+      const change = msg as CrdtMsg;
+      const document = this.crdt.get(change.id);
+      if (!document)
+        throw new Error(
+          `CRDT operations received before CRDT snapshot for model ${change.id}`,
+        );
+      document.apply(change.ops);
+      this.values.set(change.id, toValue(document.value));
+      this.state.commit(effect);
+      this.settleCrdtOps(change.id, change.ops);
+      const accepted = this.accepted(change);
+      this.acknowledge(change);
+      return accepted;
     } else if (effect.effect === "stale_patch") {
       this.state.commit(effect);
       this.acknowledge(msg as PatchMsg);
@@ -490,6 +620,8 @@ export class Client {
     } else if (effect.effect === "rejection") {
       this.state.commit(effect);
       const rejection = msg as RejectMsg;
+      if (rejection.crdt_ops)
+        this.settleCrdtOps(rejection.id, rejection.crdt_ops);
       for (const listener of [...this.rejectListeners]) listener(rejection);
       return undefined;
     }
@@ -508,6 +640,16 @@ export class Client {
   /** Identifiers for proposals that have not settled or been abandoned. */
   pendingProposals(): string[] {
     return this.state.pending();
+  }
+
+  /** Number of local CRDT operations awaiting an authoritative echo. */
+  pendingCrdtOps(id?: number): number {
+    return this.crdtOutbox.reduce(
+      (count, pending) =>
+        count +
+        (id === undefined || pending.id === id ? pending.ops.length : 0),
+      0,
+    );
   }
 
   /** Stop tracking one proposal that the caller did not send.
@@ -546,6 +688,16 @@ export class Client {
         this.abandonProposal(decoded.proposal);
       throw error;
     }
+  }
+
+  /** Apply local CRDT mutations and return their idempotent operation frame. */
+  editCrdt(id: number, mutations: CrdtMutation[]): string | Uint8Array {
+    const document = this.crdt.get(id);
+    if (!document) throw new Error(`model ${id} is not CRDT-backed`);
+    const change = document.mutate(mutations);
+    this.values.set(id, toValue(document.value));
+    if (change.ops.length) this.crdtOutbox.push({ id, ops: change.ops });
+    return this.encode({ t: "crdt", id, rev: 0, ops: change.ops });
   }
 
   /** Connect to a transports server and mirror it. Returns the `WebSocket`.
@@ -614,7 +766,7 @@ export class Client {
         if (pre) {
           // rectify: once the server has (re)snapshotted a model, push our copy back to it
           for (const id of this.values.keys()) {
-            if (!pushed.has(id) && pre.has(id)) {
+            if (!this.crdt.has(id) && !pushed.has(id) && pre.has(id)) {
               // cast, not copy: wasm-bindgen types its output Uint8Array<ArrayBufferLike>, but it
               // is always ArrayBuffer-backed, which is what WebSocket.send requires
               ws.send(

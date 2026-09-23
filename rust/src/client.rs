@@ -18,7 +18,17 @@ pub enum ClientEffect {
         id: u64,
         rev: u64,
     },
+    CrdtSnapshot {
+        id: u64,
+        rev: u64,
+    },
     Patch {
+        id: u64,
+        rev: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proposal: Option<String>,
+    },
+    Crdt {
         id: u64,
         rev: u64,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -62,6 +72,7 @@ impl ClientEffect {
 #[derive(Default)]
 pub struct ClientState {
     revisions: BTreeMap<u64, u64>,
+    crdt_ids: BTreeSet<u64>,
     pending: BTreeSet<String>,
     next_proposal: u64,
 }
@@ -71,10 +82,18 @@ pub struct ClientState {
 enum ClientMessage {
     #[serde(rename = "snapshot")]
     Snapshot { id: u64, rev: u64 },
+    #[serde(rename = "crdt_snapshot")]
+    CrdtSnapshot { id: u64, rev: u64 },
     #[serde(rename = "patch")]
     Patch {
         id: u64,
         patch: PatchRevision,
+        proposal: Option<String>,
+    },
+    #[serde(rename = "crdt")]
+    Crdt {
+        id: u64,
+        rev: u64,
         proposal: Option<String>,
     },
     #[serde(rename = "ack")]
@@ -101,6 +120,7 @@ impl ClientState {
     pub fn new() -> Self {
         Self {
             revisions: BTreeMap::new(),
+            crdt_ids: BTreeSet::new(),
             pending: BTreeSet::new(),
             next_proposal: 1,
         }
@@ -110,6 +130,9 @@ impl ClientState {
     pub fn prepare(&self, message: &Message) -> Result<ClientEffect, String> {
         match message {
             Message::Snapshot { id, rev, .. } => Ok(ClientEffect::Snapshot { id: *id, rev: *rev }),
+            Message::CrdtSnapshot { id, rev, .. } => {
+                Ok(ClientEffect::CrdtSnapshot { id: *id, rev: *rev })
+            }
             Message::Patch {
                 id,
                 patch,
@@ -127,6 +150,19 @@ impl ClientState {
                 }),
                 None => Err(format!("patch received before snapshot for model {id}")),
             },
+            Message::Crdt {
+                id, rev, proposal, ..
+            } => match self.revisions.get(id) {
+                Some(_) if self.crdt_ids.contains(id) => Ok(ClientEffect::Crdt {
+                    id: *id,
+                    rev: *rev,
+                    proposal: proposal.clone(),
+                }),
+                Some(_) => Ok(ClientEffect::Ignore),
+                None => Err(format!(
+                    "CRDT operations received before snapshot for model {id}"
+                )),
+            },
             Message::Ack { id, rev, proposal } => Ok(ClientEffect::Acknowledgement {
                 id: *id,
                 rev: *rev,
@@ -137,6 +173,7 @@ impl ClientState {
                 rev,
                 error,
                 proposal,
+                ..
             } => Ok(ClientEffect::Rejection {
                 id: *id,
                 rev: *rev,
@@ -153,6 +190,7 @@ impl ClientState {
             serde_json::from_str(message_json).map_err(|error| error.to_string())?;
         let effect = match message {
             ClientMessage::Snapshot { id, rev } => ClientEffect::Snapshot { id, rev },
+            ClientMessage::CrdtSnapshot { id, rev } => ClientEffect::CrdtSnapshot { id, rev },
             ClientMessage::Patch {
                 id,
                 patch,
@@ -169,6 +207,15 @@ impl ClientState {
                     proposal,
                 },
                 None => return Err(format!("patch received before snapshot for model {id}")),
+            },
+            ClientMessage::Crdt { id, rev, proposal } => match self.revisions.get(&id) {
+                Some(_) if self.crdt_ids.contains(&id) => ClientEffect::Crdt { id, rev, proposal },
+                Some(_) => ClientEffect::Ignore,
+                None => {
+                    return Err(format!(
+                        "CRDT operations received before snapshot for model {id}"
+                    ));
+                }
             },
             ClientMessage::Ack { id, rev, proposal } => {
                 ClientEffect::Acknowledgement { id, rev, proposal }
@@ -196,11 +243,29 @@ impl ClientState {
             ClientEffect::Snapshot { id, rev } | ClientEffect::Patch { id, rev, .. } => {
                 self.revisions.insert(*id, *rev);
             }
+            ClientEffect::CrdtSnapshot { id, rev } => {
+                let current = self.revisions.entry(*id).or_default();
+                *current = (*current).max(*rev);
+            }
+            ClientEffect::Crdt { id, rev, .. } => {
+                let current = self.revisions.entry(*id).or_default();
+                *current = (*current).max(*rev);
+            }
+            _ => {}
+        }
+        match effect {
+            ClientEffect::Snapshot { id, .. } => {
+                self.crdt_ids.remove(id);
+            }
+            ClientEffect::CrdtSnapshot { id, .. } => {
+                self.crdt_ids.insert(*id);
+            }
             _ => {}
         }
         match effect {
             ClientEffect::Patch { proposal, .. }
             | ClientEffect::StalePatch { proposal, .. }
+            | ClientEffect::Crdt { proposal, .. }
             | ClientEffect::Rejection { proposal, .. } => {
                 if let Some(proposal) = proposal {
                     self.pending.remove(proposal);
@@ -307,6 +372,27 @@ mod client_tests {
         }
     }
 
+    fn crdt_snapshot(rev: u64) -> Message {
+        Message::CrdtSnapshot {
+            id: 8,
+            model_type: "Document".into(),
+            rev,
+            value: Value::Str(String::new()),
+            spec: serde_json::json!({"version": 1, "root": {"kind": "register"}}),
+            state: serde_json::json!({}),
+        }
+    }
+
+    fn crdt(rev: u64) -> Message {
+        Message::Crdt {
+            id: 8,
+            rev,
+            ops: vec![],
+            effect: None,
+            proposal: None,
+        }
+    }
+
     #[test]
     fn revisions_advance_only_when_an_effect_is_committed() {
         let mut state = ClientState::new();
@@ -339,6 +425,57 @@ mod client_tests {
             ClientState::new().prepare(&patch(1, None)).unwrap_err(),
             "patch received before snapshot for model 7"
         );
+    }
+
+    #[test]
+    fn crdt_operations_apply_even_when_revisions_arrive_out_of_order() {
+        let mut state = ClientState::new();
+        let snapshot = state.prepare(&crdt_snapshot(3)).unwrap();
+        state.commit(&snapshot);
+
+        let newer = state.prepare(&crdt(5)).unwrap();
+        assert!(matches!(newer, ClientEffect::Crdt { rev: 5, .. }));
+        state.commit(&newer);
+        let concurrent = state.prepare(&crdt(4)).unwrap();
+        assert!(matches!(concurrent, ClientEffect::Crdt { rev: 4, .. }));
+        state.commit(&concurrent);
+
+        assert_eq!(state.revisions_json().unwrap(), r#"{"8":5}"#);
+    }
+
+    #[test]
+    fn crdt_operations_before_snapshot_are_rejected() {
+        assert_eq!(
+            ClientState::new().prepare(&crdt(1)).unwrap_err(),
+            "CRDT operations received before snapshot for model 8"
+        );
+    }
+
+    #[test]
+    fn crdt_operations_for_a_plain_snapshot_are_ignored() {
+        let mut state = ClientState::new();
+        let effect = state.prepare(&snapshot(3)).unwrap();
+        state.commit(&effect);
+
+        let mismatched = Message::Crdt {
+            id: 7,
+            rev: 4,
+            ops: vec![],
+            effect: None,
+            proposal: None,
+        };
+        assert_eq!(state.prepare(&mismatched).unwrap(), ClientEffect::Ignore);
+    }
+
+    #[test]
+    fn an_older_crdt_snapshot_does_not_move_the_resume_revision_backwards() {
+        let mut state = ClientState::new();
+        let snapshot = state.prepare(&crdt_snapshot(5)).unwrap();
+        state.commit(&snapshot);
+        let older = state.prepare(&crdt_snapshot(3)).unwrap();
+        state.commit(&older);
+
+        assert_eq!(state.revisions_json().unwrap(), r#"{"8":5}"#);
     }
 
     #[test]
@@ -393,6 +530,7 @@ mod client_tests {
                     rev: 4,
                     error: "invalid".into(),
                     proposal: Some("edit-2".into()),
+                    crdt_ops: None,
                 })
                 .unwrap(),
             ClientEffect::Rejection { .. }

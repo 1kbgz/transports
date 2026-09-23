@@ -27,6 +27,7 @@ writer.
 
 import asyncio
 import json
+import logging
 import os
 from typing import Any
 
@@ -35,6 +36,8 @@ from .backplane import Backplane
 from .hub import Hub
 from .server import Wire
 from .transports import diff as _diff
+
+logger = logging.getLogger(__name__)
 
 
 class RelayBroadcaster:
@@ -82,24 +85,45 @@ class RelayBroadcaster:
         while len(self._caught) < len(sids) and loop.time() - t0 < timeout:
             await asyncio.sleep(0.05)
         self._catching_up = False
-        for sid, patch, origin in self._buffer:
-            self.hub.apply_shared(sid, patch, origin)
+        for kind, sid, payload, origin in self._buffer:
+            try:
+                if kind == "c":
+                    self.hub.apply_crdt_shared(sid, payload, origin)
+                elif kind == "x":
+                    self.hub.compact_shared_crdt(sid, payload)
+                else:
+                    self.hub.apply_shared(sid, payload, origin)
+            except (KeyError, TypeError, ValueError):
+                logger.exception("dropping invalid buffered backplane message")
         self._buffer = []
 
     async def _consume(self) -> None:
         try:
             async for raw in self.backplane.messages():
-                m = json.loads(raw)
-                t = m.get("t", "w")
-                if t == "w":
-                    if self._catching_up:
-                        self._buffer.append((m["sid"], m["patch"], m["origin"]))
-                    else:
-                        self.hub.apply_shared(m["sid"], m["patch"], m["origin"])
-                elif t == "req":
-                    await self._respond(m)
-                elif t == "resp" and m.get("to") == self._id:
-                    self._apply_resp(m)
+                try:
+                    m = json.loads(raw)
+                    t = m.get("t", "w")
+                    if t == "w":
+                        if self._catching_up:
+                            self._buffer.append(("w", m["sid"], m["patch"], m["origin"]))
+                        else:
+                            self.hub.apply_shared(m["sid"], m["patch"], m["origin"])
+                    elif t == "c":
+                        if self._catching_up:
+                            self._buffer.append(("c", m["sid"], m["ops"], m["origin"]))
+                        else:
+                            self.hub.apply_crdt_shared(m["sid"], m["ops"], m["origin"])
+                    elif t == "x":
+                        if self._catching_up:
+                            self._buffer.append(("x", m["sid"], m["frontier"], m.get("origin")))
+                        else:
+                            self.hub.compact_shared_crdt(m["sid"], m["frontier"])
+                    elif t == "req":
+                        await self._respond(m)
+                    elif t == "resp" and m.get("to") == self._id:
+                        self._apply_resp(m)
+                except Exception:
+                    logger.exception("dropping invalid backplane message")
         except asyncio.CancelledError:
             pass
 
@@ -112,6 +136,20 @@ class RelayBroadcaster:
         for sid in list(self.hub._shared):
             want = have.get(str(sid), 0)
             snap = self.hub.snapshot_shared(sid)
+            if "crdt_state" in snap:
+                resp = {
+                    "t": "resp",
+                    "to": m["frm"],
+                    "sid": sid,
+                    "kind": "snap",
+                    "value": snap["value"],
+                    "rev": snap["rev"],
+                    "merge_state": snap["merge_state"],
+                    "crdt_spec": snap["crdt_spec"],
+                    "crdt_state": snap["crdt_state"],
+                }
+                await self.backplane.publish(json.dumps(resp).encode())
+                continue
             delta = self.hub.since_shared(sid, want) if want > 0 else None
             if delta is not None:
                 resp = {
@@ -140,10 +178,18 @@ class RelayBroadcaster:
         if sid in self._caught:
             return  # already caught up for this model from an earlier responder
         if m["kind"] == "snap":
-            self.hub.apply_snapshot_shared(sid, m["value"], m["rev"], m.get("merge_state"))
+            applied = self.hub.apply_snapshot_shared(
+                sid,
+                m["value"],
+                m["rev"],
+                m.get("merge_state"),
+                m.get("crdt_spec"),
+                m.get("crdt_state"),
+            )
         else:
-            self.hub.apply_delta_shared(sid, m["patches"], m["rev"], m.get("merge_state"))
-        self._caught.add(sid)
+            applied = self.hub.apply_delta_shared(sid, m["patches"], m["rev"], m.get("merge_state"))
+        if applied:
+            self._caught.add(sid)
 
     # --- broadcaster contract: delegate to the hub; recv also publishes shared writes to the cluster ---
     def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
@@ -153,13 +199,31 @@ class RelayBroadcaster:
         codec = self.hub._codecs.get(conn)
         if codec is None:
             return {}
-        msg = protocol.decode(data, codec)
+        try:
+            msg = protocol.decode(data, codec)
+        except (TypeError, ValueError):
+            return {}
         origin = self.hub._conn_key.get(conn)
         sid = msg.get("id", 0)
-        publish = msg.get("t") == "patch" and self.hub._shared_write_allowed(origin, sid)
+        sh = self.hub._shared.get(sid)
+        publish = (
+            msg.get("t") in ("patch", "crdt")
+            and self.hub._shared_write_allowed(origin, sid)
+            and not (msg["t"] == "patch" and sh is not None and sh.crdt is not None)
+        )
         out = self.hub.recv(conn, data)  # apply + fan to this worker's clients
+        if publish and msg["t"] == "crdt":
+            status = self.hub._last_crdt_write
+            if self._catching_up and status in ((conn, sid, "applied"), (conn, sid, "duplicate")):
+                self._buffer.append(("c", sid, msg["ops"], origin))
+            publish = status == (conn, sid, "applied")
+        elif publish and self._catching_up:
+            self._buffer.append(("w", sid, msg["patch"], origin))
         if publish:
-            payload = json.dumps({"t": "w", "sid": sid, "patch": msg["patch"], "origin": origin}).encode()
+            if msg["t"] == "crdt":
+                payload = json.dumps({"t": "c", "sid": sid, "ops": msg["ops"], "origin": origin}).encode()
+            else:
+                payload = json.dumps({"t": "w", "sid": sid, "patch": msg["patch"], "origin": origin}).encode()
             asyncio.create_task(self.backplane.publish(payload))  # broadcast the raw write to the others
         return out
 
@@ -170,11 +234,33 @@ class RelayBroadcaster:
         sh = self.hub._shared.get(sid)
         if sh is None:
             return
+        if sh.crdt is not None:
+            raise ValueError("CRDT-backed models require mutate_shared_crdt")
         patch = json.loads(_diff(json.dumps(sh.value), json.dumps(value)))
         if not patch.get("ops"):
             return
         self.hub.apply_shared(sid, patch, origin="<host>")
+        if self._catching_up:
+            self._buffer.append(("w", sid, patch, "<host>"))
         await self.backplane.publish(json.dumps({"t": "w", "sid": sid, "patch": patch, "origin": "<host>"}).encode())
+
+    async def mutate_shared_crdt(self, sid: int, mutations: list[dict]) -> None:
+        """Apply host-side CRDT mutations locally and publish their operations to every worker."""
+        ops = self.hub.mutate_shared_crdt(sid, mutations)
+        if ops:
+            if self._catching_up:
+                self._buffer.append(("c", sid, ops, "<host>"))
+            payload = json.dumps({"t": "c", "sid": sid, "ops": ops, "origin": "<host>"}).encode()
+            await self.backplane.publish(payload)
+
+    async def compact_shared_crdt(self, sid: int, frontier: dict[str, int]) -> int:
+        """Compact a stable CRDT frontier locally and on every worker."""
+        compacted = self.hub.compact_shared_crdt(sid, frontier)
+        if self._catching_up:
+            self._buffer.append(("x", sid, dict(frontier), "<host>"))
+        payload = json.dumps({"t": "x", "sid": sid, "frontier": frontier, "origin": "<host>"}).encode()
+        await self.backplane.publish(payload)
+        return compacted
 
     def flush(self) -> dict[Any, list[Wire]]:
         return self.hub.flush()

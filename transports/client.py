@@ -11,11 +11,13 @@ import inspect
 import json
 import sys
 import urllib.parse
+import uuid
 from collections.abc import Callable
 from typing import Any
 
 from . import protocol
-from ._bridge import M, from_value
+from ._bridge import M, _value_of, from_value
+from .crdt import CrdtDocument, CrdtSpec
 from .transports import ClientState as _ClientState, apply as _apply, diff as _diff
 
 
@@ -30,6 +32,9 @@ class Client:
         self._values: dict[int, Any] = {}
         self._type: dict[int, str] = {}
         self._state = _ClientState()
+        self._replica = f"client-{uuid.uuid4().hex}"
+        self._crdt: dict[int, CrdtDocument] = {}
+        self._crdt_outbox: list[dict] = []
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
         self._ack_cbs: list[Callable[[dict], None]] = []
@@ -76,6 +81,11 @@ class Client:
         """Propose explicit patch operations over the active connection."""
         frame = self.edit_ops(mid, ops, proposal)
         return await self._send_proposal(frame)
+
+    async def propose_crdt(self, mid: int, mutations: list[dict]) -> bool:
+        """Apply local CRDT mutations immediately and retain them until an authoritative echo."""
+        frame = self.edit_crdt(mid, mutations)
+        return await self.send(frame)
 
     async def _send_proposal(self, frame: str | bytes) -> bool:
         proposal = protocol.decode(frame, self._codec)["proposal"]
@@ -151,6 +161,25 @@ class Client:
             callback(change)
         return change
 
+    async def _flush_crdt_outbox(self, sender: Callable[[str | bytes], Any]) -> None:
+        for pending in list(self._crdt_outbox):
+            frame = protocol.encode(protocol.crdt_msg(pending["id"], pending["ops"]), self._codec)
+            result = sender(frame)
+            if inspect.isawaitable(result):
+                await result
+
+    def _settle_crdt_ops(self, mid: int, ops: list[dict]) -> None:
+        echoed = {json.dumps(op["dot"], sort_keys=True) for op in ops if "dot" in op}
+        retained = []
+        for pending in self._crdt_outbox:
+            if pending["id"] != mid:
+                retained.append(pending)
+                continue
+            remaining = [op for op in pending["ops"] if json.dumps(op["dot"], sort_keys=True) not in echoed]
+            if remaining:
+                retained.append({"id": pending["id"], "ops": remaining})
+        self._crdt_outbox = retained
+
     def recv(self, data: str | bytes) -> dict | None:
         """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.
 
@@ -176,15 +205,41 @@ class Client:
         kind = effect["effect"]
         if kind == "snapshot":
             mid: int = msg["id"]
+            self._crdt.pop(mid, None)
+            self._crdt_outbox = [pending for pending in self._crdt_outbox if pending["id"] != mid]
             self._values[mid] = msg["value"]
             self._type[mid] = msg["type"]
             self._state.commit(effect_json)
             return self._accepted({"t": "snapshot", "id": mid, "rev": msg["rev"]})
+        elif kind == "crdt_snapshot":
+            mid = msg["id"]
+            spec = CrdtSpec.from_dict(msg["spec"])
+            document = CrdtDocument.from_state(spec, msg["state"], self._replica)
+            for pending in self._crdt_outbox:
+                if pending["id"] == mid:
+                    document.apply(pending["ops"])
+            self._crdt[mid] = document
+            self._values[mid] = _value_of(document.value)
+            self._type[mid] = msg["type"]
+            self._state.commit(effect_json)
+            return self._accepted({"t": "crdt_snapshot", "id": mid, "rev": msg["rev"]})
         elif kind == "patch":
             mid = msg["id"]
             value = json.loads(_apply(json.dumps(self._values[mid]), json.dumps(msg["patch"])))
             self._state.commit(effect_json)
             self._values[mid] = value
+            accepted = self._accepted(msg)
+            self._acknowledge(msg)
+            return accepted
+        elif kind == "crdt":
+            mid = msg["id"]
+            document = self._crdt.get(mid)
+            if document is None:
+                raise ValueError(f"CRDT operations received before CRDT snapshot for model {mid}")
+            document.apply(msg["ops"])
+            self._values[mid] = _value_of(document.value)
+            self._state.commit(effect_json)
+            self._settle_crdt_ops(mid, msg["ops"])
             accepted = self._accepted(msg)
             self._acknowledge(msg)
             return accepted
@@ -194,6 +249,8 @@ class Client:
             return None
         elif kind == "rejection":
             self._state.commit(effect_json)
+            if "crdt_ops" in msg:
+                self._settle_crdt_ops(msg["id"], msg["crdt_ops"])
             for callback in list(self._reject_cbs):
                 callback(msg)
             return None
@@ -214,6 +271,10 @@ class Client:
     def pending_proposals(self) -> list[str]:
         """Identifiers for proposals that have not settled or been abandoned."""
         return self._state.pending()
+
+    def pending_crdt_ops(self, mid: int | None = None) -> int:
+        """Number of local CRDT operations awaiting an authoritative echo."""
+        return sum(len(pending["ops"]) for pending in self._crdt_outbox if mid is None or pending["id"] == mid)
 
     def abandon_proposal(self, proposal: str) -> bool:
         """Stop tracking one proposal that the caller did not send.
@@ -247,6 +308,21 @@ class Client:
             self.abandon_proposal(json.loads(message)["proposal"])
             raise
 
+    def edit_crdt(self, mid: int, mutations: list[dict]) -> str | bytes:
+        """Apply local CRDT mutations and return an idempotent operation frame.
+
+        Operations remain queued until the server echoes their causal dots. Reconnects restore the
+        server snapshot, reapply queued operations locally, and resend them.
+        """
+        document = self._crdt.get(mid)
+        if document is None:
+            raise KeyError(f"model {mid} is not CRDT-backed")
+        change = document.mutate(mutations)
+        self._values[mid] = _value_of(document.value)
+        if change["ops"]:
+            self._crdt_outbox.append({"id": mid, "ops": change["ops"]})
+        return protocol.encode(protocol.crdt_msg(mid, change["ops"]), self._codec)
+
     def _connect_url(self, url: str) -> str:
         """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
         mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""
@@ -272,6 +348,7 @@ class Client:
             sender = ws.send
             try:
                 self._connected(sender)
+                await self._flush_crdt_outbox(sender)
                 async for frame in ws:
                     self.recv(frame)
             finally:
@@ -292,7 +369,7 @@ class Client:
                 if not pre:  # server-authoritative (or nothing mirrored before the drop)
                     return
                 for mid in list(self._values):
-                    if mid not in pushed and mid in pre:
+                    if mid not in pushed and mid in pre and mid not in self._crdt:
                         self._send_browser(ws, self.edit(mid, pre[mid]))
                         pushed.add(mid)
 
@@ -345,6 +422,7 @@ class Client:
             # arm the outbound channel only once the socket is open (send during CONNECTING throws)
             opened = True
             self._connected(sender)
+            asyncio.create_task(self._flush_crdt_outbox(sender))
 
         proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close), create_proxy(_on_close)]
         for name, proxy in zip(("message", "open", "close", "error"), proxies):
@@ -391,11 +469,12 @@ class Client:
                     sender = ws.send
                     try:
                         self._connected(sender)
+                        await self._flush_crdt_outbox(sender)
                         async for frame in ws:
                             self.recv(frame)
                             if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
                                 for mid in list(self._values):
-                                    if mid not in pushed and mid in pre:
+                                    if mid not in pushed and mid in pre and mid not in self._crdt:
                                         await ws.send(self.edit(mid, pre[mid]))
                                         pushed.add(mid)
                     finally:

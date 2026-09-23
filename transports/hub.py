@@ -20,11 +20,13 @@ patch back.
 """
 
 import json
+import uuid
 from collections.abc import Callable
 from typing import Any
 
 from . import protocol
-from ._bridge import to_value
+from ._bridge import _py_of, _value_of, to_value
+from .crdt import CrdtDocument, CrdtSpec
 from .server import Wire
 from .session import Session
 from .transports import apply as _apply, diff as _diff
@@ -157,11 +159,22 @@ class DeepLwwCrdt(MergeStrategy):
 class _Shared:
     """Authoritative state for a shared data structure."""
 
-    def __init__(self, type_name: str, value: dict, merge: MergeStrategy, *, replay: bool = False, rev: int = 0, log_cap: int = 512) -> None:
+    def __init__(
+        self,
+        type_name: str,
+        value: dict,
+        merge: MergeStrategy,
+        *,
+        replay: bool = False,
+        rev: int = 0,
+        log_cap: int = 512,
+        crdt: CrdtDocument | None = None,
+    ) -> None:
         self.type_name = type_name
         self.value = value
         self.rev = rev
         self.merge = merge
+        self.crdt = crdt
         self.subs: dict[Any, str] = {}  # tenant key -> mode
         self.replay = replay
         self.log: list[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
@@ -181,12 +194,17 @@ class Hub:
         self.default_codec = protocol.normalize_codec(default_codec)
         self._tenants: dict[Any, Session] = {}
         self._shared: dict[int, _Shared] = {}
+        self._replica = f"hub-{uuid.uuid4().hex}"
+        self._crdt_replica_owners: dict[tuple[int, str], Any] = {}
         self._next_shared = 0
         self._conn_key: dict[Any, Any] = {}
         self._conns_by_key: dict[Any, set[Any]] = {}
         self._codecs: dict[Any, str] = {}
         self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
+        self._crdt_outbox: list[tuple[int, list[dict]]] = []
+        self._snapshot_outbox: set[int] = set()
         self._on_shared_write: Callable | None = None
+        self._last_crdt_write: tuple[Any, int, str] | None = None
 
     def tenant(self, key: Any) -> Session:
         """Get (or create) the `Session` holding a tenant's private models."""
@@ -204,6 +222,9 @@ class Hub:
         replay: bool = False,
         rev: int = 0,
         merge_state: dict | None = None,
+        crdt_spec: CrdtSpec | dict | None = None,
+        crdt_state: dict | None = None,
+        replica: str | None = None,
     ) -> int:
         """Register a shared data structure; returns its shared id.
 
@@ -212,19 +233,34 @@ class Hub:
         model gets its own instance) or an instance to reuse. ``replay=True`` keeps a bounded patch log
         so a joining worker can catch up by delta (see :meth:`since_shared`) instead of a full snapshot.
         To **restore** a model from a durable checkpoint on startup, pass ``rev`` and ``merge_state``
-        (from a prior :meth:`snapshot_shared`) alongside the saved value.
+        (from a prior :meth:`snapshot_shared`) alongside the saved value. Pass ``crdt_spec`` to use
+        the shared schema-directed reducer instead of ``merge``; ``crdt_state`` restores its reducer
+        metadata and ``replica`` overrides this hub's unique operation identity.
         """
         if type_name is None:
             type_name = type(model_or_value).__name__
             value = to_value(model_or_value)
         else:
             value = model_or_value
-        strategy = merge() if isinstance(merge, type) else merge
-        if merge_state is not None:
-            strategy.restore(merge_state)
         sid = SHARED_ID_BASE + self._next_shared
         self._next_shared += 1
-        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev)
+        strategy = merge() if isinstance(merge, type) else merge
+        crdt = None
+        if crdt_spec is not None and merge_state is not None:
+            raise ValueError("merge_state cannot be combined with crdt_spec; pass crdt_state directly")
+        if crdt_spec is None and merge_state is not None and "crdt_spec" in merge_state:
+            crdt_spec = merge_state["crdt_spec"]
+            crdt_state = merge_state.get("crdt_state")
+        if crdt_state is not None and crdt_spec is None:
+            raise ValueError("crdt_state requires crdt_spec")
+        if crdt_spec is not None:
+            spec = crdt_spec if isinstance(crdt_spec, CrdtSpec) else CrdtSpec.from_dict(crdt_spec)
+            replica = replica or f"{self._replica}-{sid}"
+            crdt = CrdtDocument.from_state(spec, crdt_state, replica) if crdt_state is not None else CrdtDocument(spec, _py_of(value), replica)
+            value = _value_of(crdt.value)
+        elif merge_state is not None:
+            strategy.restore(merge_state)
+        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev, crdt=crdt)
         return sid
 
     def subscribe(self, tenant_key: Any, sid: int, mode: str = READ) -> None:
@@ -292,7 +328,18 @@ class Hub:
                     out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
             for sid, sh in self._shared.items():
                 if key in sh.subs:
-                    out.append(self._encode_for(conn, protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)))
+                    if sh.crdt is None:
+                        message = protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)
+                    else:
+                        message = protocol.crdt_snapshot_msg(
+                            sid,
+                            sh.type_name,
+                            sh.rev,
+                            sh.value,
+                            sh.crdt.spec.to_dict(),
+                            sh.crdt.state,
+                        )
+                    out.append(self._encode_for(conn, message))
             return out
         except Exception:
             self.close(conn)
@@ -307,14 +354,19 @@ class Hub:
         every subscriber connection. Both paths are server-authoritative (origin included), with
         pending host patches returned before the proposal reply.
         """
+        self._last_crdt_write = None
         codec = self._codecs.get(conn)
         if codec is None:
             return {}
-        msg = protocol.decode(data, codec)
-        if msg.get("t") != "patch":
+        try:
+            msg = protocol.decode(data, codec)
+        except (TypeError, ValueError):
+            return {}
+        if msg.get("t") not in ("patch", "crdt"):
             return {}
         wire_id = msg["id"]
         proposal = msg.get("proposal")
+        crdt_ops = msg.get("ops") if msg["t"] == "crdt" else None
         key = self._conn_key.get(conn)
 
         def finish(pending: dict[Any, list[tuple[int | None, Wire]]], direct: dict[Any, list[Wire]]) -> dict[Any, list[Wire]]:
@@ -323,14 +375,70 @@ class Hub:
                 out.setdefault(target, []).extend(wires)
             return out
 
+        def reject_shared(error: str, sh: _Shared | None = None) -> dict[Any, list[Wire]]:
+            rev = sh.rev if sh is not None else 0
+            messages = [protocol.reject_msg(wire_id, rev, error, proposal, crdt_ops)]
+            if crdt_ops is not None and sh is not None and sh.crdt is not None:
+                messages.append(
+                    protocol.crdt_snapshot_msg(
+                        wire_id,
+                        sh.type_name,
+                        sh.rev,
+                        sh.value,
+                        sh.crdt.spec.to_dict(),
+                        sh.crdt.state,
+                    )
+                )
+            return self._encode_many([conn], messages)
+
         if wire_id >= SHARED_ID_BASE:
             sh = self._shared.get(wire_id)
             if sh is None:
-                reject = protocol.reject_msg(wire_id, 0, "unknown shared model", proposal)
-                return self._encode_many([conn], [reject])
+                return reject_shared("unknown shared model")
             if not self._shared_write_allowed(key, wire_id):
                 # a read-only (or unsubscribed) tenant's write is refused; tell the proposer why
-                reject = protocol.reject_msg(wire_id, sh.rev, "read-only subscription", proposal)
+                return reject_shared("read-only subscription", sh)
+            if msg["t"] == "crdt":
+                if sh.crdt is None:
+                    self._last_crdt_write = (conn, wire_id, "rejected")
+                    return reject_shared("model is not CRDT-backed", sh)
+                if not isinstance(crdt_ops, list):
+                    self._last_crdt_write = (conn, wire_id, "rejected")
+                    return reject_shared("CRDT operations must be a list", sh)
+                replicas = set()
+                for op in crdt_ops:
+                    if isinstance(op, dict) and isinstance(dot := op.get("dot"), dict):
+                        replica = dot.get("replica")
+                        if isinstance(replica, str):
+                            replicas.add(replica)
+                conflicting = next(
+                    (
+                        replica
+                        for replica in replicas
+                        if (wire_id, replica) in self._crdt_replica_owners and self._crdt_replica_owners[(wire_id, replica)] != key
+                    ),
+                    None,
+                )
+                if conflicting is not None:
+                    self._last_crdt_write = (conn, wire_id, "rejected")
+                    return reject_shared(f"CRDT replica {conflicting!r} belongs to another writer", sh)
+                try:
+                    result = self._write_shared_crdt(wire_id, crdt_ops)
+                except (TypeError, ValueError) as error:
+                    self._last_crdt_write = (conn, wire_id, "rejected")
+                    return reject_shared(str(error), sh)
+                for replica in replicas:
+                    self._crdt_replica_owners.setdefault((wire_id, replica), key)
+                if result is not None:
+                    self._last_crdt_write = (conn, wire_id, "applied")
+                    direct = self._fanout_crdt(wire_id, crdt_ops, origin=conn, proposal=proposal)
+                    return finish(self._flush_crdt_tagged(wire_id), direct)
+                self._last_crdt_write = (conn, wire_id, "duplicate")
+                duplicate = protocol.crdt_msg(wire_id, crdt_ops, rev=sh.rev, proposal=proposal)
+                direct = self._encode_many([conn], [duplicate])
+                return finish(self._flush_crdt_tagged(wire_id), direct)
+            if sh.crdt is not None:
+                reject = protocol.reject_msg(wire_id, sh.rev, "CRDT-backed models require CRDT operations", proposal)
                 return self._encode_many([conn], [reject])
             fan = self._write_shared(wire_id, msg["patch"], origin=key)
             if fan:
@@ -340,6 +448,9 @@ class Hub:
                 direct = self._encode_many([conn], [protocol.ack_msg(wire_id, sh.rev, proposal)])
                 return finish(self._flush_shared_tagged(wire_id), direct)
             return finish(self._flush_shared_tagged(wire_id), {})
+        if msg["t"] == "crdt":
+            reject = protocol.reject_msg(wire_id, 0, "CRDT operations require a shared model", proposal, crdt_ops)
+            return self._encode_many([conn], [reject])
         sess = self._tenants.get(key)
         if sess is None:
             return {}
@@ -380,8 +491,28 @@ class Hub:
         for key in self._tenants:
             for conn, tagged in self._flush_tenant_tagged(key).items():
                 out.setdefault(conn, []).extend(tagged)
+        for conn, tagged in self._flush_snapshots_tagged().items():
+            out.setdefault(conn, []).extend(tagged)
         for conn, tagged in self._flush_shared_tagged().items():
             out.setdefault(conn, []).extend(tagged)
+        for conn, tagged in self._flush_crdt_tagged().items():
+            out.setdefault(conn, []).extend(tagged)
+        return out
+
+    def _flush_snapshots_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
+        out: dict[Any, list[tuple[int | None, Wire]]] = {}
+        for sid in self._snapshot_outbox:
+            sh = self._shared.get(sid)
+            if sh is None:
+                continue
+            if sh.crdt is None:
+                message = protocol.snapshot_msg(sid, sh.type_name, sh.rev, sh.value)
+            else:
+                message = protocol.crdt_snapshot_msg(sid, sh.type_name, sh.rev, sh.value, sh.crdt.spec.to_dict(), sh.crdt.state)
+            conns = (conn for key in sh.subs for conn in self._conns_by_key.get(key, ()))
+            for conn, messages in self._encode_many(conns, [message]).items():
+                out.setdefault(conn, []).extend((sid, wire) for wire in messages)
+        self._snapshot_outbox.clear()
         return out
 
     def _flush_tenant_tagged(self, key: Any) -> dict[Any, list[tuple[int | None, Wire]]]:
@@ -422,8 +553,22 @@ class Hub:
             self._shared_outbox = [item for item in self._shared_outbox if item[0] != only_sid]
         return out
 
+    def _flush_crdt_tagged(self, only_sid: int | None = None) -> dict[Any, list[tuple[int | None, Wire]]]:
+        selected = self._crdt_outbox if only_sid is None else [item for item in self._crdt_outbox if item[0] == only_sid]
+        out: dict[Any, list[tuple[int | None, Wire]]] = {}
+        for sid, ops in selected:
+            for conn, messages in self._fanout_crdt(sid, ops).items():
+                out.setdefault(conn, []).extend((sid, wire) for wire in messages)
+        if only_sid is None:
+            self._crdt_outbox.clear()
+        else:
+            self._crdt_outbox = [item for item in self._crdt_outbox if item[0] != only_sid]
+        return out
+
     def set_shared(self, sid: int, new_value_or_model: Any) -> None:
         """Write to a shared model from the host side; the change is broadcast on the next `sync`/`autosync`."""
+        if self._shared[sid].crdt is not None:
+            raise ValueError("use mutate_shared_crdt for a CRDT-backed shared model")
         value = new_value_or_model if isinstance(new_value_or_model, dict) else to_value(new_value_or_model)
         patch = json.loads(_diff(json.dumps(self._shared[sid].value), json.dumps(value)))
         if not patch["ops"]:
@@ -440,16 +585,57 @@ class Hub:
         concurrent edits from clients on different workers reconcile identically everywhere."""
         if self._shared.get(sid) is None:
             return
+        if self._shared[sid].crdt is not None:
+            return
         fan = self._write_shared(sid, patch, origin)
         if fan:
             self._shared_outbox.append((sid, fan))
 
+    def mutate_shared_crdt(self, sid: int, mutations: list[dict]) -> list[dict]:
+        """Apply host-side CRDT mutations and queue their operations for subscriber fan-out."""
+        sh = self._shared[sid]
+        if sh.crdt is None:
+            raise ValueError("shared model is not CRDT-backed")
+        change = sh.crdt.mutate(mutations)
+        if change["ops"]:
+            self._commit_shared_crdt(sid, change["ops"], change["effect"])
+            self._crdt_outbox.append((sid, change["ops"]))
+        return change["ops"]
+
+    def apply_crdt_shared(self, sid: int, ops: list[dict], origin: Any = None) -> None:
+        """Apply CRDT operations received from another worker and queue local subscriber fan-out."""
+        sh = self._shared.get(sid)
+        if sh is None or sh.crdt is None:
+            return
+        result = self._write_shared_crdt(sid, ops)
+        if result is not None:
+            if origin is not None:
+                for op in ops:
+                    if isinstance(op, dict) and isinstance(dot := op.get("dot"), dict) and isinstance(replica := dot.get("replica"), str):
+                        self._crdt_replica_owners.setdefault((sid, replica), origin)
+            self._crdt_outbox.append((sid, ops))
+
+    def compact_shared_crdt(self, sid: int, frontier: dict[str, int]) -> int:
+        """Compact causally stable reducer metadata for a shared CRDT model."""
+        sh = self._shared[sid]
+        if sh.crdt is None:
+            raise ValueError("shared model is not CRDT-backed")
+        before = sh.crdt.state
+        compacted = sh.crdt.compact(frontier)
+        if sh.crdt.state != before and self._on_shared_write is not None:
+            state = {"crdt_spec": sh.crdt.spec.to_dict(), "crdt_state": sh.crdt.state}
+            change = {"crdt_compacted": dict(frontier)}
+            self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, change, state)
+        return compacted
+
     def on_shared_write(self, callback: Callable | None) -> None:
         """Register a callback fired after each authoritative shared write, with
-        ``(sid, type_name, value, rev, patch, merge_state)``. transports stores nothing durably; persist
-        these (the value+rev+merge_state, or append the patch) to make a model survive a full-cluster
-        restart, and restore with ``share(value=…, rev=…, merge_state=…)``. Gate on a single writer (e.g.
-        the relay's leader) if you don't want every worker persisting the same change."""
+        ``(sid, type_name, value, rev, change, merge_state)``. For CRDT-backed models, ``change``
+        contains ``crdt_ops`` and ``effect``, or ``crdt_compacted`` for a same-revision compaction,
+        while ``merge_state`` contains the CRDT specification and reducer state. transports stores
+        nothing durably; persist these to survive a full-cluster restart, then restore with
+        ``share(value=…, rev=…, merge_state=…)``. Gate on a single writer (e.g. the relay's leader) if
+        you don't want every worker persisting the same change."""
         self._on_shared_write = callback
 
     def snapshot_shared(self, sid: int) -> dict:
@@ -457,7 +643,19 @@ class Hub:
         clock (``merge_state``). Used by the relay to catch up a joining worker, and by users to
         checkpoint for durability."""
         sh = self._shared[sid]
-        return {"type_name": sh.type_name, "value": sh.value, "rev": sh.rev, "merge_state": sh.merge.state()}
+        snapshot = {
+            "type_name": sh.type_name,
+            "value": sh.value,
+            "rev": sh.rev,
+            "merge_state": sh.merge.state(),
+        }
+        if sh.crdt is not None:
+            crdt_spec = sh.crdt.spec.to_dict()
+            crdt_state = sh.crdt.state
+            snapshot["crdt_spec"] = crdt_spec
+            snapshot["crdt_state"] = crdt_state
+            snapshot["merge_state"] = {"crdt_spec": crdt_spec, "crdt_state": crdt_state}
+        return snapshot
 
     def since_shared(self, sid: int, since_rev: int) -> list[dict] | None:
         """Patches after `since_rev` for a delta catch-up, or ``None`` if it is outside the kept log (the
@@ -471,28 +669,46 @@ class Hub:
             return None  # the needed delta has scrolled out of the bounded log
         return [p for r, p in sh.log if r > since_rev]
 
-    def apply_snapshot_shared(self, sid: int, value: dict, rev: int, merge_state: dict | None) -> None:
+    def apply_snapshot_shared(
+        self,
+        sid: int,
+        value: dict,
+        rev: int,
+        merge_state: dict | None,
+        crdt_spec: dict | None = None,
+        crdt_state: dict | None = None,
+    ) -> bool:
         """Adopt a peer's snapshot of a shared model: set value/rev and restore the merge clock, so later
         merges respect the transferred causal stamps."""
         sh = self._shared.get(sid)
         if sh is None:
-            return
+            return False
+        if sh.crdt is not None and (crdt_spec is None or crdt_state is None):
+            return False
         sh.value = value
         sh.rev = max(sh.rev, rev)
-        sh.merge.restore(merge_state or {})
+        if crdt_spec is not None and crdt_state is not None:
+            replica = sh.crdt.replica if sh.crdt is not None else f"{self._replica}-{sid}"
+            sh.crdt = CrdtDocument.from_state(CrdtSpec.from_dict(crdt_spec), crdt_state, replica)
+            sh.value = _value_of(sh.crdt.value)
+        else:
+            sh.merge.restore(merge_state or {})
+        self._snapshot_outbox.add(sid)
+        return True
 
-    def apply_delta_shared(self, sid: int, patches: list[dict], rev: int, merge_state: dict | None) -> None:
+    def apply_delta_shared(self, sid: int, patches: list[dict], rev: int, merge_state: dict | None) -> bool:
         """Catch up by applying replay patches onto the current (restored) value, then restoring the merge
         clock — cheaper than a snapshot when a recent checkpoint is held."""
         sh = self._shared.get(sid)
-        if sh is None:
-            return
+        if sh is None or sh.crdt is not None:
+            return False
         v = sh.value
         for patch in patches:
             v = json.loads(_apply(json.dumps(v), json.dumps(patch)))
         sh.value = v
         sh.rev = max(sh.rev, rev)
         sh.merge.restore(merge_state or {})
+        return True
 
     def close(self, conn: Any) -> None:
         sentinel = object()
@@ -524,6 +740,27 @@ class Hub:
             self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, fan, sh.merge.state())
         return fan
 
+    def _write_shared_crdt(self, sid: int, ops: list[dict]) -> dict | None:
+        sh = self._shared[sid]
+        if sh.crdt is None:
+            raise ValueError("shared model is not CRDT-backed")
+        effect = sh.crdt.apply(ops)
+        if effect["applied"] == 0:
+            return None
+        self._commit_shared_crdt(sid, ops, effect)
+        return effect
+
+    def _commit_shared_crdt(self, sid: int, ops: list[dict], effect: dict) -> None:
+        sh = self._shared[sid]
+        if sh.crdt is None:
+            raise ValueError("shared model is not CRDT-backed")
+        sh.value = _value_of(sh.crdt.value)
+        sh.rev += 1
+        if self._on_shared_write is not None:
+            state = {"crdt_spec": sh.crdt.spec.to_dict(), "crdt_state": sh.crdt.state}
+            change = {"crdt_ops": ops, "effect": effect}
+            self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, change, state)
+
     def _fanout(self, sid: int, fan: dict, *, origin: Any = None, proposal: str | None = None) -> dict[Any, list[Wire]]:
         sh = self._shared[sid]
         msg = protocol.patch_msg(sid, fan)
@@ -534,4 +771,24 @@ class Hub:
             return self._encode_many(conns, [msg])
         out = self._encode_many((conn for conn in conns if conn != origin), [msg])
         out.update(self._encode_many([origin], [protocol.patch_msg(sid, fan, proposal)]))
+        return out
+
+    def _fanout_crdt(
+        self,
+        sid: int,
+        ops: list[dict],
+        *,
+        origin: Any = None,
+        proposal: str | None = None,
+    ) -> dict[Any, list[Wire]]:
+        sh = self._shared[sid]
+        message = protocol.crdt_msg(sid, ops, rev=sh.rev)
+        conns: list[Any] = []
+        for key in sh.subs:
+            conns.extend(self._conns_by_key.get(key, ()))
+        if proposal is None or origin is None:
+            return self._encode_many(conns, [message])
+        out = self._encode_many((conn for conn in conns if conn != origin), [message])
+        origin_message = protocol.crdt_msg(sid, ops, rev=sh.rev, proposal=proposal)
+        out.update(self._encode_many([origin], [origin_message]))
         return out

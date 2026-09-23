@@ -248,6 +248,8 @@ pub enum CrdtDelta {
 pub struct CrdtEffect {
     pub patch: Patch,
     pub deltas: Vec<CrdtDelta>,
+    /// Operations newly accepted by this replica. Duplicate causal dots do not count.
+    pub applied: usize,
 }
 
 /// Locally generated operations and their already-applied materialized effect.
@@ -503,6 +505,7 @@ impl CrdtDocument {
         let mut current = before.clone();
         let mut working = self.clone();
         let mut deltas = Vec::new();
+        let mut applied = 0;
         for (op, fingerprint) in ops.iter().zip(fingerprints) {
             if working.state.context.contains(op.dot()) {
                 if working
@@ -519,6 +522,7 @@ impl CrdtDocument {
                 continue;
             }
             working.apply_one(op)?;
+            applied += 1;
             working.state.context.observe(op.dot().clone());
             working
                 .state
@@ -534,6 +538,7 @@ impl CrdtDocument {
         let effect = CrdtEffect {
             patch: diff(&before, &current),
             deltas,
+            applied,
         };
         *self = working;
         Ok(effect)
@@ -566,6 +571,7 @@ impl CrdtDocument {
             effect: CrdtEffect {
                 patch: diff(&before, &current),
                 deltas,
+                applied: mutations.len(),
             },
         };
         *self = working;
@@ -1598,8 +1604,9 @@ mod tests {
 
         let before = a.value().unwrap();
         let effect = a.apply(&b_change.ops).unwrap();
+        assert_eq!(effect.applied, 1);
         assert_effect_applies(before, &effect, a.value().unwrap());
-        a.apply(&b_change.ops).unwrap();
+        assert_eq!(a.apply(&b_change.ops).unwrap().applied, 0);
         b.apply(&a_change.ops).unwrap();
 
         assert_eq!(a.value().unwrap(), 2.into());

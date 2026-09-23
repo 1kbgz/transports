@@ -100,6 +100,8 @@ therefore receive new element identities. Restore sequence content with `sequenc
 
 `mutate()` and `apply()` return two views of the same accepted change:
 
+- `applied` counts operations whose causal dots were new to this replica. It is zero for an
+  idempotent replay even when the input contains operations.
 - `patch` is an ordinary positional transports patch from the previous materialized value to the new
   value. Existing model consumers can apply it without understanding CRDT identity.
 - `deltas` preserve set-member and sequence-element identities for editors and other consumers that
@@ -113,7 +115,11 @@ Callers must not pass counters that every replica has not acknowledged. Deleted 
 discarded, but their small anchor records remain so later inserts can still name a predecessor. The
 reducer also rejects a frontier unless every counter since its last compacted counter has been
 observed. Long-lived documents should compact acknowledged history periodically; otherwise causal
-dots and duplicate-detection hashes grow with edit history.
+dots and duplicate-detection hashes grow with edit history. `Hub` does not infer a safe frontier:
+applications must track acknowledgements across every replica before calling
+`compact_shared_crdt()` and persisting the resulting state. Use the relay method in a multi-worker
+deployment so the frontier reaches every reducer replica. Compaction does not change the materialized
+value or model revision, so persistence must not discard its checkpoint as a duplicate revision.
 
 Values inside `patch` use the tagged core `Value` encoding documented above. `CrdtDocument.value`
 and identity deltas use ordinary Python or JavaScript values.
@@ -276,15 +282,62 @@ accepted revision.
 Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.
 
+### CRDT snapshot and operations
+
+A CRDT snapshot initializes both the materialized mirror and reducer metadata:
+
+```json
+{
+  "t": "crdt_snapshot",
+  "id": 1099511627776,
+  "type": "Document",
+  "rev": 4,
+  "value": {"Str": "hello"},
+  "spec": {
+    "version": 1,
+    "root": {"kind": "sequence", "materialization": "string"}
+  },
+  "state": {"version": 1, "spec_hash": "sha256:..."}
+}
+```
+
+The abbreviated `state` above represents the full reducer state produced by `CrdtDocument.state`.
+A client edit sends revision zero and one or more operations:
+
+```json
+{
+  "t": "crdt",
+  "id": 1099511627776,
+  "rev": 0,
+  "ops": [
+    {
+      "kind": "sequence_insert",
+      "path": [],
+      "after": null,
+      "values": ["!"],
+      "dot": {"counter": 1, "replica": "client-a"}
+    }
+  ]
+}
+```
+
+The authoritative echo carries the shared-model revision. The `effect` field is optional; `Hub`
+omits it because clients apply operations through their local reducer.
+Clients apply every unseen causal dot even when relay revisions arrive out of order. Revision order
+alone cannot identify a duplicate when workers accept concurrent operations; duplicate suppression
+uses the dots in reducer state. A reconnect receives a full CRDT snapshot, reapplies local outbox
+operations, and resends them. This preserves offline changes without applying an operation twice.
+
 `Client.recv()` (Python and JavaScript alike) returns `{t: "snapshot", id, rev}` for an accepted
-snapshot, the decoded patch message for an accepted patch, and `None`/`undefined` for an ignored
-revision or an unrecognized message type. Unknown types are ignored rather than raised, so a newer
-server can add message types without breaking older clients. Reactive adapters can consume the returned
-patch paths without reading and decoding the complete mirror, either from the `recv()` return value
-or via `Client.on_change` / `Client.onChange`, which fires with the same accepted change under the
-managed connect/run/SSE paths. The returned change and `Client.value()` share immutable branches
-with the mirror and must not be mutated. A patch before its snapshot, an unknown patch operation, or
-an invalid path raises; failed frames leave the mirror and its accepted revision unchanged.
+snapshot, `{t: "crdt_snapshot", id, rev}` for a CRDT snapshot, the decoded patch or CRDT operation
+message for an accepted change, and `None`/`undefined` for an ignored revision or an unrecognized
+message type. Unknown types are ignored rather than raised, so a newer server can add message types
+without breaking older clients. Reactive adapters can consume the returned change without reading
+and decoding the complete mirror, either from the `recv()` return value or via `Client.on_change` /
+`Client.onChange`, which fires with the same accepted change under the managed connect/run/SSE paths.
+The returned change and `Client.value()` share immutable branches with the mirror and must not be
+mutated. A patch or CRDT operation before its matching snapshot, an unknown operation, or an invalid
+path raises; failed frames leave the mirror and its accepted revision unchanged.
 
 ### Reject
 
@@ -305,7 +358,9 @@ the model's validation message where available, for example pydantic's.
 
 A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
 `Client.on_reject` / `Client.onReject` so an app can show why the edit was refused instead of only
-reverting. If the proposal supplied an identifier, the reject carries it.
+reverting. If the proposal supplied an identifier, the reject carries it. A CRDT rejection includes
+`crdt_ops`; clients remove those causal dots from their outbox before applying the following CRDT
+snapshot.
 
 ## Model ids
 

@@ -73,13 +73,16 @@ def test_python_binding_matches_shared_crdt_reducer_fixture():
     )
 
     assert document.value == {"text": "hi", "title": "ready"}
+    assert change["effect"]["applied"] == 2
     assert [op["dot"] for op in change["ops"]] == [
         {"counter": 1, "replica": "a"},
         {"counter": 2, "replica": "a"},
     ]
     receiver = CrdtDocument.from_state(spec, document.state, "b")
     assert receiver.value == document.value
-    assert receiver.apply(change["ops"])["patch"]["ops"] == []
+    duplicate = receiver.apply(change["ops"])
+    assert duplicate["patch"]["ops"] == []
+    assert duplicate["applied"] == 0
 
 
 def test_python_crdt_binding_exposes_validation_identity_and_compaction():
