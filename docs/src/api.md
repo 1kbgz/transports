@@ -90,8 +90,12 @@ hashing run in the shared Rust core.
 `CrdtDocument` accepts ordinary Python values. `mutate()` creates causally identified operations and
 applies them locally; `apply()` accepts the same operations from another replica. Both return a
 positional patch for existing model consumers and identity-preserving deltas for CRDT-aware
-consumers. Transfer `state` to another process with `from_state()` when a patch history is not
-available.
+consumers. For sequences, a local `sequence_splice` mutation converts a positional range into the
+stable-ID delete and insert operations used on the wire. Transfer `state` to another process with
+`from_state()` when a patch history is not available.
+
+After a CRDT snapshot, `Client.crdt_spec(id)` returns that model's canonical specification. The
+JavaScript spelling is `client.crdtSpec(id)`. Plain and unknown models return `None` / `undefined`.
 
 ## Protocol helpers
 

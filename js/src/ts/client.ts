@@ -633,6 +633,11 @@ export class Client {
     return this.values.get(id);
   }
 
+  /** The canonical merge specification for a CRDT-backed model, else undefined. */
+  crdtSpec(id: number): CrdtSpec | undefined {
+    return this.crdt.get(id)?.spec;
+  }
+
   ids(): number[] {
     return [...this.values.keys()];
   }

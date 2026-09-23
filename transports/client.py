@@ -261,6 +261,11 @@ class Client:
         """The current mirrored core `Value` of a model."""
         return self._values[mid]
 
+    def crdt_spec(self, mid: int) -> CrdtSpec | None:
+        """The canonical merge specification for a CRDT-backed model, else ``None``."""
+        document = self._crdt.get(mid)
+        return None if document is None else document.spec
+
     def model(self, mid: int, cls: type[M]) -> M:
         """Materialize the mirrored model as an instance of `cls`."""
         return from_value(self._values[mid], cls)

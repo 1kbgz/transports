@@ -98,6 +98,12 @@ assert membership. When reasserting an existing member that contains a sequence,
 fields rather than replaying the sequence value: sequence values in `set_add` are insertions and
 therefore receive new element identities. Restore sequence content with `sequence_insert` operations.
 
+Local `mutate()` calls may also use `sequence_splice` with a path, zero-based `index`,
+`delete_count`, and inserted `values`. The reducer resolves positions against its current materialized
+sequence and emits the corresponding stable-ID `sequence_delete` and `sequence_insert` operations.
+`sequence_splice` is a generic authoring convenience for text and ordered records; it never appears
+on the wire.
+
 `mutate()` and `apply()` return two views of the same accepted change:
 
 - `applied` counts operations whose causal dots were new to this replica. It is zero for an

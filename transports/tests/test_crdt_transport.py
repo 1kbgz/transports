@@ -17,6 +17,18 @@ def insert(text: str) -> list[dict]:
     return [{"kind": "sequence_insert", "path": [], "after": None, "values": list(text)}]
 
 
+def splice(index: int, text: str = "", delete_count: int = 0) -> list[dict]:
+    return [
+        {
+            "kind": "sequence_splice",
+            "path": [],
+            "index": index,
+            "delete_count": delete_count,
+            "values": list(text),
+        }
+    ]
+
+
 def crdt_hub() -> tuple[Hub, int]:
     hub = Hub(key=lambda conn: conn[0])
     sid = hub.share({"Str": ""}, "Document", crdt_spec=text_spec())
@@ -63,6 +75,7 @@ def test_crdt_client_reapplies_offline_operations_after_snapshot() -> None:
     client = Client()
     [snapshot] = hub.open(connection)
     client.recv(snapshot)
+    assert client.crdt_spec(sid) == text_spec()
 
     frame = client.edit_crdt(sid, insert("offline"))
     assert client.value(sid) == {"Str": "offline"}
@@ -76,6 +89,16 @@ def test_crdt_client_reapplies_offline_operations_after_snapshot() -> None:
     client.recv(output[connection][0])
     assert client.pending_crdt_ops(sid) == 0
     assert client.value(sid) == hub._shared[sid].value
+
+
+def test_client_exposes_specs_only_for_crdt_models() -> None:
+    hub, sid = crdt_hub()
+    hub.subscribe("alice", sid, WRITE)
+    client = Client()
+    client.recv(hub.open(("alice", 1))[0])
+
+    assert client.crdt_spec(sid) == text_spec()
+    assert client.crdt_spec(999) is None
 
 
 def test_managed_client_sends_and_flushes_crdt_outbox() -> None:
@@ -139,6 +162,7 @@ def test_plain_snapshot_clears_crdt_document_and_outbox() -> None:
 
     assert client.pending_crdt_ops(sid) == 0
     assert client.value(sid) == {"Str": "plain"}
+    assert client.crdt_spec(sid) is None
     with pytest.raises(KeyError, match="not CRDT-backed"):
         client.edit_crdt(sid, insert("stale"))
 
@@ -578,14 +602,14 @@ def test_catchup_reapplies_local_crdt_writes_after_lower_revision_peer_snapshot(
             client.recv(message)
         relay = RelayBroadcaster(hub, RecordingBackplane())
         relay._catching_up = True
-        for value in "local":
-            relay.recv(connection, client.edit_crdt(sid, insert(value)))
+        for index, value in enumerate("local"):
+            relay.recv(connection, client.edit_crdt(sid, splice(index, value)))
         assert hub._shared[sid].rev == 5
         assert len(relay._buffer) == 5
 
         peer = CrdtDocument(text_spec(), "", "peer")
-        for value in "old":
-            peer.mutate(insert(value))
+        for index, value in enumerate("old"):
+            peer.mutate(splice(index, value))
         relay._apply_resp(
             {
                 "sid": sid,

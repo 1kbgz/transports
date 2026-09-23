@@ -57,13 +57,15 @@ def _wire_item(item: Mapping[str, Any], *, encode: bool) -> dict[str, Any]:
         if "value" not in converted:
             raise TypeError(f"{converted['kind']} requires value")
         converted["value"] = transform(converted["value"])
-    elif converted.get("kind") == "sequence_insert":
+    elif converted.get("kind") in {"sequence_insert", "sequence_splice"}:
         if "values" in converted:
             converted["values"] = [transform(value) for value in converted["values"]]
-        elif "elements" in converted:
+        elif converted.get("kind") == "sequence_insert" and "elements" in converted:
             converted["elements"] = [{**element, "value": transform(element["value"])} for element in converted["elements"]]
-        else:
+        elif converted.get("kind") == "sequence_insert":
             raise TypeError("sequence_insert requires values or elements")
+        else:
+            raise TypeError("sequence_splice requires values")
     return converted
 
 

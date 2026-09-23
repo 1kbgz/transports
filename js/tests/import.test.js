@@ -109,13 +109,22 @@ test("wasm binding matches the shared CRDT reducer fixture", async () => {
       after: null,
       values: ["h", "i"],
     },
+    {
+      kind: "sequence_splice",
+      path: [{ kind: "key", key: "text" }],
+      index: 1,
+      delete_count: 1,
+      values: ["λ"],
+    },
   ]);
 
-  expect(document.value).toEqual({ text: "hi", title: "ready" });
-  expect(change.effect.applied).toBe(2);
+  expect(document.value).toEqual({ text: "hλ", title: "ready" });
+  expect(change.effect.applied).toBe(4);
   expect(change.ops.map((op) => op.dot)).toEqual([
     { counter: 1, replica: "a" },
     { counter: 2, replica: "a" },
+    { counter: 3, replica: "a" },
+    { counter: 4, replica: "a" },
   ]);
   const receiver = CrdtDocument.fromState(spec, document.state, "b");
   expect(receiver.value).toEqual(document.value);
@@ -141,6 +150,8 @@ test("Client retains offline CRDT operations through a reconnect snapshot", asyn
   };
   const client = new Client();
   client.recv(JSON.stringify(snapshot));
+  expect(client.crdtSpec(9)?.equals(spec)).toBe(true);
+  expect(client.crdtSpec(999)).toBeUndefined();
 
   const frame = client.editCrdt(9, [
     {
@@ -288,6 +299,7 @@ test("plain snapshot clears CRDT state and pending operations", async () => {
   );
 
   expect(client.value(12)).toEqual(toValue("plain"));
+  expect(client.crdtSpec(12)).toBeUndefined();
   expect(client.pendingCrdtOps(12)).toBe(0);
   expect(() => client.editCrdt(12, [])).toThrow(/not CRDT-backed/);
   expect(

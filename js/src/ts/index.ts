@@ -56,12 +56,22 @@ export type CrdtMutation =
       after: ElementId | null;
       values: unknown[];
     }
-  | { kind: "sequence_delete"; path: CrdtPath; ids: ElementId[] };
-type Mutation<K extends CrdtMutation["kind"]> = Extract<
-  CrdtMutation,
+  | { kind: "sequence_delete"; path: CrdtPath; ids: ElementId[] }
+  | {
+      kind: "sequence_splice";
+      path: CrdtPath;
+      index: number;
+      delete_count: number;
+      values: unknown[];
+    };
+type CrdtOperationMutation = Exclude<CrdtMutation, { kind: "sequence_splice" }>;
+type Mutation<K extends CrdtOperationMutation["kind"]> = Extract<
+  CrdtOperationMutation,
   { kind: K }
 >;
-type Operation<K extends CrdtMutation["kind"]> = Mutation<K> & { dot: Dot };
+type Operation<K extends CrdtOperationMutation["kind"]> = Mutation<K> & {
+  dot: Dot;
+};
 export type CrdtOp =
   | Operation<"register_set">
   | Operation<"map_set">
@@ -152,14 +162,20 @@ const wireItem = (
   if (["register_set", "map_set", "set_add"].includes(item.kind)) {
     if (!("value" in item)) throw new TypeError(`${item.kind} requires value`);
     converted.value = transform(converted.value);
-  } else if (item.kind === "sequence_insert") {
+  } else if (
+    item.kind === "sequence_insert" ||
+    item.kind === "sequence_splice"
+  ) {
+    const sequenceKind = item.kind;
     if ("values" in item) converted.values = item.values.map(transform);
     else if ("elements" in item)
       converted.elements = item.elements.map((element) => ({
         ...element,
         value: transform(element.value),
       }));
-    else throw new TypeError("sequence_insert requires values or elements");
+    else if (sequenceKind === "sequence_insert")
+      throw new TypeError("sequence_insert requires values or elements");
+    else throw new TypeError("sequence_splice requires values");
   }
   return converted;
 };
