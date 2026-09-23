@@ -71,6 +71,28 @@ This reference lists the Python surface exposed by `transports`.
    :members:
 ```
 
+## CRDT specifications
+
+```{eval-rst}
+.. autoclass:: transports.CrdtSpec
+   :members:
+   :member-order: bysource
+
+.. autoclass:: transports.CrdtDocument
+   :members:
+   :member-order: bysource
+```
+
+`RegisterPolicy`, `MapPolicy`, `SetPolicy`, `SequencePolicy`, and their `CrdtPolicy` union describe
+the accepted dictionary shapes for type checkers. Policy validation, canonical serialization, and
+hashing run in the shared Rust core.
+
+`CrdtDocument` accepts ordinary Python values. `mutate()` creates causally identified operations and
+applies them locally; `apply()` accepts the same operations from another replica. Both return a
+positional patch for existing model consumers and identity-preserving deltas for CRDT-aware
+consumers. Transfer `state` to another process with `from_state()` when a patch history is not
+available.
+
 ## Protocol helpers
 
 ```{eval-rst}

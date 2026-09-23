@@ -875,6 +875,109 @@ be transferred to a joining worker or persisted by the user. Stateless strategie
 </dd></dl>
 
 </section>
+<section id="crdt-specifications">
+<h2>CRDT specifications<a class="headerlink" href="#crdt-specifications" title="Link to this heading">¶</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.CrdtSpec">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">CrdtSpec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">root</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">RegisterPolicy</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">MapPolicy</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SetPolicy</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">SequencePolicy</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">version</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Validated, canonical merge semantics for one model.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtSpec.from_dict">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_dict</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">object</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.CrdtSpec" title="transports.crdt.CrdtSpec"><span class="pre">CrdtSpec</span></a></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec.from_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec.from_dict" title="Link to this definition">¶</a></dt>
+<dd><p>Validate a complete serialized specification.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtSpec.from_json">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_json</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.CrdtSpec" title="transports.crdt.CrdtSpec"><span class="pre">CrdtSpec</span></a></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec.from_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec.from_json" title="Link to this definition">¶</a></dt>
+<dd><p>Validate a serialized specification.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtSpec.to_dict">
+<span class="sig-name descname"><span class="pre">to_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">object</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec.to_dict"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec.to_dict" title="Link to this definition">¶</a></dt>
+<dd><p>Return a detached JSON-compatible representation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtSpec.to_json">
+<span class="sig-name descname"><span class="pre">to_json</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec.to_json"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec.to_json" title="Link to this definition">¶</a></dt>
+<dd><p>Return the deterministic serialized representation.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="transports.CrdtSpec.hash">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">hash</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#transports.CrdtSpec.hash" title="Link to this definition">¶</a></dt>
+<dd><p>SHA-256 of the deterministic serialized representation.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtSpec.require_hash">
+<span class="sig-name descname"><span class="pre">require_hash</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">peer_hash</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtSpec.require_hash"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtSpec.require_hash" title="Link to this definition">¶</a></dt>
+<dd><p>Raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> when a peer uses different merge semantics.</p>
+</dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="transports.CrdtDocument">
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">CrdtDocument</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.CrdtSpec" title="transports.crdt.CrdtSpec"><span class="pre">CrdtSpec</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replica</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument" title="Link to this definition">¶</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>One schema-directed CRDT replica backed by the shared Rust reducer.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.from_state">
+<em class="property"><span class="k"><span class="pre">classmethod</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">spec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="#transports.CrdtSpec" title="transports.crdt.CrdtSpec"><span class="pre">CrdtSpec</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replica</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.CrdtDocument" title="transports.crdt.CrdtDocument"><span class="pre">CrdtDocument</span></a></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.from_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.from_state" title="Link to this definition">¶</a></dt>
+<dd><p>Restore a transferred reducer state under a new local replica identifier.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="transports.CrdtDocument.value">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Any</span></em><a class="headerlink" href="#transports.CrdtDocument.value" title="Link to this definition">¶</a></dt>
+<dd><p>Current ordinary Python value.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="transports.CrdtDocument.state">
+<em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">state</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#transports.CrdtDocument.state" title="Link to this definition">¶</a></dt>
+<dd><p>Detached, JSON-compatible reducer state for transfer or persistence.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.mutate">
+<span class="sig-name descname"><span class="pre">mutate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mutations</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.mutate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.mutate" title="Link to this definition">¶</a></dt>
+<dd><p>Create and apply local operations, returning operations and materialized effects.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.apply">
+<span class="sig-name descname"><span class="pre">apply</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ops</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Iterable</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.apply"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.apply" title="Link to this definition">¶</a></dt>
+<dd><p>Apply remote operations idempotently and return their materialized effect.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.member_key">
+<span class="sig-name descname"><span class="pre">member_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.member_key"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.member_key" title="Link to this definition">¶</a></dt>
+<dd><p>Return canonical identity for a value at a set path.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.compact">
+<span class="sig-name descname"><span class="pre">compact</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frontier</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Mapping</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.compact"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.compact" title="Link to this definition">¶</a></dt>
+<dd><p>Discard metadata covered by a caller-provided causally stable frontier.</p>
+</dd></dl>
+
+</dd></dl>
+
+<p><code class="docutils literal notranslate"><span class="pre">RegisterPolicy</span></code>, <code class="docutils literal notranslate"><span class="pre">MapPolicy</span></code>, <code class="docutils literal notranslate"><span class="pre">SetPolicy</span></code>, <code class="docutils literal notranslate"><span class="pre">SequencePolicy</span></code>, and their <code class="docutils literal notranslate"><span class="pre">CrdtPolicy</span></code> union describe
+the accepted dictionary shapes for type checkers. Policy validation, canonical serialization, and
+hashing run in the shared Rust core.</p>
+<p><code class="docutils literal notranslate"><span class="pre">CrdtDocument</span></code> accepts ordinary Python values. <code class="docutils literal notranslate"><span class="pre">mutate()</span></code> creates causally identified operations and
+applies them locally; <code class="docutils literal notranslate"><span class="pre">apply()</span></code> accepts the same operations from another replica. Both return a
+positional patch for existing model consumers and identity-preserving deltas for CRDT-aware
+consumers. Transfer <code class="docutils literal notranslate"><span class="pre">state</span></code> to another process with <code class="docutils literal notranslate"><span class="pre">from_state()</span></code> when a patch history is not
+available.</p>
+</section>
 <section id="protocol-helpers">
 <h2>Protocol helpers<a class="headerlink" href="#protocol-helpers" title="Link to this heading">¶</a></h2>
 <dl class="py function">
@@ -1164,6 +1267,28 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.LwwMapCrdt"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code></a><ul>
 <li><a class="reference internal" href="#transports.LwwMapCrdt.restore"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt.restore()</span></code></a></li>
 <li><a class="reference internal" href="#transports.LwwMapCrdt.state"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt.state()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><a class="reference internal" href="#crdt-specifications">CRDT specifications</a><ul>
+<li><a class="reference internal" href="#transports.CrdtSpec"><code class="docutils literal notranslate"><span class="pre">CrdtSpec</span></code></a><ul>
+<li><a class="reference internal" href="#transports.CrdtSpec.from_dict"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.from_dict()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtSpec.from_json"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.from_json()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.to_dict()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtSpec.to_json"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.to_json()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtSpec.hash"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.hash</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtSpec.require_hash"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.require_hash()</span></code></a></li>
+</ul>
+</li>
+<li><a class="reference internal" href="#transports.CrdtDocument"><code class="docutils literal notranslate"><span class="pre">CrdtDocument</span></code></a><ul>
+<li><a class="reference internal" href="#transports.CrdtDocument.from_state"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.from_state()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.value"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.value</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.state"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.state</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.mutate"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.mutate()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.apply"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.apply()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.member_key"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.member_key()</span></code></a></li>
+<li><a class="reference internal" href="#transports.CrdtDocument.compact"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.compact()</span></code></a></li>
 </ul>
 </li>
 </ul>
