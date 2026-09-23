@@ -5,6 +5,13 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+mod reducer;
+
+pub use reducer::{
+    CausalContext, CrdtChange, CrdtDelta, CrdtDocument, CrdtEffect, CrdtMutation, CrdtOp, CrdtPath,
+    CrdtPathSegment, CrdtState, Dot, ElementId, SequenceDeltaElement, VersionVector,
+};
+
 const SPEC_VERSION: u32 = 1;
 
 fn default_version() -> u32 {

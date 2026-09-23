@@ -6,7 +6,9 @@
 //! consumed by [`apply_json`] in the browser using the same Rust.
 
 use crate::codec::{codec_for, Codec, JsonCodec};
-use crate::crdt::CrdtSpec;
+use crate::crdt::{
+    CrdtDocument, CrdtMutation, CrdtOp, CrdtPath, CrdtSpec, CrdtState, VersionVector,
+};
 use crate::diff::{apply, diff, Patch};
 use crate::message::Message;
 use crate::store::Store;
@@ -40,6 +42,61 @@ pub fn crdt_spec_hash_json(json: &str) -> Result<String, String> {
 /// Reject a peer hash that does not match the validated local specification.
 pub fn require_crdt_spec_hash_json(json: &str, peer_hash: &str) -> Result<(), String> {
     CrdtSpec::from_json(json)?.require_hash(peer_hash)
+}
+
+/// A string-in/string-out facade over [`CrdtDocument`] for both language bindings.
+pub struct JsonCrdtDocument {
+    inner: CrdtDocument,
+}
+
+impl JsonCrdtDocument {
+    pub fn new(spec_json: &str, value_json: &str, replica: &str) -> Result<Self, String> {
+        let spec = CrdtSpec::from_json(spec_json)?;
+        let value = serde_json::from_str(value_json).map_err(|error| error.to_string())?;
+        Ok(Self {
+            inner: CrdtDocument::new(spec, value, replica)?,
+        })
+    }
+
+    pub fn from_state(spec_json: &str, state_json: &str, replica: &str) -> Result<Self, String> {
+        let spec = CrdtSpec::from_json(spec_json)?;
+        let state: CrdtState =
+            serde_json::from_str(state_json).map_err(|error| error.to_string())?;
+        Ok(Self {
+            inner: CrdtDocument::from_state(spec, state, replica)?,
+        })
+    }
+
+    pub fn value(&self) -> Result<String, String> {
+        serde_json::to_string(&self.inner.value()?).map_err(|error| error.to_string())
+    }
+
+    pub fn state(&self) -> Result<String, String> {
+        serde_json::to_string(self.inner.state()).map_err(|error| error.to_string())
+    }
+
+    pub fn mutate(&mut self, mutations_json: &str) -> Result<String, String> {
+        let mutations: Vec<CrdtMutation> =
+            serde_json::from_str(mutations_json).map_err(|error| error.to_string())?;
+        serde_json::to_string(&self.inner.mutate(&mutations)?).map_err(|error| error.to_string())
+    }
+
+    pub fn apply(&mut self, ops_json: &str) -> Result<String, String> {
+        let ops: Vec<CrdtOp> = serde_json::from_str(ops_json).map_err(|error| error.to_string())?;
+        serde_json::to_string(&self.inner.apply(&ops)?).map_err(|error| error.to_string())
+    }
+
+    pub fn member_key(&self, path_json: &str, value_json: &str) -> Result<String, String> {
+        let path: CrdtPath = serde_json::from_str(path_json).map_err(|error| error.to_string())?;
+        let value = serde_json::from_str(value_json).map_err(|error| error.to_string())?;
+        self.inner.member_key(&path, &value)
+    }
+
+    pub fn compact(&mut self, frontier_json: &str) -> Result<usize, String> {
+        let frontier: VersionVector =
+            serde_json::from_str(frontier_json).map_err(|error| error.to_string())?;
+        self.inner.compact(&frontier)
+    }
 }
 
 /// Encode a JSON-encoded model to codec bytes (JSON codec ⇒ canonical JSON bytes).

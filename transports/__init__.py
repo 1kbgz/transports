@@ -4,7 +4,7 @@ from .anywidget import serve_anywidget, widget
 from .backplane import Backplane, QueueBackplane, UnixSocketBackplane, ZmqBackplane, serve_zmq_broker
 from .client import Client
 from .comm import serve_comm
-from .crdt import CrdtPolicy, CrdtSpec, MapPolicy, RegisterPolicy, SequencePolicy, SetPolicy
+from .crdt import CrdtDocument, CrdtPolicy, CrdtSpec, MapPolicy, RegisterPolicy, SequencePolicy, SetPolicy
 from .election import Election
 from .hub import READ, WRITE, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, MergeStrategy
 from .protocol import decode_as, encode_as, register_codec, registered_codecs, unregister_codec  # registry-aware wrappers
@@ -38,6 +38,7 @@ __all__ = [
     "Backplane",
     "Client",
     "ClientState",
+    "CrdtDocument",
     "CrdtPolicy",
     "CrdtSpec",
     "DeepLwwCrdt",

@@ -71,9 +71,55 @@ compatibility hash.
 }
 ```
 
-Python and JavaScript expose matching `CrdtSpec` value objects. JavaScript also exports
+Python and JavaScript expose matching `CrdtSpec` and `CrdtDocument` objects. JavaScript also exports
 `normalizeCrdtSpec`, `crdtSpecHash`, and `requireCrdtSpecHash` helpers for plain object literals. Both
 bindings call the same core and produce the same canonical JSON and hash.
+
+### Operations and state
+
+A `CrdtDocument` assigns each local operation a dot with a monotonically increasing `counter` and a
+non-empty `replica` identifier. Applying the same dot again is a no-op. Operation paths use stable
+identity rather than list positions:
+
+| Segment          | Shape                                                 | Addresses                         |
+| ---------------- | ----------------------------------------------------- | --------------------------------- |
+| Map key          | `{"kind": "key", "key": "title"}`                     | One map entry                     |
+| Set member       | `{"kind": "member", "key": "..."}`                    | One canonical set-member identity |
+| Sequence element | `{"kind": "element", "id": {"dot": ..., "index": 0}}` | One stable sequence element       |
+
+The operation kinds are `register_set`, `map_set`, `map_remove`, `set_add`, `set_remove`,
+`sequence_insert`, and `sequence_delete`. Remove operations carry the dots observed by their author.
+An unobserved concurrent map update or set add therefore survives a remove. Sequence inserts carry an
+optional predecessor ID; every inserted element receives the operation dot plus its index within the
+insert batch. Set identity fields are immutable in place because changing one would invalidate the
+member path; remove the old member and add the new one instead. A field-only update does not add set
+membership, so a concurrent `set_remove` wins over that update. Use `set_add` when an edit must also
+assert membership. When reasserting an existing member that contains a sequence, send its identity
+fields rather than replaying the sequence value: sequence values in `set_add` are insertions and
+therefore receive new element identities. Restore sequence content with `sequence_insert` operations.
+
+`mutate()` and `apply()` return two views of the same accepted change:
+
+- `patch` is an ordinary positional transports patch from the previous materialized value to the new
+  value. Existing model consumers can apply it without understanding CRDT identity.
+- `deltas` preserve set-member and sequence-element identities for editors and other consumers that
+  need them.
+
+Serialized reducer state contains its format version, the specification hash, causal context, stable
+identities, and tombstones. `from_state()` rejects an unknown state version or a state whose hash
+does not match the local specification.
+`compact(frontier)` may discard metadata covered by a causally stable version-vector frontier.
+Callers must not pass counters that every replica has not acknowledged. Deleted sequence payloads are
+discarded, but their small anchor records remain so later inserts can still name a predecessor. The
+reducer also rejects a frontier unless every counter since its last compacted counter has been
+observed. Long-lived documents should compact acknowledged history periodically; otherwise causal
+dots and duplicate-detection hashes grow with edit history.
+
+Values inside `patch` use the tagged core `Value` encoding documented above. `CrdtDocument.value`
+and identity deltas use ordinary Python or JavaScript values.
+
+The earlier Python `SeqCrdt` helper remains available for compatibility. `CrdtDocument` is the shared
+Rust implementation for new Python and JavaScript integrations.
 
 ## Path segments
 

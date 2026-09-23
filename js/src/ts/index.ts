@@ -1,5 +1,7 @@
 import * as wasm from "../../dist/pkg/transports";
 
+import { fromValue, toValue, type Value } from "./bridge";
+
 export * as wasm from "../../dist/pkg/transports";
 
 export const placeholder = "";
@@ -35,6 +37,54 @@ export type CrdtPolicy =
   | SequencePolicy;
 export type CrdtSpecValue = { version?: number; root: CrdtPolicy };
 export type CanonicalCrdtSpec = { version: number; root: CrdtPolicy };
+export type Dot = { counter: number; replica: string };
+export type ElementId = { dot: Dot; index: number };
+export type CrdtPathSegment =
+  | { kind: "key"; key: string }
+  | { kind: "member"; key: string }
+  | { kind: "element"; id: ElementId };
+export type CrdtPath = CrdtPathSegment[];
+export type CrdtMutation =
+  | { kind: "register_set"; path: CrdtPath; value: unknown }
+  | { kind: "map_set"; path: CrdtPath; key: string; value: unknown }
+  | { kind: "map_remove"; path: CrdtPath; key: string }
+  | { kind: "set_add"; path: CrdtPath; value: unknown }
+  | { kind: "set_remove"; path: CrdtPath; key: string }
+  | {
+      kind: "sequence_insert";
+      path: CrdtPath;
+      after: ElementId | null;
+      values: unknown[];
+    }
+  | { kind: "sequence_delete"; path: CrdtPath; ids: ElementId[] };
+type Mutation<K extends CrdtMutation["kind"]> = Extract<
+  CrdtMutation,
+  { kind: K }
+>;
+type Operation<K extends CrdtMutation["kind"]> = Mutation<K> & { dot: Dot };
+export type CrdtOp =
+  | Operation<"register_set">
+  | Operation<"map_set">
+  | (Operation<"map_remove"> & { removed: Dot[] })
+  | Operation<"set_add">
+  | (Operation<"set_remove"> & { removed: Dot[] })
+  | Operation<"sequence_insert">
+  | Operation<"sequence_delete">;
+export type CrdtDelta =
+  | { kind: "register_set"; path: CrdtPath; value: unknown }
+  | { kind: "map_set"; path: CrdtPath; key: string; value: unknown }
+  | { kind: "map_remove"; path: CrdtPath; key: string }
+  | { kind: "set_add"; path: CrdtPath; key: string; value: unknown }
+  | { kind: "set_remove"; path: CrdtPath; key: string }
+  | {
+      kind: "sequence_insert";
+      path: CrdtPath;
+      after: ElementId | null;
+      elements: { id: ElementId; value: unknown }[];
+    }
+  | { kind: "sequence_delete"; path: CrdtPath; ids: ElementId[] };
+export type CrdtEffect = { patch: unknown; deltas: CrdtDelta[] };
+export type CrdtChange = { ops: CrdtOp[]; effect: CrdtEffect };
 
 /** Validated, canonical merge semantics for one model. */
 export class CrdtSpec {
@@ -84,6 +134,119 @@ export class CrdtSpec {
 
   equals(other: CrdtSpec): boolean {
     return this.canonical === other.canonical;
+  }
+}
+
+const wireItem = (
+  item: CrdtMutation | CrdtOp | CrdtDelta,
+  encode: boolean,
+): Record<string, unknown> => {
+  const converted = { ...item } as Record<string, unknown>;
+  const transform = encode
+    ? (value: unknown): Value => toValue(value)
+    : (value: unknown): unknown => fromValue(value as Value);
+  if (["register_set", "map_set", "set_add"].includes(item.kind)) {
+    if (!("value" in item)) throw new TypeError(`${item.kind} requires value`);
+    converted.value = transform(converted.value);
+  } else if (item.kind === "sequence_insert") {
+    if ("values" in item) converted.values = item.values.map(transform);
+    else if ("elements" in item)
+      converted.elements = item.elements.map((element) => ({
+        ...element,
+        value: transform(element.value),
+      }));
+    else throw new TypeError("sequence_insert requires values or elements");
+  }
+  return converted;
+};
+
+const publicEffect = (effect: CrdtEffect): CrdtEffect => ({
+  ...effect,
+  deltas: effect.deltas.map((delta) => wireItem(delta, false) as CrdtDelta),
+});
+
+/** One schema-directed CRDT replica backed by the shared Rust reducer. */
+export class CrdtDocument {
+  private inner: wasm.CrdtDocument;
+
+  readonly spec: CrdtSpec;
+  readonly replica: string;
+
+  constructor(spec: CrdtSpec, value: unknown, replica: string) {
+    this.spec = spec;
+    this.replica = replica;
+    this.inner = new wasm.CrdtDocument(
+      spec.toJson(),
+      JSON.stringify(toValue(value)),
+      replica,
+    );
+  }
+
+  private static wrap(
+    spec: CrdtSpec,
+    replica: string,
+    inner: wasm.CrdtDocument,
+  ): CrdtDocument {
+    const document = Object.create(CrdtDocument.prototype) as CrdtDocument;
+    Object.defineProperties(document, {
+      spec: { value: spec, enumerable: true },
+      replica: { value: replica, enumerable: true },
+      inner: { value: inner, writable: true },
+    });
+    return document;
+  }
+
+  static fromState(
+    spec: CrdtSpec,
+    state: Record<string, unknown>,
+    replica: string,
+  ): CrdtDocument {
+    return CrdtDocument.wrap(
+      spec,
+      replica,
+      wasm.CrdtDocument.from_state(
+        spec.toJson(),
+        JSON.stringify(state),
+        replica,
+      ),
+    );
+  }
+
+  get value(): unknown {
+    return fromValue(JSON.parse(this.inner.value()) as Value);
+  }
+
+  get state(): Record<string, unknown> {
+    return JSON.parse(this.inner.state());
+  }
+
+  mutate(mutations: CrdtMutation[]): CrdtChange {
+    const wire = mutations.map((mutation) => wireItem(mutation, true));
+    const change = JSON.parse(
+      this.inner.mutate(JSON.stringify(wire)),
+    ) as CrdtChange;
+    return {
+      ops: change.ops.map((op) => wireItem(op, false) as CrdtOp),
+      effect: publicEffect(change.effect),
+    };
+  }
+
+  apply(ops: CrdtOp[]): CrdtEffect {
+    const wire = ops.map((op) => wireItem(op, true));
+    return publicEffect(
+      JSON.parse(this.inner.apply(JSON.stringify(wire))) as CrdtEffect,
+    );
+  }
+
+  memberKey(path: CrdtPath, value: unknown): string {
+    return this.inner.member_key(
+      JSON.stringify(path),
+      JSON.stringify(toValue(value)),
+    );
+  }
+
+  compact(frontier: Record<string, number>): number {
+    return this.inner.compact(JSON.stringify(frontier));
   }
 }
 

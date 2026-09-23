@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from transports import CrdtSpec
+from transports import CrdtDocument, CrdtSpec
 
 FIXTURE = json.loads((Path(__file__).parents[2] / "rust" / "tests" / "fixtures" / "crdt_spec.json").read_text())
 
@@ -50,3 +50,33 @@ def test_crdt_spec_rejects_invalid_policy():
 
     with pytest.raises(ValueError):
         CrdtSpec.from_dict({"root": {"kind": "register"}, "extra": float("nan")})
+
+
+def test_python_binding_matches_shared_crdt_reducer_fixture():
+    fixture = json.loads((Path(__file__).parents[2] / "rust" / "tests" / "fixtures" / "crdt_reducer.json").read_text())
+    spec = CrdtSpec.from_dict(fixture["spec"])
+    document = CrdtDocument(spec, {"text": "", "title": "draft"}, "a")
+    change = document.mutate(
+        [
+            {
+                "kind": "register_set",
+                "path": [{"kind": "key", "key": "title"}],
+                "value": "ready",
+            },
+            {
+                "kind": "sequence_insert",
+                "path": [{"kind": "key", "key": "text"}],
+                "after": None,
+                "values": ["h", "i"],
+            },
+        ]
+    )
+
+    assert document.value == {"text": "hi", "title": "ready"}
+    assert [op["dot"] for op in change["ops"]] == [
+        {"counter": 1, "replica": "a"},
+        {"counter": 2, "replica": "a"},
+    ]
+    receiver = CrdtDocument.from_state(spec, document.state, "b")
+    assert receiver.value == document.value
+    assert receiver.apply(change["ops"])["patch"]["ops"] == []

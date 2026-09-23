@@ -1,0 +1,57 @@
+{
+  "spec": {
+    "version": 1,
+    "root": {
+      "kind": "map",
+      "fields": {
+        "text": {
+          "kind": "sequence",
+          "materialization": "string",
+          "element": {"kind": "register"}
+        },
+        "title": {"kind": "register"}
+      },
+      "values": {"kind": "register"}
+    }
+  },
+  "initial": {
+    "Map": {
+      "text": {"Str": ""},
+      "title": {"Str": "draft"}
+    }
+  },
+  "mutations": [
+    {
+      "kind": "register_set",
+      "path": [{"kind": "key", "key": "title"}],
+      "value": {"Str": "ready"}
+    },
+    {
+      "kind": "sequence_insert",
+      "path": [{"kind": "key", "key": "text"}],
+      "after": null,
+      "values": [{"Str": "h"}, {"Str": "i"}]
+    }
+  ],
+  "ops": [
+    {
+      "kind": "register_set",
+      "dot": {"counter": 1, "replica": "a"},
+      "path": [{"kind": "key", "key": "title"}],
+      "value": {"Str": "ready"}
+    },
+    {
+      "kind": "sequence_insert",
+      "dot": {"counter": 2, "replica": "a"},
+      "path": [{"kind": "key", "key": "text"}],
+      "after": null,
+      "values": [{"Str": "h"}, {"Str": "i"}]
+    }
+  ],
+  "expected": {
+    "Map": {
+      "text": {"Str": "hi"},
+      "title": {"Str": "ready"}
+    }
+  }
+}
