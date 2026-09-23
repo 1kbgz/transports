@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from transports import CrdtSpec
+from transports import CrdtDocument, CrdtSpec
 
 FIXTURE = json.loads((Path(__file__).parents[2] / "rust" / "tests" / "fixtures" / "crdt_spec.json").read_text())
 
@@ -50,3 +50,72 @@ def test_crdt_spec_rejects_invalid_policy():
 
     with pytest.raises(ValueError):
         CrdtSpec.from_dict({"root": {"kind": "register"}, "extra": float("nan")})
+
+
+def test_python_binding_matches_shared_crdt_reducer_fixture():
+    fixture = json.loads((Path(__file__).parents[2] / "rust" / "tests" / "fixtures" / "crdt_reducer.json").read_text())
+    spec = CrdtSpec.from_dict(fixture["spec"])
+    document = CrdtDocument(spec, {"text": "", "title": "draft"}, "a")
+    change = document.mutate(
+        [
+            {
+                "kind": "register_set",
+                "path": [{"kind": "key", "key": "title"}],
+                "value": "ready",
+            },
+            {
+                "kind": "sequence_insert",
+                "path": [{"kind": "key", "key": "text"}],
+                "after": None,
+                "values": ["h", "i"],
+            },
+        ]
+    )
+
+    assert document.value == {"text": "hi", "title": "ready"}
+    assert [op["dot"] for op in change["ops"]] == [
+        {"counter": 1, "replica": "a"},
+        {"counter": 2, "replica": "a"},
+    ]
+    receiver = CrdtDocument.from_state(spec, document.state, "b")
+    assert receiver.value == document.value
+    assert receiver.apply(change["ops"])["patch"]["ops"] == []
+
+
+def test_python_crdt_binding_exposes_validation_identity_and_compaction():
+    explicit = CrdtSpec({"kind": "register"}, version=1)
+    assert repr(explicit) == 'CrdtSpec.from_json(\'{"version":1,"root":{"kind":"register"}}\')'
+    with pytest.raises(ValueError, match="unsupported CRDT spec version 2"):
+        CrdtSpec({"kind": "register"}, version=2)
+
+    register = CrdtDocument(explicit, "draft", "register")
+    with pytest.raises(TypeError, match="register_set requires value"):
+        register.mutate([{"kind": "register_set", "path": []}])
+
+    sequence = CrdtDocument(CrdtSpec({"kind": "sequence", "materialization": "string"}), "", "sequence")
+    with pytest.raises(TypeError, match="sequence_insert requires values or elements"):
+        sequence.mutate([{"kind": "sequence_insert", "path": [], "after": None}])
+
+    keyed = CrdtDocument(
+        CrdtSpec(
+            {
+                "kind": "set",
+                "keys": [["id"]],
+                "element": {"kind": "map", "fields": {"id": {"kind": "register"}}},
+            }
+        ),
+        [{"id": "row-1"}],
+        "set",
+    )
+    assert keyed.member_key([], {"id": "row-1"}) in keyed.state["root"]["entries"]
+
+    change = register.mutate([{"kind": "register_set", "path": [], "value": "ready"}])
+    assert change["ops"][0]["dot"] == {"counter": 1, "replica": "register"}
+
+    compacted = CrdtDocument(
+        CrdtSpec({"kind": "map", "values": {"kind": "register"}}),
+        {"old": 1},
+        "map",
+    )
+    compacted.mutate([{"kind": "map_remove", "path": [], "key": "old"}])
+    assert compacted.compact({"map": 1}) == 1

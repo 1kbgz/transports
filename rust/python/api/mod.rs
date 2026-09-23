@@ -161,6 +161,61 @@ impl ClientState {
     }
 }
 
+/// Schema-directed CRDT reducer backed by the shared core.
+#[pyclass]
+pub struct CrdtDocument {
+    inner: transports::JsonCrdtDocument,
+}
+
+#[pymethods]
+impl CrdtDocument {
+    #[new]
+    fn new(spec_json: &str, value_json: &str, replica: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: transports::JsonCrdtDocument::new(spec_json, value_json, replica)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+
+    #[staticmethod]
+    fn from_state(spec_json: &str, state_json: &str, replica: &str) -> PyResult<Self> {
+        Ok(Self {
+            inner: transports::JsonCrdtDocument::from_state(spec_json, state_json, replica)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+
+    fn value(&self) -> PyResult<String> {
+        self.inner.value().map_err(PyValueError::new_err)
+    }
+
+    fn state(&self) -> PyResult<String> {
+        self.inner.state().map_err(PyValueError::new_err)
+    }
+
+    fn mutate(&mut self, mutations_json: &str) -> PyResult<String> {
+        self.inner
+            .mutate(mutations_json)
+            .map_err(PyValueError::new_err)
+    }
+
+    fn apply(&mut self, ops_json: &str) -> PyResult<String> {
+        self.inner.apply(ops_json).map_err(PyValueError::new_err)
+    }
+
+    fn member_key(&self, path_json: &str, value_json: &str) -> PyResult<String> {
+        self.inner
+            .member_key(path_json, value_json)
+            .map_err(PyValueError::new_err)
+    }
+
+    fn compact(&mut self, frontier_json: &str) -> PyResult<usize> {
+        self.inner
+            .compact(frontier_json)
+            .map_err(PyValueError::new_err)
+    }
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[pyclass]
 pub struct Store {

@@ -21,6 +21,7 @@ import {
   crdtSpecHash,
   requireCrdtSpecHash,
   CrdtSpec,
+  CrdtDocument,
 } from "../src/ts/index";
 import { initSync } from "../dist/pkg/transports";
 import fs from "fs";
@@ -88,6 +89,36 @@ test("CRDT spec rejects unknown policies and register fields", async () => {
   expect(() =>
     CrdtSpec.fromObject({ root: { kind: "register", fields: {} } }),
   ).toThrow(/unknown field/);
+});
+
+test("wasm binding matches the shared CRDT reducer fixture", async () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/crdt_reducer.json", "utf8"),
+  );
+  const spec = CrdtSpec.fromObject(fixture.spec);
+  const document = new CrdtDocument(spec, { text: "", title: "draft" }, "a");
+  const change = document.mutate([
+    {
+      kind: "register_set",
+      path: [{ kind: "key", key: "title" }],
+      value: "ready",
+    },
+    {
+      kind: "sequence_insert",
+      path: [{ kind: "key", key: "text" }],
+      after: null,
+      values: ["h", "i"],
+    },
+  ]);
+
+  expect(document.value).toEqual({ text: "hi", title: "ready" });
+  expect(change.ops.map((op) => op.dot)).toEqual([
+    { counter: 1, replica: "a" },
+    { counter: 2, replica: "a" },
+  ]);
+  const receiver = CrdtDocument.fromState(spec, document.state, "b");
+  expect(receiver.value).toEqual(document.value);
+  expect(receiver.apply(change.ops).patch.ops).toEqual([]);
 });
 
 test("wasm core emits and applies sequence moves", async () => {

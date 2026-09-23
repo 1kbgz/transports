@@ -160,6 +160,62 @@ impl Default for ClientState {
     }
 }
 
+/// Schema-directed CRDT reducer backed by the shared core.
+#[wasm_bindgen]
+pub struct CrdtDocument {
+    inner: transports::JsonCrdtDocument,
+}
+
+#[wasm_bindgen]
+impl CrdtDocument {
+    #[wasm_bindgen(constructor)]
+    pub fn new(spec_json: &str, value_json: &str, replica: &str) -> Result<Self, JsError> {
+        Ok(Self {
+            inner: transports::JsonCrdtDocument::new(spec_json, value_json, replica)
+                .map_err(|error| JsError::new(&error))?,
+        })
+    }
+
+    pub fn from_state(spec_json: &str, state_json: &str, replica: &str) -> Result<Self, JsError> {
+        Ok(Self {
+            inner: transports::JsonCrdtDocument::from_state(spec_json, state_json, replica)
+                .map_err(|error| JsError::new(&error))?,
+        })
+    }
+
+    pub fn value(&self) -> Result<String, JsError> {
+        self.inner.value().map_err(|error| JsError::new(&error))
+    }
+
+    pub fn state(&self) -> Result<String, JsError> {
+        self.inner.state().map_err(|error| JsError::new(&error))
+    }
+
+    pub fn mutate(&mut self, mutations_json: &str) -> Result<String, JsError> {
+        self.inner
+            .mutate(mutations_json)
+            .map_err(|error| JsError::new(&error))
+    }
+
+    pub fn apply(&mut self, ops_json: &str) -> Result<String, JsError> {
+        self.inner
+            .apply(ops_json)
+            .map_err(|error| JsError::new(&error))
+    }
+
+    pub fn member_key(&self, path_json: &str, value_json: &str) -> Result<String, JsError> {
+        self.inner
+            .member_key(path_json, value_json)
+            .map_err(|error| JsError::new(&error))
+    }
+
+    pub fn compact(&mut self, frontier_json: &str) -> Result<usize, JsError> {
+        self.inner
+            .compact(frontier_json)
+            .map_err(|error| JsError::new(&error))
+    }
+}
+
 /// In-process model store: host / mutate → patch / apply / snapshot.
 #[wasm_bindgen]
 pub struct Store {
