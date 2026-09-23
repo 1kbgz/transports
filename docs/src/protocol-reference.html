@@ -409,6 +409,11 @@ membership, so a concurrent <code class="docutils literal notranslate"><span cla
 assert membership. When reasserting an existing member that contains a sequence, send its identity
 fields rather than replaying the sequence value: sequence values in <code class="docutils literal notranslate"><span class="pre">set_add</span></code> are insertions and
 therefore receive new element identities. Restore sequence content with <code class="docutils literal notranslate"><span class="pre">sequence_insert</span></code> operations.</p>
+<p>Local <code class="docutils literal notranslate"><span class="pre">mutate()</span></code> calls may also use <code class="docutils literal notranslate"><span class="pre">sequence_splice</span></code> with a path, zero-based <code class="docutils literal notranslate"><span class="pre">index</span></code>,
+<code class="docutils literal notranslate"><span class="pre">delete_count</span></code>, and inserted <code class="docutils literal notranslate"><span class="pre">values</span></code>. The reducer resolves positions against its current materialized
+sequence and emits the corresponding stable-ID <code class="docutils literal notranslate"><span class="pre">sequence_delete</span></code> and <code class="docutils literal notranslate"><span class="pre">sequence_insert</span></code> operations.
+<code class="docutils literal notranslate"><span class="pre">sequence_splice</span></code> is a generic authoring convenience for text and ordered records; it never appears
+on the wire.</p>
 <p><code class="docutils literal notranslate"><span class="pre">mutate()</span></code> and <code class="docutils literal notranslate"><span class="pre">apply()</span></code> return two views of the same accepted change:</p>
 <ul class="simple">
 <li><p><code class="docutils literal notranslate"><span class="pre">applied</span></code> counts operations whose causal dots were new to this replica. It is zero for an

@@ -542,6 +542,14 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span></div>
 
 
+<div class="viewcode-block" id="Client.crdt_spec">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.crdt_spec">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">crdt_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CrdtSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""The canonical merge specification for a CRDT-backed model, else ``None``."""</span>
+        <span class="n">document</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crdt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">return</span> <span class="kc">None</span> <span class="k">if</span> <span class="n">document</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">document</span><span class="o">.</span><span class="n">spec</span></div>
+
+
 <div class="viewcode-block" id="Client.model">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.model">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">model</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="bp">cls</span><span class="p">:</span> <span class="nb">type</span><span class="p">[</span><span class="n">M</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">M</span><span class="p">:</span>

@@ -527,6 +527,12 @@ may receive batch frames, which apply in order and return the accepted changes a
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.crdt_spec">
+<span class="sig-name descname"><span class="pre">crdt_spec</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.CrdtSpec" title="transports.crdt.CrdtSpec"><span class="pre">CrdtSpec</span></a><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.crdt_spec"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.crdt_spec" title="Link to this definition">¶</a></dt>
+<dd><p>The canonical merge specification for a CRDT-backed model, else <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.model">
 <span class="sig-name descname"><span class="pre">model</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cls</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">type</span><span class="p"><span class="pre">[</span></span><span class="pre">M</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">M</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.model"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.model" title="Link to this definition">¶</a></dt>
 <dd><p>Materialize the mirrored model as an instance of <cite>cls</cite>.</p>
@@ -1018,8 +1024,11 @@ hashing run in the shared Rust core.</p>
 <p><code class="docutils literal notranslate"><span class="pre">CrdtDocument</span></code> accepts ordinary Python values. <code class="docutils literal notranslate"><span class="pre">mutate()</span></code> creates causally identified operations and
 applies them locally; <code class="docutils literal notranslate"><span class="pre">apply()</span></code> accepts the same operations from another replica. Both return a
 positional patch for existing model consumers and identity-preserving deltas for CRDT-aware
-consumers. Transfer <code class="docutils literal notranslate"><span class="pre">state</span></code> to another process with <code class="docutils literal notranslate"><span class="pre">from_state()</span></code> when a patch history is not
-available.</p>
+consumers. For sequences, a local <code class="docutils literal notranslate"><span class="pre">sequence_splice</span></code> mutation converts a positional range into the
+stable-ID delete and insert operations used on the wire. Transfer <code class="docutils literal notranslate"><span class="pre">state</span></code> to another process with
+<code class="docutils literal notranslate"><span class="pre">from_state()</span></code> when a patch history is not available.</p>
+<p>After a CRDT snapshot, <code class="docutils literal notranslate"><span class="pre">Client.crdt_spec(id)</span></code> returns that model’s canonical specification. The
+JavaScript spelling is <code class="docutils literal notranslate"><span class="pre">client.crdtSpec(id)</span></code>. Plain and unknown models return <code class="docutils literal notranslate"><span class="pre">None</span></code> / <code class="docutils literal notranslate"><span class="pre">undefined</span></code>.</p>
 </section>
 <section id="protocol-helpers">
 <h2>Protocol helpers<a class="headerlink" href="#protocol-helpers" title="Link to this heading">¶</a></h2>
@@ -1273,6 +1282,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.on_abandon"><code class="docutils literal notranslate"><span class="pre">Client.on_abandon()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.value"><code class="docutils literal notranslate"><span class="pre">Client.value()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.crdt_spec"><code class="docutils literal notranslate"><span class="pre">Client.crdt_spec()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.model"><code class="docutils literal notranslate"><span class="pre">Client.model()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.pending_proposals"><code class="docutils literal notranslate"><span class="pre">Client.pending_proposals()</span></code></a></li>
