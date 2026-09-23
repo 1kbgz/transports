@@ -411,6 +411,8 @@ fields rather than replaying the sequence value: sequence values in <code class=
 therefore receive new element identities. Restore sequence content with <code class="docutils literal notranslate"><span class="pre">sequence_insert</span></code> operations.</p>
 <p><code class="docutils literal notranslate"><span class="pre">mutate()</span></code> and <code class="docutils literal notranslate"><span class="pre">apply()</span></code> return two views of the same accepted change:</p>
 <ul class="simple">
+<li><p><code class="docutils literal notranslate"><span class="pre">applied</span></code> counts operations whose causal dots were new to this replica. It is zero for an
+idempotent replay even when the input contains operations.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">patch</span></code> is an ordinary positional transports patch from the previous materialized value to the new
 value. Existing model consumers can apply it without understanding CRDT identity.</p></li>
 <li><p><code class="docutils literal notranslate"><span class="pre">deltas</span></code> preserve set-member and sequence-element identities for editors and other consumers that
@@ -424,7 +426,11 @@ Callers must not pass counters that every replica has not acknowledged. Deleted 
 discarded, but their small anchor records remain so later inserts can still name a predecessor. The
 reducer also rejects a frontier unless every counter since its last compacted counter has been
 observed. Long-lived documents should compact acknowledged history periodically; otherwise causal
-dots and duplicate-detection hashes grow with edit history.</p>
+dots and duplicate-detection hashes grow with edit history. <code class="docutils literal notranslate"><span class="pre">Hub</span></code> does not infer a safe frontier:
+applications must track acknowledgements across every replica before calling
+<code class="docutils literal notranslate"><span class="pre">compact_shared_crdt()</span></code> and persisting the resulting state. Use the relay method in a multi-worker
+deployment so the frontier reaches every reducer replica. Compaction does not change the materialized
+value or model revision, so persistence must not discard its checkpoint as a duplicate revision.</p>
 <p>Values inside <code class="docutils literal notranslate"><span class="pre">patch</span></code> use the tagged core <code class="docutils literal notranslate"><span class="pre">Value</span></code> encoding documented above. <code class="docutils literal notranslate"><span class="pre">CrdtDocument.value</span></code>
 and identity deltas use ordinary Python or JavaScript values.</p>
 <p>The earlier Python <code class="docutils literal notranslate"><span class="pre">SeqCrdt</span></code> helper remains available for compatibility. <code class="docutils literal notranslate"><span class="pre">CrdtDocument</span></code> is the shared
@@ -575,15 +581,58 @@ patch revision is already mirrored.</p>
 accepted revision.</p>
 <p>Clients ignore patch messages whose revision is less than or equal to the revision already seen for
 that model.</p>
+</section>
+<section id="crdt-snapshot-and-operations">
+<h3>CRDT snapshot and operations<a class="headerlink" href="#crdt-snapshot-and-operations" title="Link to this heading">¶</a></h3>
+<p>A CRDT snapshot initializes both the materialized mirror and reducer metadata:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"crdt_snapshot"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1099511627776</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"type"</span><span class="p">:</span><span class="w"> </span><span class="s2">"Document"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">4</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"value"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Str"</span><span class="p">:</span><span class="w"> </span><span class="s2">"hello"</span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"spec"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"root"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sequence"</span><span class="p">,</span><span class="w"> </span><span class="nt">"materialization"</span><span class="p">:</span><span class="w"> </span><span class="s2">"string"</span><span class="p">}</span>
+<span class="w">  </span><span class="p">},</span>
+<span class="w">  </span><span class="nt">"state"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"version"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"spec_hash"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sha256:..."</span><span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The abbreviated <code class="docutils literal notranslate"><span class="pre">state</span></code> above represents the full reducer state produced by <code class="docutils literal notranslate"><span class="pre">CrdtDocument.state</span></code>.
+A client edit sends revision zero and one or more operations:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"crdt"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1099511627776</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"rev"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"ops"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span>
+<span class="w">    </span><span class="p">{</span>
+<span class="w">      </span><span class="nt">"kind"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sequence_insert"</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"path"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">      </span><span class="nt">"after"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">      </span><span class="nt">"values"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">"!"</span><span class="p">],</span>
+<span class="w">      </span><span class="nt">"dot"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"counter"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nt">"replica"</span><span class="p">:</span><span class="w"> </span><span class="s2">"client-a"</span><span class="p">}</span>
+<span class="w">    </span><span class="p">}</span>
+<span class="w">  </span><span class="p">]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>The authoritative echo carries the shared-model revision. The <code class="docutils literal notranslate"><span class="pre">effect</span></code> field is optional; <code class="docutils literal notranslate"><span class="pre">Hub</span></code>
+omits it because clients apply operations through their local reducer.
+Clients apply every unseen causal dot even when relay revisions arrive out of order. Revision order
+alone cannot identify a duplicate when workers accept concurrent operations; duplicate suppression
+uses the dots in reducer state. A reconnect receives a full CRDT snapshot, reapplies local outbox
+operations, and resends them. This preserves offline changes without applying an operation twice.</p>
 <p><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> (Python and JavaScript alike) returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted
-snapshot, the decoded patch message for an accepted patch, and <code class="docutils literal notranslate"><span class="pre">None</span></code>/<code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored
-revision or an unrecognized message type. Unknown types are ignored rather than raised, so a newer
-server can add message types without breaking older clients. Reactive adapters can consume the returned
-patch paths without reading and decoding the complete mirror, either from the <code class="docutils literal notranslate"><span class="pre">recv()</span></code> return value
-or via <code class="docutils literal notranslate"><span class="pre">Client.on_change</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onChange</span></code>, which fires with the same accepted change under the
-managed connect/run/SSE paths. The returned change and <code class="docutils literal notranslate"><span class="pre">Client.value()</span></code> share immutable branches
-with the mirror and must not be mutated. A patch before its snapshot, an unknown patch operation, or
-an invalid path raises; failed frames leave the mirror and its accepted revision unchanged.</p>
+snapshot, <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;crdt_snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for a CRDT snapshot, the decoded patch or CRDT operation
+message for an accepted change, and <code class="docutils literal notranslate"><span class="pre">None</span></code>/<code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored revision or an unrecognized
+message type. Unknown types are ignored rather than raised, so a newer server can add message types
+without breaking older clients. Reactive adapters can consume the returned change without reading
+and decoding the complete mirror, either from the <code class="docutils literal notranslate"><span class="pre">recv()</span></code> return value or via <code class="docutils literal notranslate"><span class="pre">Client.on_change</span></code> /
+<code class="docutils literal notranslate"><span class="pre">Client.onChange</span></code>, which fires with the same accepted change under the managed connect/run/SSE paths.
+The returned change and <code class="docutils literal notranslate"><span class="pre">Client.value()</span></code> share immutable branches with the mirror and must not be
+mutated. A patch or CRDT operation before its matching snapshot, an unknown operation, or an invalid
+path raises; failed frames leave the mirror and its accepted revision unchanged.</p>
 </section>
 <section id="reject">
 <h3>Reject<a class="headerlink" href="#reject" title="Link to this heading">¶</a></h3>
@@ -602,7 +651,9 @@ the model’s validation message where available, for example pydantic’s.</p>
 </div>
 <p>A reject never changes the mirror (the revert snapshot alongside does); clients surface it through
 <code class="docutils literal notranslate"><span class="pre">Client.on_reject</span></code> / <code class="docutils literal notranslate"><span class="pre">Client.onReject</span></code> so an app can show why the edit was refused instead of only
-reverting. If the proposal supplied an identifier, the reject carries it.</p>
+reverting. If the proposal supplied an identifier, the reject carries it. A CRDT rejection includes
+<code class="docutils literal notranslate"><span class="pre">crdt_ops</span></code>; clients remove those causal dots from their outbox before applying the following CRDT
+snapshot.</p>
 </section>
 </section>
 <section id="model-ids">
@@ -740,6 +791,7 @@ implementations in every Python or JavaScript process that uses the content type
 <li><a class="reference internal" href="#protocol-messages">Protocol messages</a><ul>
 <li><a class="reference internal" href="#snapshot">Snapshot</a></li>
 <li><a class="reference internal" href="#id1">Patch</a></li>
+<li><a class="reference internal" href="#crdt-snapshot-and-operations">CRDT snapshot and operations</a></li>
 <li><a class="reference internal" href="#reject">Reject</a></li>
 </ul>
 </li>

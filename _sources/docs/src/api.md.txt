@@ -100,7 +100,11 @@ available.
 
 .. autofunction:: transports.protocol.snapshot_msg
 
+.. autofunction:: transports.protocol.crdt_snapshot_msg
+
 .. autofunction:: transports.protocol.patch_msg
+
+.. autofunction:: transports.protocol.crdt_msg
 
 .. autofunction:: transports.protocol.encode
 

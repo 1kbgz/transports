@@ -528,9 +528,10 @@
 
 <span class="sd">    Each connection's undelivered state patches live in a per-model map, and **state coalesces**:</span>
 <span class="sd">    a newer revision is composed with that model's undelivered patch into one frame, so no delta is</span>
-<span class="sd">    lost while a slow consumer's frame count stays bounded by its model count. Composed operations</span>
-<span class="sd">    can still grow one frame, so ``max_queue_bytes`` also bounds each connection's queued encoded</span>
-<span class="sd">    payload. Non-coalescible messages (batch envelopes and direct replies) use unique keys.</span>
+<span class="sd">    lost while a slow consumer's patch frame count stays bounded by its model count. CRDT operations,</span>
+<span class="sd">    snapshots, batch envelopes, and direct replies do not coalesce; ``max_queue`` bounds their count.</span>
+<span class="sd">    Composed patches can still grow one frame, so ``max_queue_bytes`` also bounds each connection's</span>
+<span class="sd">    queued encoded payload.</span>
 
 <span class="sd">    Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of</span>
 <span class="sd">    connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x</span>
@@ -597,9 +598,14 @@
                         <span class="n">codec</span> <span class="o">=</span> <span class="n">server</span><span class="o">.</span><span class="n">_codecs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">server</span><span class="o">.</span><span class="n">default_codec</span><span class="p">)</span>
                         <span class="n">older</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">previous</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">codec</span><span class="p">)</span>
                         <span class="n">newer</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">wire</span><span class="p">,</span> <span class="n">codec</span><span class="p">)</span>
-                        <span class="n">patch</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">newer</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])</span>
-                        <span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">older</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">][</span><span class="s2">"ops"</span><span class="p">],</span> <span class="o">*</span><span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]]</span>
-                        <span class="n">wire</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="n">codec</span><span class="p">)</span>
+                        <span class="k">if</span> <span class="n">older</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span> <span class="o">==</span> <span class="n">newer</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"t"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"patch"</span><span class="p">:</span>
+                            <span class="n">patch</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">newer</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">])</span>
+                            <span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="o">*</span><span class="n">older</span><span class="p">[</span><span class="s2">"patch"</span><span class="p">][</span><span class="s2">"ops"</span><span class="p">],</span> <span class="o">*</span><span class="n">patch</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">]]</span>
+                            <span class="n">wire</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">patch_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">),</span> <span class="n">codec</span><span class="p">)</span>
+                        <span class="k">else</span><span class="p">:</span>
+                            <span class="n">key</span> <span class="o">=</span> <span class="p">(</span><span class="kc">None</span><span class="p">,</span> <span class="nb">next</span><span class="p">(</span><span class="n">nonce</span><span class="p">))</span>
+                            <span class="n">epoch</span> <span class="o">+=</span> <span class="mi">1</span>
+                            <span class="n">previous</span> <span class="o">=</span> <span class="kc">None</span>
                     <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
                         <span class="n">drop</span><span class="p">(</span><span class="n">conn</span><span class="p">)</span>
                         <span class="k">return</span>

@@ -347,6 +347,11 @@ they are safe as fire-and-forget callbacks even across <code class="docutils lit
 <code class="docutils literal notranslate"><span class="pre">client.abandonProposal(proposal)</span></code> to remove it from the JavaScript client’s pending set. Python
 provides <code class="docutils literal notranslate"><span class="pre">client.abandon_proposal(proposal)</span></code>. The methods return whether the proposal was pending;
 they do not fire the disconnect-only <code class="docutils literal notranslate"><span class="pre">onAbandon</span></code> or <code class="docutils literal notranslate"><span class="pre">on_abandon</span></code> callbacks.</p>
+<p>CRDT-backed shared models use <code class="docutils literal notranslate"><span class="pre">proposeCrdt(id,</span> <span class="pre">mutations)</span></code> or <code class="docutils literal notranslate"><span class="pre">editCrdt(id,</span> <span class="pre">mutations)</span></code>. These edits
+are optimistic: the client applies them locally, retains their causally identified operations while
+offline, and resends them after reconnect. An authoritative echo clears the matching operations.
+Unlike ordinary patch proposals, CRDT operations survive a connection drop because resending one
+causal dot is safe. Use <code class="docutils literal notranslate"><span class="pre">pendingCrdtOps(id)</span></code> to inspect the outbox.</p>
 </section>
 <section id="mirror-the-server-in-python">
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
@@ -362,6 +367,10 @@ native or Pyodide. They return <code class="docutils literal notranslate"><span 
 <code class="docutils literal notranslate"><span class="pre">client.edit(mid,</span> <span class="pre">value)</span></code> or <code class="docutils literal notranslate"><span class="pre">client.edit_ops(mid,</span> <span class="pre">ops)</span></code> yourself.</p>
 <p>Python exposes the same correlation API as <code class="docutils literal notranslate"><span class="pre">edit(...,</span> <span class="pre">proposal=...)</span></code>, <code class="docutils literal notranslate"><span class="pre">edit_ops</span></code>, <code class="docutils literal notranslate"><span class="pre">on_ack</span></code>, and
 <code class="docutils literal notranslate"><span class="pre">on_reject</span></code>.</p>
+<p>For a CRDT-backed shared model, use <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">client.propose_crdt(mid,</span> <span class="pre">mutations)</span></code> on a managed
+connection or send <code class="docutils literal notranslate"><span class="pre">client.edit_crdt(mid,</span> <span class="pre">mutations)</span></code> over a hand-rolled socket. The local mirror
+updates immediately, including while disconnected. <code class="docutils literal notranslate"><span class="pre">pending_crdt_ops(mid)</span></code> reports operations still
+waiting for the server echo.</p>
 </section>
 <section id="use-messagepack-on-a-connection">
 <h2>Use MessagePack on a connection<a class="headerlink" href="#use-messagepack-on-a-connection" title="Link to this heading">¶</a></h2>

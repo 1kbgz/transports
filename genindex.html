@@ -258,6 +258,8 @@
           <li><a href="docs/src/api.html#transports.Store.apply">(transports.Store method)</a>
 </li>
         </ul></li>
+        <li><a href="docs/src/api.html#transports.Hub.apply_crdt_shared">apply_crdt_shared() (transports.Hub method)</a>
+</li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Hub.apply_delta_shared">apply_delta_shared() (transports.Hub method)</a>
@@ -288,13 +290,19 @@
         </ul></li>
         <li><a href="docs/src/api.html#transports.CrdtDocument.compact">compact() (transports.CrdtDocument method)</a>
 </li>
-    </ul></td>
-    <td style="width: 33%; vertical-align: top;"><ul>
+        <li><a href="docs/src/api.html#transports.Hub.compact_shared_crdt">compact_shared_crdt() (transports.Hub method)</a>
+</li>
         <li><a href="docs/src/api.html#transports.Client.connect">connect() (transports.Client method)</a>
 </li>
+    </ul></td>
+    <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Client.connect_sse">connect_sse() (transports.Client method)</a>
 </li>
         <li><a href="docs/src/api.html#transports.Client.connected">connected (transports.Client property)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.protocol.crdt_msg">crdt_msg() (in module transports.protocol)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.protocol.crdt_snapshot_msg">crdt_snapshot_msg() (in module transports.protocol)</a>
 </li>
         <li><a href="docs/src/api.html#transports.CrdtDocument">CrdtDocument (class in transports)</a>
 </li>
@@ -331,6 +339,8 @@
   <table style="width: 100%" class="indextable genindextable"><tr>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Client.edit">edit() (transports.Client method)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.Client.edit_crdt">edit_crdt() (transports.Client method)</a>
 </li>
         <li><a href="docs/src/api.html#transports.Client.edit_ops">edit_ops() (transports.Client method)</a>
 </li>
@@ -452,6 +462,8 @@
           <li><a href="docs/src/api.html#transports.Store.mutate">(transports.Store method)</a>
 </li>
         </ul></li>
+        <li><a href="docs/src/api.html#transports.Hub.mutate_shared_crdt">mutate_shared_crdt() (transports.Hub method)</a>
+</li>
     </ul></td>
   </tr></table>
 </section>
@@ -504,11 +516,15 @@
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.protocol.patch_msg">patch_msg() (in module transports.protocol)</a>
 </li>
+        <li><a href="docs/src/api.html#transports.Client.pending_crdt_ops">pending_crdt_ops() (transports.Client method)</a>
+</li>
         <li><a href="docs/src/api.html#transports.Client.pending_proposals">pending_proposals() (transports.Client method)</a>
 </li>
     </ul></td>
     <td style="width: 33%; vertical-align: top;"><ul>
         <li><a href="docs/src/api.html#transports.Client.propose">propose() (transports.Client method)</a>
+</li>
+        <li><a href="docs/src/api.html#transports.Client.propose_crdt">propose_crdt() (transports.Client method)</a>
 </li>
         <li><a href="docs/src/api.html#transports.Client.propose_ops">propose_ops() (transports.Client method)</a>
 </li>

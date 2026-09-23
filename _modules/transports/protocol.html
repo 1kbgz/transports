@@ -247,17 +247,23 @@
 <span class="sd">in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small</span>
 <span class="sd">JSON envelope carries the routing metadata around a model snapshot or a patch.</span>
 
-<span class="sd">Four message kinds:</span>
+<span class="sd">Six message kinds:</span>
 
 <span class="sd">- ``{"t": "snapshot", "id": &lt;int&gt;, "type": &lt;str&gt;, "rev": &lt;int&gt;, "value": &lt;Value&gt;}``</span>
 <span class="sd">- ``{"t": "patch", "id": &lt;int&gt;, "patch": {"rev": &lt;int&gt;, "ops": [...]}, "proposal": &lt;str&gt;?}``</span>
 <span class="sd">- ``{"t": "ack", "id": &lt;int&gt;, "rev": &lt;int&gt;, "proposal": &lt;str&gt;}`` — an accepted proposal that</span>
 <span class="sd">  produced no authoritative patch; sent only to the origin and never changes its mirror.</span>
-<span class="sd">- ``{"t": "reject", "id": &lt;int&gt;, "rev": &lt;int&gt;, "error": &lt;str&gt;, "proposal": &lt;str&gt;?}`` — a</span>
-<span class="sd">  proposed edit was refused; sent to the proposing connection only, alongside the authoritative</span>
-<span class="sd">  revert. ``rev`` is the server's current revision for the model. ``proposal`` is an optional opaque</span>
-<span class="sd">  identifier returned only to the origin on acceptance or rejection. Clients that predate a field</span>
-<span class="sd">  or message kind ignore it.</span>
+<span class="sd">- ``{"t": "reject", "id": &lt;int&gt;, "rev": &lt;int&gt;, "error": &lt;str&gt;, "proposal": &lt;str&gt;?,</span>
+<span class="sd">  "crdt_ops": [...]?}`` — a proposed edit was refused; sent to the proposing connection only,</span>
+<span class="sd">  alongside the authoritative revert. ``rev`` is the server's current revision for the model.</span>
+<span class="sd">  ``proposal`` is an optional opaque identifier returned only to the origin on acceptance or</span>
+<span class="sd">  rejection. ``crdt_ops`` lets an optimistic CRDT client settle the refused causal dots before the</span>
+<span class="sd">  revert. Clients that predate a field or message kind ignore it.</span>
+<span class="sd">- ``{"t": "crdt_snapshot", ..., "spec": &lt;CrdtSpec&gt;, "state": &lt;CrdtState&gt;}`` — a materialized</span>
+<span class="sd">  value plus reducer state for a joining or reconnecting replica.</span>
+<span class="sd">- ``{"t": "crdt", "id": &lt;int&gt;, "rev": &lt;int&gt;, "ops": [...], "effect": {...}?}`` — causally</span>
+<span class="sd">  identified CRDT operations. Client proposals use revision zero; authoritative echoes carry the</span>
+<span class="sd">  shared model revision. Senders may include the optional materialized effect as a cache.</span>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -344,6 +350,23 @@
 
 
 
+<div class="viewcode-block" id="crdt_snapshot_msg">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.crdt_snapshot_msg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">crdt_snapshot_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">type_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">spec</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span>
+        <span class="p">{</span>
+            <span class="s2">"t"</span><span class="p">:</span> <span class="s2">"crdt_snapshot"</span><span class="p">,</span>
+            <span class="s2">"id"</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span>
+            <span class="s2">"type"</span><span class="p">:</span> <span class="n">type_name</span><span class="p">,</span>
+            <span class="s2">"rev"</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span>
+            <span class="s2">"value"</span><span class="p">:</span> <span class="n">value</span><span class="p">,</span>
+            <span class="s2">"spec"</span><span class="p">:</span> <span class="n">spec</span><span class="p">,</span>
+            <span class="s2">"state"</span><span class="p">:</span> <span class="n">state</span><span class="p">,</span>
+        <span class="p">}</span>
+    <span class="p">)</span></div>
+
+
+
 <div class="viewcode-block" id="patch_msg">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.patch_msg">[docs]</a>
 <span class="k">def</span><span class="w"> </span><span class="nf">patch_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">patch</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
@@ -354,14 +377,41 @@
 
 
 
+<div class="viewcode-block" id="crdt_msg">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.protocol.crdt_msg">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">crdt_msg</span><span class="p">(</span>
+    <span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">],</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="n">effect</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"crdt"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">"rev"</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">"ops"</span><span class="p">:</span> <span class="n">ops</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">effect</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s2">"effect"</span><span class="p">]</span> <span class="o">=</span> <span class="n">effect</span>
+    <span class="k">if</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s2">"proposal"</span><span class="p">]</span> <span class="o">=</span> <span class="n">proposal</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span></div>
+
+
+
 <span class="k">def</span><span class="w"> </span><span class="nf">ack_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">({</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"ack"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">"rev"</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">"proposal"</span><span class="p">:</span> <span class="n">proposal</span><span class="p">})</span>
 
 
-<span class="k">def</span><span class="w"> </span><span class="nf">reject_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">error</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">reject_msg</span><span class="p">(</span>
+    <span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">rev</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">error</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">proposal</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">crdt_ops</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
     <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"reject"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">"rev"</span><span class="p">:</span> <span class="n">rev</span><span class="p">,</span> <span class="s2">"error"</span><span class="p">:</span> <span class="n">error</span><span class="p">}</span>
     <span class="k">if</span> <span class="n">proposal</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">msg</span><span class="p">[</span><span class="s2">"proposal"</span><span class="p">]</span> <span class="o">=</span> <span class="n">proposal</span>
+    <span class="k">if</span> <span class="n">crdt_ops</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s2">"crdt_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="n">crdt_ops</span>
     <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 
 
