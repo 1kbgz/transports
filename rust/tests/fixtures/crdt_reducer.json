@@ -31,6 +31,13 @@
       "path": [{"kind": "key", "key": "text"}],
       "after": null,
       "values": [{"Str": "h"}, {"Str": "i"}]
+    },
+    {
+      "kind": "sequence_splice",
+      "path": [{"kind": "key", "key": "text"}],
+      "index": 1,
+      "delete_count": 1,
+      "values": [{"Str": "λ"}]
     }
   ],
   "ops": [
@@ -46,11 +53,24 @@
       "path": [{"kind": "key", "key": "text"}],
       "after": null,
       "values": [{"Str": "h"}, {"Str": "i"}]
+    },
+    {
+      "kind": "sequence_delete",
+      "dot": {"counter": 3, "replica": "a"},
+      "path": [{"kind": "key", "key": "text"}],
+      "ids": [{"dot": {"counter": 2, "replica": "a"}, "index": 1}]
+    },
+    {
+      "kind": "sequence_insert",
+      "dot": {"counter": 4, "replica": "a"},
+      "path": [{"kind": "key", "key": "text"}],
+      "after": {"dot": {"counter": 2, "replica": "a"}, "index": 0},
+      "values": [{"Str": "λ"}]
     }
   ],
   "expected": {
     "Map": {
-      "text": {"Str": "hi"},
+      "text": {"Str": "hλ"},
       "title": {"Str": "ready"}
     }
   }

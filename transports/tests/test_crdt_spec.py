@@ -69,14 +69,23 @@ def test_python_binding_matches_shared_crdt_reducer_fixture():
                 "after": None,
                 "values": ["h", "i"],
             },
+            {
+                "kind": "sequence_splice",
+                "path": [{"kind": "key", "key": "text"}],
+                "index": 1,
+                "delete_count": 1,
+                "values": ["λ"],
+            },
         ]
     )
 
-    assert document.value == {"text": "hi", "title": "ready"}
-    assert change["effect"]["applied"] == 2
+    assert document.value == {"text": "hλ", "title": "ready"}
+    assert change["effect"]["applied"] == 4
     assert [op["dot"] for op in change["ops"]] == [
         {"counter": 1, "replica": "a"},
         {"counter": 2, "replica": "a"},
+        {"counter": 3, "replica": "a"},
+        {"counter": 4, "replica": "a"},
     ]
     receiver = CrdtDocument.from_state(spec, document.state, "b")
     assert receiver.value == document.value

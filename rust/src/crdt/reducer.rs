@@ -196,6 +196,14 @@ pub enum CrdtMutation {
         path: CrdtPath,
         ids: Vec<ElementId>,
     },
+    /// Positional local convenience that expands to identity-based delete / insert operations.
+    /// It is never sent on the wire.
+    SequenceSplice {
+        path: CrdtPath,
+        index: usize,
+        delete_count: usize,
+        values: Vec<Value>,
+    },
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
@@ -551,27 +559,29 @@ impl CrdtDocument {
         let mut ops = Vec::with_capacity(mutations.len());
         let mut deltas = Vec::new();
         for mutation in mutations {
-            let op = working.operation_for(mutation)?;
-            let fingerprint = op_fingerprint(&op)?;
-            working.apply_one(&op)?;
-            working.state.context.observe(op.dot().clone());
-            working
-                .state
-                .fingerprints
-                .insert(op.dot().clone(), fingerprint);
-            let after = working.value()?;
-            if current != after {
-                deltas.push(delta_for(&op, &working.spec, &working.state.root)?);
-                current = after;
+            for op in working.operations_for(mutation)? {
+                let fingerprint = op_fingerprint(&op)?;
+                working.apply_one(&op)?;
+                working.state.context.observe(op.dot().clone());
+                working
+                    .state
+                    .fingerprints
+                    .insert(op.dot().clone(), fingerprint);
+                let after = working.value()?;
+                if current != after {
+                    deltas.push(delta_for(&op, &working.spec, &working.state.root)?);
+                    current = after;
+                }
+                ops.push(op);
             }
-            ops.push(op);
         }
+        let applied = ops.len();
         let change = CrdtChange {
             ops,
             effect: CrdtEffect {
                 patch: diff(&before, &current),
                 deltas,
-                applied: mutations.len(),
+                applied,
             },
         };
         *self = working;
@@ -629,6 +639,53 @@ impl CrdtDocument {
         }
     }
 
+    fn operations_for(&mut self, mutation: &CrdtMutation) -> Result<Vec<CrdtOp>, String> {
+        let CrdtMutation::SequenceSplice {
+            path,
+            index,
+            delete_count,
+            values,
+        } = mutation
+        else {
+            return Ok(vec![self.operation_for(mutation)?]);
+        };
+        let ids = visible_sequence_ids_at(&self.state.root, &self.spec.root, path)?;
+        if *index > ids.len() {
+            return Err(format!(
+                "sequence splice index {index} out of bounds (len {})",
+                ids.len()
+            ));
+        }
+        let end = index
+            .checked_add(*delete_count)
+            .filter(|end| *end <= ids.len())
+            .ok_or_else(|| {
+                format!(
+                    "sequence splice delete range {index}..{} out of bounds (len {})",
+                    index.saturating_add(*delete_count),
+                    ids.len()
+                )
+            })?;
+        let after = index.checked_sub(1).map(|previous| ids[previous].clone());
+        let mut ops = Vec::with_capacity(2);
+        if *delete_count > 0 {
+            ops.push(CrdtOp::SequenceDelete {
+                dot: self.next_dot(),
+                path: path.clone(),
+                ids: ids[*index..end].to_vec(),
+            });
+        }
+        if !values.is_empty() {
+            ops.push(CrdtOp::SequenceInsert {
+                dot: self.next_dot(),
+                path: path.clone(),
+                after,
+                values: values.clone(),
+            });
+        }
+        Ok(ops)
+    }
+
     fn operation_for(&mut self, mutation: &CrdtMutation) -> Result<CrdtOp, String> {
         let dot = self.next_dot();
         Ok(match mutation {
@@ -681,6 +738,9 @@ impl CrdtDocument {
                 path: path.clone(),
                 ids: ids.clone(),
             },
+            CrdtMutation::SequenceSplice { .. } => {
+                return Err("sequence_splice must expand before operation encoding".into());
+            }
         })
     }
 
@@ -1194,6 +1254,24 @@ fn ordered_sequence_ids(entries: &BTreeMap<ElementId, SequenceEntryState>) -> Ve
     ordered
 }
 
+fn visible_sequence_ids_at(
+    root: &NodeState,
+    policy: &CrdtPolicy,
+    path: &[CrdtPathSegment],
+) -> Result<Vec<ElementId>, String> {
+    let (node, policy) = node_at_path(root, policy, path)?;
+    if !matches!(policy, CrdtPolicy::Sequence { .. }) {
+        return Err("sequence_splice path does not address a sequence".into());
+    }
+    let NodeState::Sequence { entries, deletes } = node else {
+        return Err("sequence policy has incompatible reducer state".into());
+    };
+    Ok(ordered_sequence_ids(entries)
+        .into_iter()
+        .filter(|id| !deletes.contains_key(id))
+        .collect())
+}
+
 fn append_sequence_children(
     parent: Option<ElementId>,
     children: &BTreeMap<Option<ElementId>, Vec<ElementId>>,
@@ -1204,14 +1282,13 @@ fn append_sequence_children(
         .get(&parent)
         .into_iter()
         .flatten()
-        .rev()
         .cloned()
         .collect::<Vec<_>>();
     while let Some(id) = stack.pop() {
         if visited.insert(id.clone()) {
             ordered.push(id.clone());
             if let Some(descendants) = children.get(&Some(id)) {
-                stack.extend(descendants.iter().rev().cloned());
+                stack.extend(descendants.iter().cloned());
             }
         }
     }
@@ -1873,7 +1950,7 @@ mod tests {
         a.apply(&b_insert.ops).unwrap();
         b.apply(&a_insert.ops).unwrap();
         assert_eq!(a.value(), b.value());
-        assert_eq!(a.value().unwrap(), "AλB".into());
+        assert_eq!(a.value().unwrap(), "BAλ".into());
 
         let first_id = match &a_insert.ops[0] {
             CrdtOp::SequenceInsert { dot, .. } => ElementId {
@@ -1894,11 +1971,55 @@ mod tests {
         reordered.apply(&a_insert.ops).unwrap();
         reordered.apply(&a_insert.ops).unwrap();
         a.apply(&b_insert.ops).unwrap();
-        assert_eq!(reordered.value().unwrap(), "λB".into());
+        assert_eq!(reordered.value().unwrap(), "Bλ".into());
         assert!(matches!(
             a_insert.effect.deltas.as_slice(),
             [CrdtDelta::SequenceInsert { elements, .. }] if elements.len() == 2
         ));
+    }
+
+    #[test]
+    fn sequence_splice_expands_positions_to_stable_element_ids_atomically() {
+        let mut document = CrdtDocument::new(string_spec(), "AλB".into(), "editor").unwrap();
+        let change = document
+            .mutate(&[CrdtMutation::SequenceSplice {
+                path: vec![],
+                index: 1,
+                delete_count: 1,
+                values: vec!["🙂".into()],
+            }])
+            .unwrap();
+
+        assert_eq!(document.value().unwrap(), "A🙂B".into());
+        assert_eq!(change.ops.len(), 2);
+        assert_eq!(change.effect.applied, 2);
+        assert!(matches!(&change.ops[0], CrdtOp::SequenceDelete { ids, .. } if ids.len() == 1));
+        assert!(
+            matches!(&change.ops[1], CrdtOp::SequenceInsert { after: Some(_), values, .. } if values == &vec!["🙂".into()])
+        );
+
+        let before = document.value().unwrap();
+        assert!(document
+            .mutate(&[CrdtMutation::SequenceSplice {
+                path: vec![],
+                index: 4,
+                delete_count: 0,
+                values: vec!["!".into()],
+            }])
+            .unwrap_err()
+            .contains("out of bounds"));
+        assert_eq!(document.value().unwrap(), before);
+
+        let no_op = document
+            .mutate(&[CrdtMutation::SequenceSplice {
+                path: vec![],
+                index: 3,
+                delete_count: 0,
+                values: vec![],
+            }])
+            .unwrap();
+        assert!(no_op.ops.is_empty());
+        assert_eq!(no_op.effect.applied, 0);
     }
 
     #[test]
