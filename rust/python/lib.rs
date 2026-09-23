@@ -7,6 +7,9 @@ mod api;
 fn transports(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(api::diff, m)?)?;
     m.add_function(wrap_pyfunction!(api::apply, m)?)?;
+    m.add_function(wrap_pyfunction!(api::normalize_crdt_spec, m)?)?;
+    m.add_function(wrap_pyfunction!(api::crdt_spec_hash, m)?)?;
+    m.add_function(wrap_pyfunction!(api::require_crdt_spec_hash, m)?)?;
     m.add_function(wrap_pyfunction!(api::encode, m)?)?;
     m.add_function(wrap_pyfunction!(api::decode, m)?)?;
     m.add_function(wrap_pyfunction!(api::encode_as, m)?)?;

@@ -6,6 +6,15 @@ def diff(old: str, new: str) -> str:
 def apply(value: str, patch: str) -> str:
     """Apply a JSON-encoded patch to a JSON-encoded model, returning the JSON-encoded result."""
 
+def normalize_crdt_spec(json: str) -> str:
+    """Parse, validate, and deterministically serialize a CRDT specification."""
+
+def crdt_spec_hash(json: str) -> str:
+    """Return the deterministic SHA-256 hash of a CRDT specification."""
+
+def require_crdt_spec_hash(json: str, peer_hash: str) -> None:
+    """Reject a peer hash that does not match the local CRDT specification."""
+
 def encode(value: str) -> bytes:
     """Encode a JSON-encoded model to codec bytes."""
 

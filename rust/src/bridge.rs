@@ -6,6 +6,7 @@
 //! consumed by [`apply_json`] in the browser using the same Rust.
 
 use crate::codec::{codec_for, Codec, JsonCodec};
+use crate::crdt::CrdtSpec;
 use crate::diff::{apply, diff, Patch};
 use crate::message::Message;
 use crate::store::Store;
@@ -24,6 +25,21 @@ pub fn apply_json(value: &str, patch: &str) -> Result<String, String> {
     let patch: Patch = serde_json::from_str(patch).map_err(|e| e.to_string())?;
     apply(&mut value, &patch)?;
     serde_json::to_string(&value).map_err(|e| e.to_string())
+}
+
+/// Parse, validate, and deterministically serialize a CRDT specification.
+pub fn normalize_crdt_spec_json(json: &str) -> Result<String, String> {
+    CrdtSpec::from_json(json)?.to_json()
+}
+
+/// Return the deterministic hash of a validated CRDT specification.
+pub fn crdt_spec_hash_json(json: &str) -> Result<String, String> {
+    CrdtSpec::from_json(json)?.hash()
+}
+
+/// Reject a peer hash that does not match the validated local specification.
+pub fn require_crdt_spec_hash_json(json: &str, peer_hash: &str) -> Result<(), String> {
+    CrdtSpec::from_json(json)?.require_hash(peer_hash)
 }
 
 /// Encode a JSON-encoded model to codec bytes (JSON codec ⇒ canonical JSON bytes).

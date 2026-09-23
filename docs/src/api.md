@@ -71,6 +71,18 @@ This reference lists the Python surface exposed by `transports`.
    :members:
 ```
 
+## CRDT specifications
+
+```{eval-rst}
+.. autoclass:: transports.CrdtSpec
+   :members:
+   :member-order: bysource
+```
+
+`RegisterPolicy`, `MapPolicy`, `SetPolicy`, `SequencePolicy`, and their `CrdtPolicy` union describe
+the accepted dictionary shapes for type checkers. Policy validation, canonical serialization, and
+hashing run in the shared Rust core.
+
 ## Protocol helpers
 
 ```{eval-rst}
