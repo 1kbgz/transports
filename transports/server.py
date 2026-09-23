@@ -265,9 +265,10 @@ async def autosync(
 
     Each connection's undelivered state patches live in a per-model map, and **state coalesces**:
     a newer revision is composed with that model's undelivered patch into one frame, so no delta is
-    lost while a slow consumer's frame count stays bounded by its model count. Composed operations
-    can still grow one frame, so ``max_queue_bytes`` also bounds each connection's queued encoded
-    payload. Non-coalescible messages (batch envelopes and direct replies) use unique keys.
+    lost while a slow consumer's patch frame count stays bounded by its model count. CRDT operations,
+    snapshots, batch envelopes, and direct replies do not coalesce; ``max_queue`` bounds their count.
+    Composed patches can still grow one frame, so ``max_queue_bytes`` also bounds each connection's
+    queued encoded payload.
 
     Delivery runs on a fixed pool of ``shards`` writer tasks, each serially draining its share of
     connections — serial-loop economics (per-connection writer tasks were measured as a multiple-x
@@ -334,9 +335,14 @@ async def autosync(
                         codec = server._codecs.get(conn, server.default_codec)
                         older = protocol.decode(previous[0], codec)
                         newer = protocol.decode(wire, codec)
-                        patch = dict(newer["patch"])
-                        patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
-                        wire = protocol.encode(protocol.patch_msg(mid, patch), codec)
+                        if older.get("t") == newer.get("t") == "patch":
+                            patch = dict(newer["patch"])
+                            patch["ops"] = [*older["patch"]["ops"], *patch["ops"]]
+                            wire = protocol.encode(protocol.patch_msg(mid, patch), codec)
+                        else:
+                            key = (None, next(nonce))
+                            epoch += 1
+                            previous = None
                     except Exception:  # noqa: BLE001
                         drop(conn)
                         return

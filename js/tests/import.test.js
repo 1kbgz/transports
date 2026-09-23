@@ -112,13 +112,187 @@ test("wasm binding matches the shared CRDT reducer fixture", async () => {
   ]);
 
   expect(document.value).toEqual({ text: "hi", title: "ready" });
+  expect(change.effect.applied).toBe(2);
   expect(change.ops.map((op) => op.dot)).toEqual([
     { counter: 1, replica: "a" },
     { counter: 2, replica: "a" },
   ]);
   const receiver = CrdtDocument.fromState(spec, document.state, "b");
   expect(receiver.value).toEqual(document.value);
-  expect(receiver.apply(change.ops).patch.ops).toEqual([]);
+  const duplicate = receiver.apply(change.ops);
+  expect(duplicate.patch.ops).toEqual([]);
+  expect(duplicate.applied).toBe(0);
+});
+
+test("Client retains offline CRDT operations through a reconnect snapshot", async () => {
+  const spec = new CrdtSpec({
+    kind: "sequence",
+    materialization: "string",
+  });
+  const server = new CrdtDocument(spec, "", "server");
+  const snapshot = {
+    t: "crdt_snapshot",
+    id: 9,
+    type: "Document",
+    rev: 0,
+    value: toValue(server.value),
+    spec: spec.toObject(),
+    state: server.state,
+  };
+  const client = new Client();
+  client.recv(JSON.stringify(snapshot));
+
+  const frame = client.editCrdt(9, [
+    {
+      kind: "sequence_insert",
+      path: [],
+      after: null,
+      values: [..."offline"],
+    },
+  ]);
+  const message = JSON.parse(frame);
+  expect(client.value(9)).toEqual(toValue("offline"));
+  expect(client.pendingCrdtOps(9)).toBe(1);
+
+  client.recv(JSON.stringify(snapshot));
+  expect(client.value(9)).toEqual(toValue("offline"));
+  server.apply(message.ops);
+  client.recv(JSON.stringify({ t: "crdt", id: 9, rev: 1, ops: message.ops }));
+  expect(client.pendingCrdtOps(9)).toBe(0);
+  expect(client.value(9)).toEqual(toValue(server.value));
+});
+
+test("Client applies concurrent CRDT operations with out-of-order revisions", async () => {
+  const spec = new CrdtSpec({
+    kind: "sequence",
+    materialization: "string",
+  });
+  const initial = new CrdtDocument(spec, "", "server");
+  const client = new Client();
+  client.recv(
+    JSON.stringify({
+      t: "crdt_snapshot",
+      id: 10,
+      type: "Document",
+      rev: 0,
+      value: toValue(initial.value),
+      spec: spec.toObject(),
+      state: initial.state,
+    }),
+  );
+  const a = CrdtDocument.fromState(spec, initial.state, "a");
+  const b = CrdtDocument.fromState(spec, initial.state, "b");
+  const aOps = a.mutate([
+    {
+      kind: "sequence_insert",
+      path: [],
+      after: null,
+      values: ["a"],
+    },
+  ]).ops;
+  const bOps = b.mutate([
+    {
+      kind: "sequence_insert",
+      path: [],
+      after: null,
+      values: ["b"],
+    },
+  ]).ops;
+  initial.apply(aOps);
+  initial.apply(bOps);
+
+  client.recv(JSON.stringify({ t: "crdt", id: 10, rev: 2, ops: bOps }));
+  client.recv(JSON.stringify({ t: "crdt", id: 10, rev: 1, ops: aOps }));
+
+  expect(client.value(10)).toEqual(toValue(initial.value));
+});
+
+test("Client clears rejected CRDT operations before an authoritative snapshot", async () => {
+  const spec = new CrdtSpec({
+    kind: "sequence",
+    materialization: "string",
+  });
+  const server = new CrdtDocument(spec, "", "server");
+  const snapshot = {
+    t: "crdt_snapshot",
+    id: 11,
+    type: "Document",
+    rev: 0,
+    value: toValue(server.value),
+    spec: spec.toObject(),
+    state: server.state,
+  };
+  const client = new Client();
+  client.recv(JSON.stringify(snapshot));
+  const edit = JSON.parse(
+    client.editCrdt(11, [
+      {
+        kind: "sequence_insert",
+        path: [],
+        after: null,
+        values: ["x"],
+      },
+    ]),
+  );
+
+  client.recv(
+    JSON.stringify({
+      t: "reject",
+      id: 11,
+      rev: 0,
+      error: "read-only subscription",
+      crdt_ops: edit.ops,
+    }),
+  );
+  client.recv(JSON.stringify(snapshot));
+
+  expect(client.pendingCrdtOps(11)).toBe(0);
+  expect(client.value(11)).toEqual(toValue(""));
+});
+
+test("plain snapshot clears CRDT state and pending operations", async () => {
+  const spec = new CrdtSpec({
+    kind: "sequence",
+    materialization: "string",
+  });
+  const server = new CrdtDocument(spec, "", "server");
+  const client = new Client();
+  client.recv(
+    JSON.stringify({
+      t: "crdt_snapshot",
+      id: 12,
+      type: "Document",
+      rev: 0,
+      value: toValue(server.value),
+      spec: spec.toObject(),
+      state: server.state,
+    }),
+  );
+  client.editCrdt(12, [
+    {
+      kind: "sequence_insert",
+      path: [],
+      after: null,
+      values: ["x"],
+    },
+  ]);
+
+  client.recv(
+    JSON.stringify({
+      t: "snapshot",
+      id: 12,
+      type: "Document",
+      rev: 1,
+      value: toValue("plain"),
+    }),
+  );
+
+  expect(client.value(12)).toEqual(toValue("plain"));
+  expect(client.pendingCrdtOps(12)).toBe(0);
+  expect(() => client.editCrdt(12, [])).toThrow(/not CRDT-backed/);
+  expect(
+    client.recv(JSON.stringify({ t: "crdt", id: 12, rev: 2, ops: [] })),
+  ).toBeUndefined();
 });
 
 test("wasm core emits and applies sequence moves", async () => {

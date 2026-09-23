@@ -83,7 +83,11 @@ export type CrdtDelta =
       elements: { id: ElementId; value: unknown }[];
     }
   | { kind: "sequence_delete"; path: CrdtPath; ids: ElementId[] };
-export type CrdtEffect = { patch: unknown; deltas: CrdtDelta[] };
+export type CrdtEffect = {
+  patch: unknown;
+  deltas: CrdtDelta[];
+  applied: number;
+};
 export type CrdtChange = { ops: CrdtOp[]; effect: CrdtEffect };
 
 /** Validated, canonical merge semantics for one model. */

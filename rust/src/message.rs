@@ -17,9 +17,24 @@ pub enum Message {
         rev: u64,
         value: Value,
     },
+    CrdtSnapshot {
+        id: u64,
+        model_type: String,
+        rev: u64,
+        value: Value,
+        spec: serde_json::Value,
+        state: serde_json::Value,
+    },
     Patch {
         id: u64,
         patch: Patch,
+        proposal: Option<String>,
+    },
+    Crdt {
+        id: u64,
+        rev: u64,
+        ops: Vec<serde_json::Value>,
+        effect: Option<serde_json::Value>,
         proposal: Option<String>,
     },
     Ack {
@@ -32,6 +47,7 @@ pub enum Message {
         rev: u64,
         error: String,
         proposal: Option<String>,
+        crdt_ops: Option<Vec<serde_json::Value>>,
     },
     Batch {
         msgs: Vec<Message>,
@@ -51,10 +67,30 @@ enum KnownMessage {
         rev: u64,
         value: Value,
     },
+    #[serde(rename = "crdt_snapshot")]
+    CrdtSnapshot {
+        id: u64,
+        #[serde(rename = "type")]
+        model_type: String,
+        rev: u64,
+        value: Value,
+        spec: serde_json::Value,
+        state: serde_json::Value,
+    },
     #[serde(rename = "patch")]
     Patch {
         id: u64,
         patch: Patch,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        proposal: Option<String>,
+    },
+    #[serde(rename = "crdt")]
+    Crdt {
+        id: u64,
+        rev: u64,
+        ops: Vec<serde_json::Value>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        effect: Option<serde_json::Value>,
         #[serde(skip_serializing_if = "Option::is_none")]
         proposal: Option<String>,
     },
@@ -67,6 +103,8 @@ enum KnownMessage {
         error: String,
         #[serde(skip_serializing_if = "Option::is_none")]
         proposal: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        crdt_ops: Option<Vec<serde_json::Value>>,
     },
     #[serde(rename = "batch")]
     Batch { msgs: Vec<Message> },
@@ -86,6 +124,21 @@ impl From<KnownMessage> for Message {
                 rev,
                 value,
             },
+            KnownMessage::CrdtSnapshot {
+                id,
+                model_type,
+                rev,
+                value,
+                spec,
+                state,
+            } => Message::CrdtSnapshot {
+                id,
+                model_type,
+                rev,
+                value,
+                spec,
+                state,
+            },
             KnownMessage::Patch {
                 id,
                 patch,
@@ -95,17 +148,32 @@ impl From<KnownMessage> for Message {
                 patch,
                 proposal,
             },
+            KnownMessage::Crdt {
+                id,
+                rev,
+                ops,
+                effect,
+                proposal,
+            } => Message::Crdt {
+                id,
+                rev,
+                ops,
+                effect,
+                proposal,
+            },
             KnownMessage::Ack { id, rev, proposal } => Message::Ack { id, rev, proposal },
             KnownMessage::Reject {
                 id,
                 rev,
                 error,
                 proposal,
+                crdt_ops,
             } => Message::Reject {
                 id,
                 rev,
                 error,
                 proposal,
+                crdt_ops,
             },
             KnownMessage::Batch { msgs } => Message::Batch { msgs },
         }
@@ -126,6 +194,21 @@ impl From<&Message> for KnownMessage {
                 rev: *rev,
                 value: value.clone(),
             },
+            Message::CrdtSnapshot {
+                id,
+                model_type,
+                rev,
+                value,
+                spec,
+                state,
+            } => KnownMessage::CrdtSnapshot {
+                id: *id,
+                model_type: model_type.clone(),
+                rev: *rev,
+                value: value.clone(),
+                spec: spec.clone(),
+                state: state.clone(),
+            },
             Message::Patch {
                 id,
                 patch,
@@ -133,6 +216,19 @@ impl From<&Message> for KnownMessage {
             } => KnownMessage::Patch {
                 id: *id,
                 patch: patch.clone(),
+                proposal: proposal.clone(),
+            },
+            Message::Crdt {
+                id,
+                rev,
+                ops,
+                effect,
+                proposal,
+            } => KnownMessage::Crdt {
+                id: *id,
+                rev: *rev,
+                ops: ops.clone(),
+                effect: effect.clone(),
                 proposal: proposal.clone(),
             },
             Message::Ack { id, rev, proposal } => KnownMessage::Ack {
@@ -145,11 +241,13 @@ impl From<&Message> for KnownMessage {
                 rev,
                 error,
                 proposal,
+                crdt_ops,
             } => KnownMessage::Reject {
                 id: *id,
                 rev: *rev,
                 error: error.clone(),
                 proposal: proposal.clone(),
+                crdt_ops: crdt_ops.clone(),
             },
             Message::Batch { msgs } => KnownMessage::Batch { msgs: msgs.clone() },
             Message::Unknown(_) => {
@@ -179,7 +277,7 @@ impl<'de> Deserialize<'de> for Message {
         let value = serde_json::Value::deserialize(deserializer)?;
         let kind = value.get("t").and_then(serde_json::Value::as_str);
         match kind {
-            Some("snapshot" | "patch" | "ack" | "reject" | "batch") => {
+            Some("snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "batch") => {
                 serde_json::from_value::<KnownMessage>(value)
                     .map(Message::from)
                     .map_err(serde::de::Error::custom)
@@ -259,6 +357,17 @@ mod message_tests {
                 rev: 3,
                 value: Value::map([("count", Value::Int(4))]),
             },
+            Message::CrdtSnapshot {
+                id: 8,
+                model_type: "Document".into(),
+                rev: 2,
+                value: Value::Str("hello".into()),
+                spec: serde_json::json!({
+                    "version": 1,
+                    "root": {"kind": "sequence", "materialization": "string"}
+                }),
+                state: serde_json::json!({"version": 1, "spec_hash": "abc"}),
+            },
             Message::Patch {
                 id: 7,
                 patch: Patch {
@@ -270,6 +379,19 @@ mod message_tests {
                 },
                 proposal: Some("editor-4".into()),
             },
+            Message::Crdt {
+                id: 8,
+                rev: 3,
+                ops: vec![serde_json::json!({
+                    "kind": "sequence_insert",
+                    "path": [],
+                    "after": null,
+                    "values": ["!"] ,
+                    "dot": {"counter": 1, "replica": "editor"}
+                })],
+                effect: Some(serde_json::json!({"patch": {"rev": 0, "ops": []}, "deltas": []})),
+                proposal: None,
+            },
             Message::Ack {
                 id: 7,
                 rev: 4,
@@ -280,6 +402,7 @@ mod message_tests {
                 rev: 4,
                 error: "count must be positive".into(),
                 proposal: Some("editor-6".into()),
+                crdt_ops: None,
             },
         ]
     }

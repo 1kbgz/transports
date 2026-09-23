@@ -114,6 +114,12 @@ If a hand-rolled sender fails after `edit` or `editOps` creates a proposal, call
 provides `client.abandon_proposal(proposal)`. The methods return whether the proposal was pending;
 they do not fire the disconnect-only `onAbandon` or `on_abandon` callbacks.
 
+CRDT-backed shared models use `proposeCrdt(id, mutations)` or `editCrdt(id, mutations)`. These edits
+are optimistic: the client applies them locally, retains their causally identified operations while
+offline, and resends them after reconnect. An authoritative echo clears the matching operations.
+Unlike ordinary patch proposals, CRDT operations survive a connection drop because resending one
+causal dot is safe. Use `pendingCrdtOps(id)` to inspect the outbox.
+
 ## Mirror the server in Python
 
 `Client.connect()` runs a receive loop until the WebSocket closes.
@@ -131,6 +137,11 @@ native or Pyodide. They return `False` and drop the frame when there is none, so
 
 Python exposes the same correlation API as `edit(..., proposal=...)`, `edit_ops`, `on_ack`, and
 `on_reject`.
+
+For a CRDT-backed shared model, use `await client.propose_crdt(mid, mutations)` on a managed
+connection or send `client.edit_crdt(mid, mutations)` over a hand-rolled socket. The local mirror
+updates immediately, including while disconnected. `pending_crdt_ops(mid)` reports operations still
+waiting for the server echo.
 
 ## Use MessagePack on a connection
 
