@@ -865,8 +865,10 @@ test("Client manages custom duplex channel lifecycle", async () => {
 test("Client sends, tracks, and clears awareness", async () => {
   const c = new Client();
   const sent = [];
+  const resent = [];
   const updates = [];
   const sender = (frame) => sent.push(frame);
+  const replacement = (frame) => resent.push(frame);
   c.onAwareness((update) => updates.push(update));
   c.attach(sender);
 
@@ -898,6 +900,66 @@ test("Client sends, tracks, and clears awareness", async () => {
     state: null,
   });
   expect(c.setAwareness(8, null)).toBe(false);
+
+  c.setAwareness(8, { selection: { anchor: 5, head: 5 } });
+  c.attach(replacement);
+  expect(JSON.parse(resent[0])).toEqual({
+    t: "awareness",
+    id: 8,
+    state: { selection: { anchor: 5, head: 5 } },
+  });
+  expect(c.setAwareness(8, null)).toBe(true);
+  c.detach(replacement);
+  resent.length = 0;
+  c.attach(replacement);
+  expect(resent).toEqual([]);
+});
+
+test("Client manages an RTCDataChannel", async () => {
+  class FakeDataChannel {
+    constructor() {
+      this.binaryType = "blob";
+      this.readyState = "connecting";
+      this.listeners = {};
+      this.sent = [];
+    }
+    addEventListener(name, listener) {
+      (this.listeners[name] ??= []).push(listener);
+    }
+    send(frame) {
+      this.sent.push(frame);
+    }
+    emit(name, event = {}) {
+      for (const listener of this.listeners[name] ?? []) listener(event);
+    }
+  }
+
+  const c = new Client();
+  const channel = new FakeDataChannel();
+  expect(c.connectDataChannel(channel)).toBe(channel);
+  expect(channel.binaryType).toBe("arraybuffer");
+  expect(c.connected).toBe(false);
+
+  channel.readyState = "open";
+  channel.emit("open");
+  expect(c.connected).toBe(true);
+  expect(c.send("outbound")).toBe(true);
+  expect(channel.sent).toEqual(["outbound"]);
+
+  channel.emit("message", {
+    data: JSON.stringify({
+      t: "snapshot",
+      id: 31,
+      type: "Counter",
+      rev: 0,
+      value: toValue({ tick: 1 }),
+    }),
+  });
+  expect(fromValue(c.value(31))).toEqual({ tick: 1 });
+
+  channel.readyState = "closed";
+  channel.emit("close");
+  expect(c.connected).toBe(false);
 });
 
 test("Client flushes queued CRDT operations on custom channel reattach", async () => {

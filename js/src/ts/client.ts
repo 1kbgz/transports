@@ -329,6 +329,7 @@ export class Client {
   private crdt = new Map<number, CrdtDocument>();
   private crdtOutbox: Array<{ id: number; ops: CrdtOp[] }> = [];
   private awarenessState = new Map<number, Map<string, unknown>>();
+  private localAwareness = new Map<number, string | Uint8Array>();
   private replica: string;
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
   private ackListeners: Array<(ack: PatchMsg | CrdtMsg | AckMsg) => void> = [];
@@ -386,9 +387,15 @@ export class Client {
     return this.send(frame);
   }
 
-  /** Publish ephemeral state for one model, or clear it with `null`. */
+  /** Publish ephemeral state for one model, or clear it with `null`.
+   *
+   * The latest non-null state is retained locally and republished when a managed connection opens.
+   */
   setAwareness(id: number, state: unknown | null): boolean {
-    return this.send(this.encode({ t: "awareness", id, state }));
+    const frame = this.encode({ t: "awareness", id, state });
+    if (state === null) this.localAwareness.delete(id);
+    else this.localAwareness.set(id, frame);
+    return this.send(frame);
   }
 
   private sendProposal(frame: string | Uint8Array): boolean {
@@ -468,7 +475,7 @@ export class Client {
     };
   }
 
-  /** Attach an open duplex channel's sender and flush queued CRDT operations.
+  /** Attach an open duplex channel's sender and flush queued CRDT operations and awareness.
    *
    * Feed inbound frames to `recv()`. When the channel closes, pass the same sender function to
    * `detach()`; sender identity prevents a late close from detaching a replacement channel. An
@@ -482,6 +489,7 @@ export class Client {
     this.sender = sender;
     try {
       this.flushCrdtOutbox();
+      this.flushAwareness();
     } catch (error) {
       this.detach(sender);
       throw error;
@@ -503,6 +511,11 @@ export class Client {
       this.sender(
         this.encode({ t: "crdt", id: pending.id, rev: 0, ops: pending.ops }),
       );
+  }
+
+  private flushAwareness(): void {
+    if (!this.sender) return;
+    for (const frame of this.localAwareness.values()) this.sender(frame);
   }
 
   private settleCrdtOps(id: number, ops: CrdtOp[]): void {
@@ -816,6 +829,33 @@ export class Client {
       this.detach(sender); // don't clobber a newer reconnect's channel
     });
     return ws;
+  }
+
+  /** Mirror frames over an externally negotiated WebRTC data channel.
+   *
+   * Signaling and peer-connection ownership stay with the application. The channel becomes this
+   * client's managed duplex connection when it opens, so queued CRDT operations and connection
+   * lifecycle hooks behave the same way as with `connect()`.
+   */
+  connectDataChannel(channel: RTCDataChannel): RTCDataChannel {
+    channel.binaryType = "arraybuffer";
+    channel.addEventListener("message", (event) => {
+      const data = (event as MessageEvent).data;
+      this.recv(
+        typeof data === "string" ? data : new Uint8Array(data as ArrayBuffer),
+      );
+    });
+    const sender = (frame: string | Uint8Array) => {
+      if (typeof frame === "string") channel.send(frame);
+      else channel.send(frame as Uint8Array<ArrayBuffer>);
+    };
+    const open = () => this.attach(sender);
+    channel.addEventListener("open", open);
+    channel.addEventListener("close", () => {
+      this.detach(sender);
+    });
+    if (channel.readyState === "open") open();
+    return channel;
   }
 
   /** Connect and mirror, **reconnecting** whenever the socket drops — so the client survives a server
