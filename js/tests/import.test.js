@@ -824,6 +824,91 @@ test("Client exposes managed connection lifecycle", async () => {
   }
 });
 
+test("Client manages custom duplex channel lifecycle", async () => {
+  const c = new Client();
+  const connections = [];
+  const disconnects = [];
+  const abandoned = [];
+  const firstSent = [];
+  const secondSent = [];
+  const firstSender = (frame) => firstSent.push(frame);
+  const secondSender = (frame) => secondSent.push(frame);
+  c.onConnect(() => connections.push(c.connected));
+  c.onDisconnect(() => disconnects.push(c.connected));
+  c.onAbandon((proposals) => abandoned.push(proposals));
+
+  c.attach(firstSender);
+  expect(c.connected).toBe(true);
+  expect(connections).toEqual([true]);
+  expect(c.send("first")).toBe(true);
+  expect(firstSent).toEqual(["first"]);
+  expect(c.proposeOps(1, [], "first-pending")).toBe(true);
+
+  c.attach(secondSender);
+  expect(connections).toEqual([true, true]);
+  expect(disconnects).toEqual([false]);
+  expect(abandoned).toEqual([["first-pending"]]);
+  expect(c.pendingProposals()).toEqual([]);
+  expect(c.detach(firstSender)).toBe(false);
+  expect(c.connected).toBe(true);
+  expect(disconnects).toEqual([false]);
+  expect(c.send("second")).toBe(true);
+  expect(secondSent).toEqual(["second"]);
+
+  expect(c.detach(secondSender)).toBe(true);
+  expect(c.connected).toBe(false);
+  expect(disconnects).toEqual([false, false]);
+  expect(c.detach(secondSender)).toBe(false);
+  expect(disconnects).toEqual([false, false]);
+});
+
+test("Client flushes queued CRDT operations on custom channel reattach", async () => {
+  const spec = new CrdtSpec({
+    kind: "sequence",
+    materialization: "string",
+  });
+  const server = new CrdtDocument(spec, "", "server");
+  const c = new Client();
+  c.recv(
+    JSON.stringify({
+      t: "crdt_snapshot",
+      id: 13,
+      type: "Document",
+      rev: 0,
+      value: toValue(server.value),
+      spec: spec.toObject(),
+      state: server.state,
+    }),
+  );
+  c.editCrdt(13, [
+    {
+      kind: "sequence_insert",
+      path: [],
+      after: null,
+      values: ["x"],
+    },
+  ]);
+
+  expect(() =>
+    c.attach(() => {
+      throw new Error("channel failed");
+    }),
+  ).toThrow("channel failed");
+  expect(c.connected).toBe(false);
+  expect(c.pendingCrdtOps(13)).toBe(1);
+
+  const first = [];
+  const firstSender = (frame) => first.push(frame);
+  c.attach(firstSender);
+  expect(JSON.parse(first[0]).t).toBe("crdt");
+  expect(c.detach(firstSender)).toBe(true);
+
+  const second = [];
+  const secondSender = (frame) => second.push(frame);
+  c.attach(secondSender);
+  expect(second).toEqual(first);
+});
+
 test("Client.run reports every reconnect without waiting for a frame", async () => {
   const NativeWebSocket = globalThis.WebSocket;
   const sockets = [];

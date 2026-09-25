@@ -2,8 +2,8 @@
 
 `Client.recv(text)` applies snapshot/patch messages to a local mirror using the core `apply`, so the
 client tracks each remote model's value without hosting it. `connect(url)` runs a real WebSocket
-client loop for live use; the rest of the class is sync and transport-agnostic (testable without a
-network).
+client loop for live use; `attach(sender)` and `detach(sender)` manage application-owned duplex
+channels while inbound frames continue through `recv`.
 """
 
 import contextlib
@@ -25,8 +25,9 @@ class Client:
     """Mirrors a remote `Session` — applies snapshot/patch messages to a local copy of each model.
 
     Read values with `value(id)` or materialize them with `model(id, cls)`. Drive it with a live
-    connection via `connect(url)`, or feed it messages directly with `recv(data)`. The `codec`
-    (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound edits and decodes inbound frames."""
+    connection via `connect(url)`, attach an application-owned duplex sender, or feed it messages
+    directly with `recv(data)`. The `codec` (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound
+    edits and decodes inbound frames."""
 
     def __init__(self, codec: str = protocol.JSON) -> None:
         self._values: dict[int, Any] = {}
@@ -42,12 +43,12 @@ class Client:
         self._abandon_cbs: list[Callable[[list[str]], None]] = []
         self._connect_cbs: list[Callable[[], None]] = []
         self._disconnect_cbs: list[Callable[[], None]] = []
-        #: outbound channel of the active managed connection (set by `connect`/`run`, cleared on drop)
+        #: outbound channel of the active managed connection (set by `attach`, cleared by `detach`)
         self._sender: Callable[[str | bytes], Any] | None = None
 
     @property
     def connected(self) -> bool:
-        """Whether a managed connection (`connect` / `run`) is open right now."""
+        """Whether a managed duplex connection is open right now."""
         return self._sender is not None
 
     @property
@@ -56,7 +57,7 @@ class Client:
         return {int(mid): rev for mid, rev in json.loads(self._state.revisions()).items()}
 
     async def send(self, frame: str | bytes) -> bool:
-        """Send a frame over the active managed connection (`connect` / `run`).
+        """Send a frame over the active managed duplex connection.
 
         Returns ``True`` when handed to an open connection, ``False`` when none is active (never
         connected, in a reconnect gap, or receive-only `connect_sse`) — the frame is dropped, like a
@@ -124,12 +125,12 @@ class Client:
         return lambda: self._ack_cbs.remove(callback)
 
     def on_disconnect(self, callback: Callable[[], None]) -> Callable[[], None]:
-        """Register a callback fired when an active managed WebSocket disconnects."""
+        """Register a callback fired when an active managed duplex connection disconnects."""
         self._disconnect_cbs.append(callback)
         return lambda: self._disconnect_cbs.remove(callback)
 
     def on_connect(self, callback: Callable[[], None]) -> Callable[[], None]:
-        """Register a callback fired when a managed WebSocket opens, including reconnects."""
+        """Register a callback fired when a managed duplex connection opens, including reconnects."""
         self._connect_cbs.append(callback)
         return lambda: self._connect_cbs.remove(callback)
 
@@ -138,10 +139,35 @@ class Client:
         self._abandon_cbs.append(callback)
         return lambda: self._abandon_cbs.remove(callback)
 
-    def _connected(self, sender: Callable[[str | bytes], Any]) -> None:
+    def _activate(self, sender: Callable[[str | bytes], Any]) -> None:
+        if self._sender is not None and self._sender is not sender:
+            self._sender = None
+            self._disconnected()
         self._sender = sender
         for callback in list(self._connect_cbs):
             callback()
+
+    async def attach(self, sender: Callable[[str | bytes], Any]) -> None:
+        """Attach an open duplex channel's sender and flush queued CRDT operations.
+
+        Feed inbound frames to `recv`. When the channel closes, pass the same sender object to
+        `detach`; sender identity prevents a late close from detaching a replacement channel. An
+        existing channel is disconnected before its replacement is attached.
+        """
+        self._activate(sender)
+        try:
+            await self._flush_crdt_outbox(sender)
+        except Exception:
+            self.detach(sender)
+            raise
+
+    def detach(self, sender: Callable[[str | bytes], Any]) -> bool:
+        """Detach `sender` if it is still active, returning whether the client disconnected."""
+        if self._sender is not sender:
+            return False
+        self._sender = None
+        self._disconnected()
+        return True
 
     def _disconnected(self) -> None:
         abandoned = json.loads(self._state.disconnect())["proposals"]
@@ -352,14 +378,11 @@ class Client:
         async with websockets.connect(self._connect_url(url)) as ws:
             sender = ws.send
             try:
-                self._connected(sender)
-                await self._flush_crdt_outbox(sender)
+                await self.attach(sender)
                 async for frame in ws:
                     self.recv(frame)
             finally:
-                if self._sender is sender:
-                    self._sender = None
-                    self._disconnected()
+                self.detach(sender)
 
     async def _run_browser(self, url: str, *, authority: str = "server", retry: float = 1.0) -> None:
         """`run` over the browser's native `WebSocket` (the Pyodide path): reconnect forever with
@@ -426,7 +449,7 @@ class Client:
             nonlocal opened
             # arm the outbound channel only once the socket is open (send during CONNECTING throws)
             opened = True
-            self._connected(sender)
+            self._activate(sender)
             asyncio.create_task(self._flush_crdt_outbox(sender))
 
         proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close), create_proxy(_on_close)]
@@ -435,10 +458,8 @@ class Client:
         try:
             await closed
         finally:
-            if self._sender is sender:
-                self._sender = None
-                if opened:
-                    self._disconnected()
+            if opened:
+                self.detach(sender)
             for proxy in proxies:
                 proxy.destroy()
 
@@ -473,8 +494,7 @@ class Client:
                 async with websockets.connect(self._connect_url(url)) as ws:
                     sender = ws.send
                     try:
-                        self._connected(sender)
-                        await self._flush_crdt_outbox(sender)
+                        await self.attach(sender)
                         async for frame in ws:
                             self.recv(frame)
                             if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
@@ -483,9 +503,7 @@ class Client:
                                         await ws.send(self.edit(mid, pre[mid]))
                                         pushed.add(mid)
                     finally:
-                        if self._sender is sender:
-                            self._sender = None
-                            self._disconnected()
+                        self.detach(sender)
             except (websockets.ConnectionClosed, OSError):
                 pass  # dropped — fall through to retry
             await asyncio.sleep(retry)

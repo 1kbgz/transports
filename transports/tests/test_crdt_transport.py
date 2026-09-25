@@ -102,28 +102,44 @@ def test_client_exposes_specs_only_for_crdt_models() -> None:
 
 
 def test_managed_client_sends_and_flushes_crdt_outbox() -> None:
-    hub, sid = crdt_hub()
-    hub.subscribe("alice", sid, WRITE)
-    client = Client()
-    for message in hub.open(("alice", 1)):
-        client.recv(message)
-    sent = []
-    client._connected(sent.append)
+    async def run() -> None:
+        hub, sid = crdt_hub()
+        hub.subscribe("alice", sid, WRITE)
+        client = Client()
+        for message in hub.open(("alice", 1)):
+            client.recv(message)
+        sent = []
+        sender = sent.append
+        await client.attach(sender)
 
-    assert asyncio.run(client.propose_crdt(sid, insert("live"))) is True
-    assert protocol.decode(sent[0])["t"] == "crdt"
+        assert await client.propose_crdt(sid, insert("live")) is True
+        assert protocol.decode(sent[0])["t"] == "crdt"
 
-    offline = Client()
-    for message in hub.open(("alice", 2)):
-        offline.recv(message)
-    offline.edit_crdt(sid, insert("queued"))
-    flushed = []
+        offline = Client()
+        for message in hub.open(("alice", 2)):
+            offline.recv(message)
+        offline.edit_crdt(sid, insert("queued"))
 
-    async def sender(frame: str | bytes) -> None:
-        flushed.append(frame)
+        async def failing_sender(_frame: str | bytes) -> None:
+            raise RuntimeError("channel failed")
 
-    asyncio.run(offline._flush_crdt_outbox(sender))
-    assert protocol.decode(flushed[0])["t"] == "crdt"
+        with pytest.raises(RuntimeError, match="channel failed"):
+            await offline.attach(failing_sender)
+        assert offline.connected is False
+        assert offline.pending_crdt_ops(sid) == 1
+
+        first_flush = []
+        first_sender = first_flush.append
+        await offline.attach(first_sender)
+        assert protocol.decode(first_flush[0])["t"] == "crdt"
+
+        assert offline.detach(first_sender) is True
+        second_flush = []
+        second_sender = second_flush.append
+        await offline.attach(second_sender)
+        assert second_flush == first_flush
+
+    asyncio.run(run())
 
 
 def test_client_keeps_other_models_queued_and_ignores_crdt_ops_for_plain_models() -> None:
