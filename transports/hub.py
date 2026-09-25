@@ -200,6 +200,8 @@ class Hub:
         self._conn_key: dict[Any, Any] = {}
         self._conns_by_key: dict[Any, set[Any]] = {}
         self._codecs: dict[Any, str] = {}
+        self._peer_ids: dict[Any, str] = {}
+        self._awareness: dict[int, dict[Any, Any]] = {}
         self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
         self._crdt_outbox: list[tuple[int, list[dict]]] = []
         self._snapshot_outbox: set[int] = set()
@@ -314,6 +316,7 @@ class Hub:
         self._conn_key[conn] = key
         self._conns_by_key.setdefault(key, set()).add(conn)
         self._codecs[conn] = codec
+        self._peer_ids.setdefault(conn, uuid.uuid4().hex)
         try:
             sess = self.tenant(key)
             out: list[Wire] = []
@@ -340,6 +343,10 @@ class Hub:
                             sh.crdt.state,
                         )
                     out.append(self._encode_for(conn, message))
+                    for peer_conn, state in self._awareness.get(sid, {}).items():
+                        if peer_conn != conn and peer_conn in self._peer_ids:
+                            message = protocol.awareness_msg(sid, state, self._peer_ids[peer_conn])
+                            out.append(self._encode_for(conn, message))
             return out
         except Exception:
             self.close(conn)
@@ -362,6 +369,23 @@ class Hub:
             msg = protocol.decode(data, codec)
         except (TypeError, ValueError):
             return {}
+        if msg.get("t") == "awareness":
+            sid = msg.get("id")
+            key = self._conn_key.get(conn)
+            shared = self._shared.get(sid)
+            if shared is None or key not in shared.subs:
+                return {}
+            peers = self._awareness.setdefault(sid, {})
+            state = msg.get("state")
+            if state is None:
+                peers.pop(conn, None)
+                if not peers:
+                    self._awareness.pop(sid, None)
+            else:
+                peers[conn] = state
+            message = protocol.awareness_msg(sid, state, self._peer_ids[conn])
+            targets = (target for tenant in shared.subs for target in self._conns_by_key.get(tenant, ()) if target != conn)
+            return self._encode_many(targets, [message])
         if msg.get("t") not in ("patch", "crdt"):
             return {}
         wire_id = msg["id"]
@@ -710,7 +734,14 @@ class Hub:
         sh.merge.restore(merge_state or {})
         return True
 
-    def close(self, conn: Any) -> None:
+    def close(self, conn: Any) -> dict[Any, list[Wire]]:
+        peer = self._peer_ids.pop(conn, None)
+        removed = [sid for sid, states in self._awareness.items() if conn in states]
+        for sid in removed:
+            states = self._awareness[sid]
+            states.pop(conn, None)
+            if not states:
+                self._awareness.pop(sid)
         sentinel = object()
         key = self._conn_key.pop(conn, sentinel)
         if key is not sentinel:
@@ -720,6 +751,16 @@ class Hub:
                 if not conns:
                     self._conns_by_key.pop(key)
         self._codecs.pop(conn, None)
+        out: dict[Any, list[Wire]] = {}
+        if peer is not None:
+            for sid in removed:
+                shared = self._shared.get(sid)
+                if shared is None:
+                    continue
+                targets = (target for tenant in shared.subs for target in self._conns_by_key.get(tenant, ()))
+                for target, messages in self._encode_many(targets, [protocol.awareness_msg(sid, None, peer)]).items():
+                    out.setdefault(target, []).extend(messages)
+        return out
 
     def _write_shared(self, sid: int, patch: dict, origin: Any) -> dict | None:
         """Merge a write into a shared model; return the authoritative fan-out patch (or None)."""

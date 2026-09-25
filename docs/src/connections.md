@@ -148,6 +148,34 @@ offline, and resends them after reconnect. An authoritative echo clears the matc
 Unlike ordinary patch proposals, CRDT operations survive a connection drop because resending one
 causal dot is safe. Use `pendingCrdtOps(id)` to inspect the outbox.
 
+## Publish ephemeral awareness
+
+Awareness carries transient state for a shared `Hub` model. It is suitable for cursor positions,
+selections, typing state, and other hints that should disappear when a connection closes. The Hub
+does not store awareness in the model, replay log, CRDT state, or persistence callbacks.
+
+```ts
+client.onAwareness(({ id, peer, state }) => {
+  if (id !== documentId) return;
+  if (state === null) removePeerCursor(peer);
+  else updatePeerCursor(peer, state);
+});
+
+client.setAwareness(documentId, {
+  selection: { anchor: 12, head: 18 },
+});
+```
+
+```python
+client.on_awareness(handle_awareness)
+await client.set_awareness(document_id, {"selection": {"anchor": 12, "head": 18}})
+```
+
+`awareness(id)` returns the latest remote state keyed by the Hub-assigned peer id. Pass `null` in
+JavaScript or `None` in Python to clear local state before closing. The Hub also sends a removal when
+the connection closes. Read-only subscribers may publish awareness; it does not grant model write
+access. Payload meaning, user identity, names, colors, and rendering remain application concerns.
+
 ## Mirror the server in Python
 
 `Client.connect()` runs a receive loop until the WebSocket closes.

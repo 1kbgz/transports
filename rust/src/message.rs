@@ -49,6 +49,11 @@ pub enum Message {
         proposal: Option<String>,
         crdt_ops: Option<Vec<serde_json::Value>>,
     },
+    Awareness {
+        id: u64,
+        peer: Option<String>,
+        state: Option<serde_json::Value>,
+    },
     Batch {
         msgs: Vec<Message>,
     },
@@ -105,6 +110,13 @@ enum KnownMessage {
         proposal: Option<String>,
         #[serde(skip_serializing_if = "Option::is_none")]
         crdt_ops: Option<Vec<serde_json::Value>>,
+    },
+    #[serde(rename = "awareness")]
+    Awareness {
+        id: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        peer: Option<String>,
+        state: Option<serde_json::Value>,
     },
     #[serde(rename = "batch")]
     Batch { msgs: Vec<Message> },
@@ -175,6 +187,7 @@ impl From<KnownMessage> for Message {
                 proposal,
                 crdt_ops,
             },
+            KnownMessage::Awareness { id, peer, state } => Message::Awareness { id, peer, state },
             KnownMessage::Batch { msgs } => Message::Batch { msgs },
         }
     }
@@ -249,6 +262,11 @@ impl From<&Message> for KnownMessage {
                 proposal: proposal.clone(),
                 crdt_ops: crdt_ops.clone(),
             },
+            Message::Awareness { id, peer, state } => KnownMessage::Awareness {
+                id: *id,
+                peer: peer.clone(),
+                state: state.clone(),
+            },
             Message::Batch { msgs } => KnownMessage::Batch { msgs: msgs.clone() },
             Message::Unknown(_) => {
                 unreachable!("unknown messages serialize through their raw value")
@@ -277,11 +295,12 @@ impl<'de> Deserialize<'de> for Message {
         let value = serde_json::Value::deserialize(deserializer)?;
         let kind = value.get("t").and_then(serde_json::Value::as_str);
         match kind {
-            Some("snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "batch") => {
-                serde_json::from_value::<KnownMessage>(value)
-                    .map(Message::from)
-                    .map_err(serde::de::Error::custom)
-            }
+            Some(
+                "snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "awareness"
+                | "batch",
+            ) => serde_json::from_value::<KnownMessage>(value)
+                .map(Message::from)
+                .map_err(serde::de::Error::custom),
             _ => Ok(Message::Unknown(value)),
         }
     }
@@ -403,6 +422,11 @@ mod message_tests {
                 error: "count must be positive".into(),
                 proposal: Some("editor-6".into()),
                 crdt_ops: None,
+            },
+            Message::Awareness {
+                id: 8,
+                peer: Some("peer-1".into()),
+                state: Some(serde_json::json!({"selection": {"anchor": 2, "head": 4}})),
             },
         ]
     }

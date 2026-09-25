@@ -272,5 +272,5 @@ class RelayBroadcaster:
     def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
         return self.hub._flush_tagged()
 
-    def close(self, conn: Any) -> None:
-        self.hub.close(conn)
+    def close(self, conn: Any) -> dict[Any, list[Wire]]:
+        return self.hub.close(conn)

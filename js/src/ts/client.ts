@@ -65,6 +65,12 @@ export type RejectMsg = {
   proposal?: string;
   crdt_ops?: CrdtOp[];
 };
+export type AwarenessMsg = {
+  t: "awareness";
+  id: number;
+  peer: string;
+  state: unknown | null;
+};
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
@@ -100,6 +106,7 @@ type ClientEffect =
       error: string;
       proposal?: string;
     }
+  | { effect: "awareness"; id: number; peer: string; state: unknown | null }
   | { effect: "ignore" }
   | { effect: "disconnect"; proposals: string[] };
 
@@ -160,7 +167,14 @@ function mapValue(value: Value | undefined): Record<string, Value> {
 
 interface BatchMsg {
   t: "batch";
-  msgs: (SnapshotMsg | CrdtSnapshotMsg | PatchMsg | CrdtMsg | RejectMsg)[];
+  msgs: (
+    | SnapshotMsg
+    | CrdtSnapshotMsg
+    | PatchMsg
+    | CrdtMsg
+    | RejectMsg
+    | AwarenessMsg
+  )[];
 }
 
 function listValue(value: Value | undefined): Value[] {
@@ -314,6 +328,7 @@ export class Client {
   private values = new Map<number, unknown>();
   private crdt = new Map<number, CrdtDocument>();
   private crdtOutbox: Array<{ id: number; ops: CrdtOp[] }> = [];
+  private awarenessState = new Map<number, Map<string, unknown>>();
   private replica: string;
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
   private ackListeners: Array<(ack: PatchMsg | CrdtMsg | AckMsg) => void> = [];
@@ -321,6 +336,7 @@ export class Client {
   private abandonListeners: Array<(proposals: string[]) => void> = [];
   private connectListeners: Array<() => void> = [];
   private disconnectListeners: Array<() => void> = [];
+  private awarenessListeners: Array<(update: AwarenessMsg) => void> = [];
   private state: ClientStateAdapter;
   // outbound channel of the active managed connection (set by attach(), cleared by detach())
   private sender: ((frame: string | Uint8Array) => void) | null = null;
@@ -370,6 +386,11 @@ export class Client {
     return this.send(frame);
   }
 
+  /** Publish ephemeral state for one model, or clear it with `null`. */
+  setAwareness(id: number, state: unknown | null): boolean {
+    return this.send(this.encode({ t: "awareness", id, state }));
+  }
+
   private sendProposal(frame: string | Uint8Array): boolean {
     const custom = codecFor(this.codec);
     const message = custom
@@ -398,6 +419,15 @@ export class Client {
     return () => {
       const i = this.rejectListeners.indexOf(listener);
       if (i >= 0) this.rejectListeners.splice(i, 1);
+    };
+  }
+
+  /** Register for remote awareness updates and removals (`state` is `null`). */
+  onAwareness(listener: (update: AwarenessMsg) => void): () => void {
+    this.awarenessListeners.push(listener);
+    return () => {
+      const i = this.awarenessListeners.indexOf(listener);
+      if (i >= 0) this.awarenessListeners.splice(i, 1);
     };
   }
 
@@ -495,6 +525,11 @@ export class Client {
     const { proposals } = this.state.disconnect();
     if (proposals.length)
       for (const listener of [...this.abandonListeners]) listener(proposals);
+    for (const [id, peers] of this.awarenessState)
+      for (const peer of peers.keys())
+        for (const listener of [...this.awarenessListeners])
+          listener({ t: "awareness", id, peer, state: null });
+    this.awarenessState.clear();
     for (const listener of [...this.disconnectListeners]) listener();
   }
 
@@ -541,6 +576,7 @@ export class Client {
       | CrdtMsg
       | AckMsg
       | RejectMsg
+      | AwarenessMsg
       | BatchMsg;
     if (custom) {
       msg = custom.decode(data) as
@@ -549,7 +585,8 @@ export class Client {
         | PatchMsg
         | CrdtMsg
         | AckMsg
-        | RejectMsg;
+        | RejectMsg
+        | AwarenessMsg;
     } else if (typeof data === "string") {
       msg = JSON.parse(data);
     } else {
@@ -574,7 +611,8 @@ export class Client {
       | PatchMsg
       | CrdtMsg
       | AckMsg
-      | RejectMsg,
+      | RejectMsg
+      | AwarenessMsg,
   ): ReceiveChange | undefined {
     const effect = this.state.prepare(msg);
     if (effect.effect === "snapshot") {
@@ -647,6 +685,21 @@ export class Client {
         this.settleCrdtOps(rejection.id, rejection.crdt_ops);
       for (const listener of [...this.rejectListeners]) listener(rejection);
       return undefined;
+    } else if (effect.effect === "awareness") {
+      const update = msg as AwarenessMsg;
+      let peers = this.awarenessState.get(update.id);
+      if (update.state === null) {
+        peers?.delete(update.peer);
+        if (peers?.size === 0) this.awarenessState.delete(update.id);
+      } else {
+        if (!peers) {
+          peers = new Map();
+          this.awarenessState.set(update.id, peers);
+        }
+        peers.set(update.peer, update.state);
+      }
+      for (const listener of [...this.awarenessListeners]) listener(update);
+      return undefined;
     }
     return undefined;
   }
@@ -678,6 +731,11 @@ export class Client {
         (id === undefined || pending.id === id ? pending.ops.length : 0),
       0,
     );
+  }
+
+  /** Snapshot remote ephemeral state keyed by server-assigned peer id. */
+  awareness(id: number): ReadonlyMap<string, unknown> {
+    return new Map(this.awarenessState.get(id));
   }
 
   /** Stop tracking one proposal that the caller did not send.

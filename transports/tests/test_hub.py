@@ -1,3 +1,4 @@
+import asyncio
 import itertools
 import json
 
@@ -157,6 +158,63 @@ def test_shared_read_fanout_to_many_tenants():
         cl2.recv(m)
     assert cl1.value(sid)["Map"]["x"] == {"Int": 3}
     assert cl2.value(sid)["Map"]["x"] == {"Int": 3}
+
+
+def test_shared_awareness_is_ephemeral_and_connection_scoped():
+    h = hub()
+    sid = h.share(Doc())
+    h.subscribe("reader", sid, READ)
+    h.subscribe("writer", sid, WRITE)
+    reader = ("reader", "a")
+    writer = ("writer", "a")
+    observer = ("writer", "b")
+    h.open(reader)
+    writer_client = Client()
+    for frame in h.open(writer):
+        writer_client.recv(frame)
+
+    updates = []
+    writer_client.on_awareness(updates.append)
+    state = {"selection": {"anchor": 2, "head": 4}}
+    out = h.recv(reader, protocol.awareness_msg(sid, state))
+    assert set(out) == {writer}
+    writer_client.recv(out[writer][0])
+    [(peer, remote)] = writer_client.awareness(sid).items()
+    assert remote == state
+    assert updates[-1]["peer"] == peer
+
+    # A later subscriber receives current awareness, but it is not part of the model snapshot.
+    observer_frames = [json.loads(frame) for frame in h.open(observer)]
+    assert [frame["t"] for frame in observer_frames] == ["snapshot", "awareness"]
+    assert observer_frames[1] == {"t": "awareness", "id": sid, "state": state, "peer": peer}
+    assert h.snapshot_shared(sid)["value"] == {"Map": {"x": {"Int": 0}, "y": {"Int": 0}}}
+
+    cleared = h.recv(reader, protocol.awareness_msg(sid, None))
+    assert json.loads(cleared[writer][0])["state"] is None
+    h.recv(reader, protocol.awareness_msg(sid, state))
+
+    # Closing the publishing connection removes its state from every remaining subscriber.
+    leave = h.close(reader)
+    assert set(leave) == {writer, observer}
+    writer_client.recv(leave[writer][0])
+    assert writer_client.awareness(sid) == {}
+    assert updates[-1] == {"t": "awareness", "id": sid, "state": None, "peer": peer}
+
+    sent = []
+
+    def sender(frame):
+        sent.append(frame)
+
+    asyncio.run(writer_client.attach(sender))
+    assert asyncio.run(writer_client.set_awareness(sid, state)) is True
+    assert protocol.decode(sent[-1])["state"] == state
+    writer_client.recv(protocol.awareness_msg(sid, state, "temporary-peer"))
+    assert writer_client.detach(sender) is True
+    assert updates[-1]["state"] is None
+
+    outsider = ("outsider", "a")
+    h.open(outsider)
+    assert h.recv(outsider, protocol.awareness_msg(sid, state)) == {}
 
 
 def test_broken_custom_encoder_does_not_block_shared_fanout():
@@ -437,15 +495,23 @@ def test_starlette_two_tenants_share_over_mixed_codecs():
     h.subscribe("bob", sid, WRITE)
     app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", ws_endpoint(h))])
 
-    with TestClient(app) as tc, tc.websocket_connect("/ws/alice?codec=json") as wa, tc.websocket_connect("/ws/bob?codec=msgpack") as wb:
-        ca = Client()
+    with TestClient(app) as tc, tc.websocket_connect("/ws/bob?codec=msgpack") as wb:
         cb = Client(codec="msgpack")
-        ca.recv(wa.receive_text())  # alice: JSON snapshot
-        cb.recv(wb.receive_bytes())  # bob: msgpack snapshot
-
-        # alice writes the shared model; bob (a different tenant, different codec) receives it
-        edit = ca.edit(sid, {"Map": {"x": {"Int": 42}, "y": {"Int": 0}}})
-        assert isinstance(edit, str)
-        wa.send_text(edit)
         cb.recv(wb.receive_bytes())
-        assert cb.value(sid)["Map"]["x"] == {"Int": 42}
+        with tc.websocket_connect("/ws/alice?codec=json") as wa:
+            ca = Client()
+            ca.recv(wa.receive_text())
+
+            # alice writes the shared model; bob (a different tenant, different codec) receives it
+            edit = ca.edit(sid, {"Map": {"x": {"Int": 42}, "y": {"Int": 0}}})
+            assert isinstance(edit, str)
+            wa.send_text(edit)
+            cb.recv(wb.receive_bytes())
+            assert cb.value(sid)["Map"]["x"] == {"Int": 42}
+
+            wa.send_text(protocol.awareness_msg(sid, {"selection": {"anchor": 1}}))
+            cb.recv(wb.receive_bytes())
+            assert len(cb.awareness(sid)) == 1
+
+        cb.recv(wb.receive_bytes())
+        assert cb.awareness(sid) == {}

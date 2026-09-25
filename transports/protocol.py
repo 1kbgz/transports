@@ -4,7 +4,7 @@ WebSocket messages (and Jupyter comm messages) are self-delimiting, so the binar
 in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small
 JSON envelope carries the routing metadata around a model snapshot or a patch.
 
-Six message kinds:
+Live message kinds:
 
 - ``{"t": "snapshot", "id": <int>, "type": <str>, "rev": <int>, "value": <Value>}``
 - ``{"t": "patch", "id": <int>, "patch": {"rev": <int>, "ops": [...]}, "proposal": <str>?}``
@@ -21,6 +21,9 @@ Six message kinds:
 - ``{"t": "crdt", "id": <int>, "rev": <int>, "ops": [...], "effect": {...}?}`` — causally
   identified CRDT operations. Client proposals use revision zero; authoritative echoes carry the
   shared model revision. Senders may include the optional materialized effect as a cache.
+- ``{"t": "awareness", "id": <int>, "state": <json|null>, "peer": <str>?}`` — ephemeral state
+  scoped to a shared model. Clients omit ``peer``; the Hub assigns it when relaying an update.
+  ``null`` removes the peer's state.
 """
 
 import json
@@ -145,6 +148,14 @@ def reject_msg(
         msg["proposal"] = proposal
     if crdt_ops is not None:
         msg["crdt_ops"] = crdt_ops
+    return json.dumps(msg)
+
+
+def awareness_msg(model_id: int, state: Any | None, peer: str | None = None) -> str:
+    """Build ephemeral per-model awareness. ``peer`` is assigned by the server on fan-out."""
+    msg = {"t": "awareness", "id": model_id, "state": state}
+    if peer is not None:
+        msg["peer"] = peer
     return json.dumps(msg)
 
 

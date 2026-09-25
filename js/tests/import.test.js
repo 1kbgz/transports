@@ -862,6 +862,44 @@ test("Client manages custom duplex channel lifecycle", async () => {
   expect(disconnects).toEqual([false, false]);
 });
 
+test("Client sends, tracks, and clears awareness", async () => {
+  const c = new Client();
+  const sent = [];
+  const updates = [];
+  const sender = (frame) => sent.push(frame);
+  c.onAwareness((update) => updates.push(update));
+  c.attach(sender);
+
+  expect(c.setAwareness(8, { selection: { anchor: 2, head: 4 } })).toBe(true);
+  expect(JSON.parse(sent[0])).toEqual({
+    t: "awareness",
+    id: 8,
+    state: { selection: { anchor: 2, head: 4 } },
+  });
+
+  c.recv(
+    JSON.stringify({
+      t: "awareness",
+      id: 8,
+      peer: "peer-1",
+      state: { selection: { anchor: 1, head: 1 } },
+    }),
+  );
+  expect(c.awareness(8).get("peer-1")).toEqual({
+    selection: { anchor: 1, head: 1 },
+  });
+
+  c.detach(sender);
+  expect(c.awareness(8).size).toBe(0);
+  expect(updates.at(-1)).toEqual({
+    t: "awareness",
+    id: 8,
+    peer: "peer-1",
+    state: null,
+  });
+  expect(c.setAwareness(8, null)).toBe(false);
+});
+
 test("Client flushes queued CRDT operations on custom channel reattach", async () => {
   const spec = new CrdtSpec({
     kind: "sequence",
