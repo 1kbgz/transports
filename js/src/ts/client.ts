@@ -322,7 +322,7 @@ export class Client {
   private connectListeners: Array<() => void> = [];
   private disconnectListeners: Array<() => void> = [];
   private state: ClientStateAdapter;
-  // outbound channel of the active managed connection (set by connect()/run(), cleared on close)
+  // outbound channel of the active managed connection (set by attach(), cleared by detach())
   private sender: ((frame: string | Uint8Array) => void) | null = null;
 
   constructor(private codec: string = "json") {
@@ -332,12 +332,12 @@ export class Client {
     this.replica = `client-${random}`;
   }
 
-  /** Whether a managed connection (`connect()`/`run()`) is open right now. */
+  /** Whether a managed duplex connection is open right now. */
   get connected(): boolean {
     return this.sender !== null;
   }
 
-  /** Send a frame over the active managed connection (`connect()`/`run()`).
+  /** Send a frame over the active managed duplex connection.
    *
    * Returns `true` when handed to an open connection, `false` when none is active (never connected,
    * in a reconnect gap, or receive-only `connectSSE`) — the frame is dropped, matching a browser
@@ -411,7 +411,7 @@ export class Client {
     };
   }
 
-  /** Register a listener fired when an active managed WebSocket disconnects. */
+  /** Register a listener fired when an active managed duplex connection disconnects. */
   onDisconnect(listener: () => void): () => void {
     this.disconnectListeners.push(listener);
     return () => {
@@ -420,7 +420,7 @@ export class Client {
     };
   }
 
-  /** Register a listener fired when a managed WebSocket opens, including reconnects. */
+  /** Register a listener fired when a managed duplex connection opens, including reconnects. */
   onConnect(listener: () => void): () => void {
     this.connectListeners.push(listener);
     return () => {
@@ -438,10 +438,33 @@ export class Client {
     };
   }
 
-  private opened(sender: (frame: string | Uint8Array) => void): void {
+  /** Attach an open duplex channel's sender and flush queued CRDT operations.
+   *
+   * Feed inbound frames to `recv()`. When the channel closes, pass the same sender function to
+   * `detach()`; sender identity prevents a late close from detaching a replacement channel. An
+   * existing channel is disconnected before its replacement is attached.
+   */
+  attach(sender: (frame: string | Uint8Array) => void): void {
+    if (this.sender && this.sender !== sender) {
+      this.sender = null;
+      this.disconnected();
+    }
     this.sender = sender;
-    this.flushCrdtOutbox();
+    try {
+      this.flushCrdtOutbox();
+    } catch (error) {
+      this.detach(sender);
+      throw error;
+    }
     for (const listener of [...this.connectListeners]) listener();
+  }
+
+  /** Detach `sender` if it is still active. Returns whether the client disconnected. */
+  detach(sender: (frame: string | Uint8Array) => void): boolean {
+    if (this.sender !== sender) return false;
+    this.sender = null;
+    this.disconnected();
+    return true;
   }
 
   private flushCrdtOutbox(): void {
@@ -729,13 +752,10 @@ export class Client {
     const sender = (frame: string | Uint8Array) =>
       ws.send(frame as string | Uint8Array<ArrayBuffer>);
     ws.addEventListener("open", () => {
-      this.opened(sender); // arm only once open: send during CONNECTING throws in the DOM
+      this.attach(sender); // arm only once open: send during CONNECTING throws in the DOM
     });
     ws.addEventListener("close", () => {
-      if (this.sender === sender) {
-        this.sender = null; // don't clobber a newer reconnect's channel
-        this.disconnected();
-      }
+      this.detach(sender); // don't clobber a newer reconnect's channel
     });
     return ws;
   }

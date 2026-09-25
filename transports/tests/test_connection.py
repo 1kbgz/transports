@@ -493,6 +493,54 @@ def test_client_send_awaits_native_senders_and_drops_when_unconnected():
     asyncio.run(run())
 
 
+def test_client_manages_custom_duplex_channel_lifecycle():
+    import asyncio
+
+    async def run():
+        client = Client()
+        connected = []
+        disconnected = []
+        abandoned = []
+        first_sent = []
+        second_sent = []
+
+        async def first_sender(frame):
+            first_sent.append(frame)
+
+        async def second_sender(frame):
+            second_sent.append(frame)
+
+        client.on_connect(lambda: connected.append(client.connected))
+        client.on_disconnect(lambda: disconnected.append(client.connected))
+        client.on_abandon(abandoned.append)
+
+        await client.attach(first_sender)
+        assert client.connected is True
+        assert connected == [True]
+        assert await client.send("first") is True
+        assert first_sent == ["first"]
+        assert await client.propose_ops(1, [], "first-pending") is True
+
+        await client.attach(second_sender)
+        assert connected == [True, True]
+        assert disconnected == [False]
+        assert abandoned == [["first-pending"]]
+        assert client.pending_proposals() == []
+        assert client.detach(first_sender) is False
+        assert client.connected is True
+        assert disconnected == [False]
+        assert await client.send("second") is True
+        assert second_sent == ["second"]
+
+        assert client.detach(second_sender) is True
+        assert client.connected is False
+        assert disconnected == [False, False]
+        assert client.detach(second_sender) is False
+        assert disconnected == [False, False]
+
+    asyncio.run(run())
+
+
 def test_browser_run_reconnects_with_resume_and_client_authority():
     """`Client._run_browser` (the Pyodide `run`) reconnects with `?since=` resume and, under client
     authority, pushes the pre-drop state back once the server has (re)snapshotted."""
