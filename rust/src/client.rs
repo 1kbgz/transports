@@ -52,6 +52,11 @@ pub enum ClientEffect {
         #[serde(skip_serializing_if = "Option::is_none")]
         proposal: Option<String>,
     },
+    Awareness {
+        id: u64,
+        peer: String,
+        state: Option<serde_json::Value>,
+    },
     Ignore,
     Disconnect {
         proposals: Vec<String>,
@@ -104,6 +109,12 @@ enum ClientMessage {
         rev: u64,
         error: String,
         proposal: Option<String>,
+    },
+    #[serde(rename = "awareness")]
+    Awareness {
+        id: u64,
+        peer: String,
+        state: Option<serde_json::Value>,
     },
     #[serde(rename = "batch")]
     Batch,
@@ -180,6 +191,16 @@ impl ClientState {
                 error: error.clone(),
                 proposal: proposal.clone(),
             }),
+            Message::Awareness {
+                id,
+                peer: Some(peer),
+                state,
+            } => Ok(ClientEffect::Awareness {
+                id: *id,
+                peer: peer.clone(),
+                state: state.clone(),
+            }),
+            Message::Awareness { peer: None, .. } => Ok(ClientEffect::Ignore),
             Message::Unknown(_) => Ok(ClientEffect::Ignore),
             Message::Batch { .. } => Err("batch messages must be prepared in order".into()),
         }
@@ -231,6 +252,9 @@ impl ClientState {
                 error,
                 proposal,
             },
+            ClientMessage::Awareness { id, peer, state } => {
+                ClientEffect::Awareness { id, peer, state }
+            }
             ClientMessage::Unknown => ClientEffect::Ignore,
             ClientMessage::Batch => return Err("batch messages must be prepared in order".into()),
         };

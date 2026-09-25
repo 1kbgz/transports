@@ -38,6 +38,8 @@ class Client:
         self._crdt_outbox: list[dict] = []
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
+        self._awareness: dict[int, dict[str, Any]] = {}
+        self._awareness_cbs: list[Callable[[dict], None]] = []
         self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
         self._abandon_cbs: list[Callable[[list[str]], None]] = []
@@ -88,6 +90,10 @@ class Client:
         frame = self.edit_crdt(mid, mutations)
         return await self.send(frame)
 
+    async def set_awareness(self, mid: int, state: Any | None) -> bool:
+        """Publish ephemeral state for one model, or clear it with ``None``."""
+        return await self.send(protocol.encode(protocol.awareness_msg(mid, state), self._codec))
+
     async def _send_proposal(self, frame: str | bytes) -> bool:
         proposal = protocol.decode(frame, self._codec)["proposal"]
         try:
@@ -113,6 +119,11 @@ class Client:
         the authoritative snapshot the server sends alongside. Returns an unsubscribe function."""
         self._reject_cbs.append(callback)
         return lambda: self._reject_cbs.remove(callback)
+
+    def on_awareness(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Register for remote awareness updates and removals (``state`` is ``None``)."""
+        self._awareness_cbs.append(callback)
+        return lambda: self._awareness_cbs.remove(callback)
 
     def on_ack(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired when the server accepts a tagged proposal.
@@ -174,6 +185,12 @@ class Client:
         if abandoned:
             for callback in list(self._abandon_cbs):
                 callback(abandoned)
+        for mid, peers in list(self._awareness.items()):
+            for peer in list(peers):
+                update = {"t": "awareness", "id": mid, "peer": peer, "state": None}
+                for callback in list(self._awareness_cbs):
+                    callback(update)
+        self._awareness.clear()
         for callback in list(self._disconnect_cbs):
             callback()
 
@@ -280,6 +297,20 @@ class Client:
             for callback in list(self._reject_cbs):
                 callback(msg)
             return None
+        elif kind == "awareness":
+            mid = msg["id"]
+            peer = msg["peer"]
+            state = msg.get("state")
+            peers = self._awareness.setdefault(mid, {})
+            if state is None:
+                peers.pop(peer, None)
+                if not peers:
+                    self._awareness.pop(mid, None)
+            else:
+                peers[peer] = state
+            for callback in list(self._awareness_cbs):
+                callback(msg)
+            return None
         # an unrecognized message type is ignored (not an error): the server may be newer than this client
         return None
 
@@ -306,6 +337,10 @@ class Client:
     def pending_crdt_ops(self, mid: int | None = None) -> int:
         """Number of local CRDT operations awaiting an authoritative echo."""
         return sum(len(pending["ops"]) for pending in self._crdt_outbox if mid is None or pending["id"] == mid)
+
+    def awareness(self, mid: int) -> dict[str, Any]:
+        """Snapshot remote ephemeral state keyed by server-assigned peer id."""
+        return dict(self._awareness.get(mid, {}))
 
     def abandon_proposal(self, proposal: str) -> bool:
         """Stop tracking one proposal that the caller did not send.

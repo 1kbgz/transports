@@ -51,7 +51,7 @@ class Broadcaster(Protocol):
 
     def _flush_tagged(self) -> dict[Any, list[tuple[int | None, "Wire"]]]: ...
 
-    def close(self, conn: Any) -> None: ...
+    def close(self, conn: Any) -> dict[Any, list[Wire]]: ...
 
 
 class Server:
@@ -193,9 +193,10 @@ class Server:
                 out[conn] = encoded
         return out
 
-    def close(self, conn: Any) -> None:
+    def close(self, conn: Any) -> dict[Any, list[Wire]]:
         self._codecs.pop(conn, None)
         self._batched.discard(conn)
+        return {}
 
 
 async def _send(conn: Any, msg: Wire) -> None:
@@ -242,7 +243,11 @@ def ws_endpoint(server: Broadcaster):
         except WebSocketDisconnect:
             pass
         finally:
-            server.close(websocket)
+            replies = server.close(websocket)
+            if replies and not _enqueue_if_autosync(server, replies):
+                for conn, msgs in replies.items():
+                    for msg in msgs:
+                        await _send(conn, msg)
 
     return endpoint
 
