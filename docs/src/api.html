@@ -425,18 +425,19 @@ distinct codecs), not O(messages x connections).</p>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Mirrors a remote <cite>Session</cite> — applies snapshot/patch messages to a local copy of each model.</p>
 <p>Read values with <cite>value(id)</cite> or materialize them with <cite>model(id, cls)</cite>. Drive it with a live
-connection via <cite>connect(url)</cite>, or feed it messages directly with <cite>recv(data)</cite>. The <cite>codec</cite>
-(<cite>“json”</cite>, <cite>“msgpack”</cite>, or <cite>“cbor”</cite>) frames outbound edits and decodes inbound frames.</p>
+connection via <cite>connect(url)</cite>, attach an application-owned duplex sender, or feed it messages
+directly with <cite>recv(data)</cite>. The <cite>codec</cite> (<cite>“json”</cite>, <cite>“msgpack”</cite>, or <cite>“cbor”</cite>) frames outbound
+edits and decodes inbound frames.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="transports.Client.connected">
 <em class="property"><span class="k"><span class="pre">property</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connected</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#transports.Client.connected" title="Link to this definition">¶</a></dt>
-<dd><p>Whether a managed connection (<cite>connect</cite> / <cite>run</cite>) is open right now.</p>
+<dd><p>Whether a managed duplex connection is open right now.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.send">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">send</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">frame</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.send"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.send" title="Link to this definition">¶</a></dt>
-<dd><p>Send a frame over the active managed connection (<cite>connect</cite> / <cite>run</cite>).</p>
+<dd><p>Send a frame over the active managed duplex connection.</p>
 <p>Returns <code class="docutils literal notranslate"><span class="pre">True</span></code> when handed to an open connection, <code class="docutils literal notranslate"><span class="pre">False</span></code> when none is active (never
 connected, in a reconnect gap, or receive-only <cite>connect_sse</cite>) — the frame is dropped, like a
 browser WebSocket’s send on a closed socket, so an adapter can pass <code class="docutils literal notranslate"><span class="pre">client.send</span></code> as a
@@ -492,19 +493,34 @@ Returns an unsubscribe function.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_disconnect">
 <span class="sig-name descname"><span class="pre">on_disconnect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_disconnect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_disconnect" title="Link to this definition">¶</a></dt>
-<dd><p>Register a callback fired when an active managed WebSocket disconnects.</p>
+<dd><p>Register a callback fired when an active managed duplex connection disconnects.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_connect">
 <span class="sig-name descname"><span class="pre">on_connect</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_connect"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_connect" title="Link to this definition">¶</a></dt>
-<dd><p>Register a callback fired when a managed WebSocket opens, including reconnects.</p>
+<dd><p>Register a callback fired when a managed duplex connection opens, including reconnects.</p>
 </dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_abandon">
 <span class="sig-name descname"><span class="pre">on_abandon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_abandon"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_abandon" title="Link to this definition">¶</a></dt>
 <dd><p>Register a callback fired with unsettled proposal identifiers on disconnect.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.attach">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">attach</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sender</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.attach"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.attach" title="Link to this definition">¶</a></dt>
+<dd><p>Attach an open duplex channel’s sender and flush queued CRDT operations.</p>
+<p>Feed inbound frames to <cite>recv</cite>. When the channel closes, pass the same sender object to
+<cite>detach</cite>; sender identity prevents a late close from detaching a replacement channel. An
+existing channel is disconnected before its replacement is attached.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.detach">
+<span class="sig-name descname"><span class="pre">detach</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sender</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.detach"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.detach" title="Link to this definition">¶</a></dt>
+<dd><p>Detach <cite>sender</cite> if it is still active, returning whether the client disconnected.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1280,6 +1296,8 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.on_disconnect"><code class="docutils literal notranslate"><span class="pre">Client.on_disconnect()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.on_connect"><code class="docutils literal notranslate"><span class="pre">Client.on_connect()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.on_abandon"><code class="docutils literal notranslate"><span class="pre">Client.on_abandon()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.attach"><code class="docutils literal notranslate"><span class="pre">Client.attach()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.detach"><code class="docutils literal notranslate"><span class="pre">Client.detach()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.value"><code class="docutils literal notranslate"><span class="pre">Client.value()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.crdt_spec"><code class="docutils literal notranslate"><span class="pre">Client.crdt_spec()</span></code></a></li>

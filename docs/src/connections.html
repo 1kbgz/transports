@@ -327,8 +327,9 @@ identifier, and rejects include it in <code class="docutils literal notranslate"
 <code class="docutils literal notranslate"><span class="pre">editOps</span></code> with a hand-rolled socket, to send explicit operations when a whole-value diff would be
 empty against the current mirror. Generated identifiers use the reserved <code class="docutils literal notranslate"><span class="pre">auto-N</span></code> form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.</p>
-<p><code class="docutils literal notranslate"><span class="pre">onConnect</span></code> fires whenever a managed WebSocket opens, including each <code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect. It fires
-after <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> becomes true and does not depend on the server sending a snapshot or patch.
+<p><code class="docutils literal notranslate"><span class="pre">onConnect</span></code> fires whenever a managed duplex connection opens, including each <code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect and
+custom channels attached with <code class="docutils literal notranslate"><span class="pre">attach()</span></code>. It fires after <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> becomes true and does
+not depend on the server sending a snapshot or patch.
 Use it with <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> when an adapter needs connection status. Python names the hooks
 <code class="docutils literal notranslate"><span class="pre">on_connect</span></code> and <code class="docutils literal notranslate"><span class="pre">on_disconnect</span></code>. These hooks do not apply to receive-only <code class="docutils literal notranslate"><span class="pre">connectSSE</span></code> /
 <code class="docutils literal notranslate"><span class="pre">connect_sse</span></code> streams.</p>
@@ -343,6 +344,29 @@ when no managed connection is open. This matches a browser WebSocket’s send on
 they are safe as fire-and-forget callbacks even across <code class="docutils literal notranslate"><span class="pre">run()</span></code> reconnect gaps. Check
 <code class="docutils literal notranslate"><span class="pre">client.connected</span></code> (or the return value) when delivery matters. With a hand-rolled socket, send
 <code class="docutils literal notranslate"><span class="pre">client.edit(id,</span> <span class="pre">value)</span></code> yourself as before.</p>
+<p>An adapter can also make its channel the client’s managed connection. Attach its sender, feed
+received frames to <code class="docutils literal notranslate"><span class="pre">recv</span></code>, and detach the same sender object when the channel closes:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="nx">channel</span><span class="p">.</span><span class="nx">binaryType</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">"arraybuffer"</span><span class="p">;</span>
+<span class="kd">const</span><span class="w"> </span><span class="nx">sender</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">(</span><span class="nx">frame</span><span class="o">:</span><span class="w"> </span><span class="kt">string</span><span class="w"> </span><span class="o">|</span><span class="w"> </span><span class="nb">Uint8Array</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">channel</span><span class="p">.</span><span class="nx">send</span><span class="p">(</span><span class="nx">frame</span><span class="p">);</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">attach</span><span class="p">(</span><span class="nx">sender</span><span class="p">);</span>
+<span class="nx">channel</span><span class="p">.</span><span class="nx">onmessage</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">({</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span>
+<span class="w">  </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="ow">typeof</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">"string"</span><span class="w"> </span><span class="o">?</span><span class="w"> </span><span class="nx">data</span><span class="w"> </span><span class="o">:</span><span class="w"> </span><span class="kt">new</span><span class="w"> </span><span class="nb">Uint8Array</span><span class="p">(</span><span class="nx">data</span><span class="p">));</span>
+<span class="nx">channel</span><span class="p">.</span><span class="nx">onclose</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">()</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">detach</span><span class="p">(</span><span class="nx">sender</span><span class="p">);</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">sender</span> <span class="o">=</span> <span class="n">channel</span><span class="o">.</span><span class="n">send</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">attach</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="k">async</span> <span class="k">for</span> <span class="n">frame</span> <span class="ow">in</span> <span class="n">channel</span><span class="p">:</span>
+        <span class="n">client</span><span class="o">.</span><span class="n">recv</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span>
+<span class="k">finally</span><span class="p">:</span>
+    <span class="n">client</span><span class="o">.</span><span class="n">detach</span><span class="p">(</span><span class="n">sender</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">attach</span></code> flushes queued CRDT operations. Attaching a replacement first disconnects the old channel,
+which abandons its unsettled ordinary proposals but retains CRDT operations for the replacement.
+<code class="docutils literal notranslate"><span class="pre">detach</span></code> checks sender identity, so a late close from the old channel cannot clear the replacement.
+If the initial CRDT flush fails, <code class="docutils literal notranslate"><span class="pre">attach</span></code> detaches the failed channel and reports the send error.</p>
 <p>If a hand-rolled sender fails after <code class="docutils literal notranslate"><span class="pre">edit</span></code> or <code class="docutils literal notranslate"><span class="pre">editOps</span></code> creates a proposal, call
 <code class="docutils literal notranslate"><span class="pre">client.abandonProposal(proposal)</span></code> to remove it from the JavaScript client’s pending set. Python
 provides <code class="docutils literal notranslate"><span class="pre">client.abandon_proposal(proposal)</span></code>. The methods return whether the proposal was pending;

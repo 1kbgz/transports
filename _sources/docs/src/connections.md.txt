@@ -90,8 +90,9 @@ identifier, and rejects include it in `onReject`. Use `proposeOps` on a managed 
 empty against the current mirror. Generated identifiers use the reserved `auto-N` form; explicit
 identifiers matching that form are rejected so the two sources cannot collide.
 
-`onConnect` fires whenever a managed WebSocket opens, including each `run()` reconnect. It fires
-after `client.connected` becomes true and does not depend on the server sending a snapshot or patch.
+`onConnect` fires whenever a managed duplex connection opens, including each `run()` reconnect and
+custom channels attached with `attach()`. It fires after `client.connected` becomes true and does
+not depend on the server sending a snapshot or patch.
 Use it with `onDisconnect` when an adapter needs connection status. Python names the hooks
 `on_connect` and `on_disconnect`. These hooks do not apply to receive-only `connectSSE` /
 `connect_sse` streams.
@@ -108,6 +109,33 @@ when no managed connection is open. This matches a browser WebSocket's send on a
 they are safe as fire-and-forget callbacks even across `run()` reconnect gaps. Check
 `client.connected` (or the return value) when delivery matters. With a hand-rolled socket, send
 `client.edit(id, value)` yourself as before.
+
+An adapter can also make its channel the client's managed connection. Attach its sender, feed
+received frames to `recv`, and detach the same sender object when the channel closes:
+
+```ts
+channel.binaryType = "arraybuffer";
+const sender = (frame: string | Uint8Array) => channel.send(frame);
+client.attach(sender);
+channel.onmessage = ({ data }) =>
+  client.recv(typeof data === "string" ? data : new Uint8Array(data));
+channel.onclose = () => client.detach(sender);
+```
+
+```python
+sender = channel.send
+await client.attach(sender)
+try:
+    async for frame in channel:
+        client.recv(frame)
+finally:
+    client.detach(sender)
+```
+
+`attach` flushes queued CRDT operations. Attaching a replacement first disconnects the old channel,
+which abandons its unsettled ordinary proposals but retains CRDT operations for the replacement.
+`detach` checks sender identity, so a late close from the old channel cannot clear the replacement.
+If the initial CRDT flush fails, `attach` detaches the failed channel and reports the send error.
 
 If a hand-rolled sender fails after `edit` or `editOps` creates a proposal, call
 `client.abandonProposal(proposal)` to remove it from the JavaScript client's pending set. Python
