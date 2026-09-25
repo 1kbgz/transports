@@ -247,7 +247,7 @@
 <span class="sd">in the Rust core — which exists for byte-stream transports like TCP — isn't needed here. A small</span>
 <span class="sd">JSON envelope carries the routing metadata around a model snapshot or a patch.</span>
 
-<span class="sd">Six message kinds:</span>
+<span class="sd">Live message kinds:</span>
 
 <span class="sd">- ``{"t": "snapshot", "id": &lt;int&gt;, "type": &lt;str&gt;, "rev": &lt;int&gt;, "value": &lt;Value&gt;}``</span>
 <span class="sd">- ``{"t": "patch", "id": &lt;int&gt;, "patch": {"rev": &lt;int&gt;, "ops": [...]}, "proposal": &lt;str&gt;?}``</span>
@@ -264,6 +264,9 @@
 <span class="sd">- ``{"t": "crdt", "id": &lt;int&gt;, "rev": &lt;int&gt;, "ops": [...], "effect": {...}?}`` — causally</span>
 <span class="sd">  identified CRDT operations. Client proposals use revision zero; authoritative echoes carry the</span>
 <span class="sd">  shared model revision. Senders may include the optional materialized effect as a cache.</span>
+<span class="sd">- ``{"t": "awareness", "id": &lt;int&gt;, "state": &lt;json|null&gt;, "peer": &lt;str&gt;?}`` — ephemeral state</span>
+<span class="sd">  scoped to a shared model. Clients omit ``peer``; the Hub assigns it when relaying an update.</span>
+<span class="sd">  ``null`` removes the peer's state.</span>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
@@ -412,6 +415,14 @@
         <span class="n">msg</span><span class="p">[</span><span class="s2">"proposal"</span><span class="p">]</span> <span class="o">=</span> <span class="n">proposal</span>
     <span class="k">if</span> <span class="n">crdt_ops</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
         <span class="n">msg</span><span class="p">[</span><span class="s2">"crdt_ops"</span><span class="p">]</span> <span class="o">=</span> <span class="n">crdt_ops</span>
+    <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">awareness_msg</span><span class="p">(</span><span class="n">model_id</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">peer</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">"""Build ephemeral per-model awareness. ``peer`` is assigned by the server on fan-out."""</span>
+    <span class="n">msg</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"awareness"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">model_id</span><span class="p">,</span> <span class="s2">"state"</span><span class="p">:</span> <span class="n">state</span><span class="p">}</span>
+    <span class="k">if</span> <span class="n">peer</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span><span class="p">[</span><span class="s2">"peer"</span><span class="p">]</span> <span class="o">=</span> <span class="n">peer</span>
     <span class="k">return</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 
 

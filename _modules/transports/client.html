@@ -283,6 +283,8 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">_crdt_outbox</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">normalize_codec</span><span class="p">(</span><span class="n">codec</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_change_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_awareness_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_ack_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="p">[]</span>
@@ -345,6 +347,13 @@
         <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">frame</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="Client.set_awareness">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.set_awareness">[docs]</a>
+    <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">set_awareness</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">Any</span> <span class="o">|</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">"""Publish ephemeral state for one model, or clear it with ``None``."""</span>
+        <span class="k">return</span> <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">send</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="n">protocol</span><span class="o">.</span><span class="n">awareness_msg</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">state</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">))</span></div>
+
+
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">_send_proposal</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">frame</span><span class="p">:</span> <span class="nb">str</span> <span class="o">|</span> <span class="nb">bytes</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
         <span class="n">proposal</span> <span class="o">=</span> <span class="n">protocol</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="n">frame</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_codec</span><span class="p">)[</span><span class="s2">"proposal"</span><span class="p">]</span>
         <span class="k">try</span><span class="p">:</span>
@@ -375,6 +384,14 @@
 <span class="sd">        the authoritative snapshot the server sends alongside. Returns an unsubscribe function."""</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
         <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Client.on_awareness">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.on_awareness">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">on_awareness</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">callback</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">dict</span><span class="p">],</span> <span class="kc">None</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[],</span> <span class="kc">None</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Register for remote awareness updates and removals (``state`` is ``None``)."""</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_awareness_cbs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span>
+        <span class="k">return</span> <span class="k">lambda</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">_awareness_cbs</span><span class="o">.</span><span class="n">remove</span><span class="p">(</span><span class="n">callback</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="Client.on_ack">
@@ -455,6 +472,12 @@
         <span class="k">if</span> <span class="n">abandoned</span><span class="p">:</span>
             <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_abandon_cbs</span><span class="p">):</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">abandoned</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">mid</span><span class="p">,</span> <span class="n">peers</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="o">.</span><span class="n">items</span><span class="p">()):</span>
+            <span class="k">for</span> <span class="n">peer</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="n">peers</span><span class="p">):</span>
+                <span class="n">update</span> <span class="o">=</span> <span class="p">{</span><span class="s2">"t"</span><span class="p">:</span> <span class="s2">"awareness"</span><span class="p">,</span> <span class="s2">"id"</span><span class="p">:</span> <span class="n">mid</span><span class="p">,</span> <span class="s2">"peer"</span><span class="p">:</span> <span class="n">peer</span><span class="p">,</span> <span class="s2">"state"</span><span class="p">:</span> <span class="kc">None</span><span class="p">}</span>
+                <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_awareness_cbs</span><span class="p">):</span>
+                    <span class="n">callback</span><span class="p">(</span><span class="n">update</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="o">.</span><span class="n">clear</span><span class="p">()</span>
         <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_disconnect_cbs</span><span class="p">):</span>
             <span class="n">callback</span><span class="p">()</span>
 
@@ -564,6 +587,20 @@
             <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_reject_cbs</span><span class="p">):</span>
                 <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
             <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">elif</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">"awareness"</span><span class="p">:</span>
+            <span class="n">mid</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span>
+            <span class="n">peer</span> <span class="o">=</span> <span class="n">msg</span><span class="p">[</span><span class="s2">"peer"</span><span class="p">]</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">msg</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"state"</span><span class="p">)</span>
+            <span class="n">peers</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="o">.</span><span class="n">setdefault</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">{})</span>
+            <span class="k">if</span> <span class="n">state</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">peers</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">peer</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+                <span class="k">if</span> <span class="ow">not</span> <span class="n">peers</span><span class="p">:</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">peers</span><span class="p">[</span><span class="n">peer</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span>
+            <span class="k">for</span> <span class="n">callback</span> <span class="ow">in</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_awareness_cbs</span><span class="p">):</span>
+                <span class="n">callback</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span>
         <span class="c1"># an unrecognized message type is ignored (not an error): the server may be newer than this client</span>
         <span class="k">return</span> <span class="kc">None</span>
 
@@ -607,6 +644,13 @@
     <span class="k">def</span><span class="w"> </span><span class="nf">pending_crdt_ops</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">"""Number of local CRDT operations awaiting an authoritative echo."""</span>
         <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">pending</span><span class="p">[</span><span class="s2">"ops"</span><span class="p">])</span> <span class="k">for</span> <span class="n">pending</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crdt_outbox</span> <span class="k">if</span> <span class="n">mid</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">pending</span><span class="p">[</span><span class="s2">"id"</span><span class="p">]</span> <span class="o">==</span> <span class="n">mid</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Client.awareness">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.awareness">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">awareness</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Snapshot remote ephemeral state keyed by server-assigned peer id."""</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_awareness</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">{}))</span></div>
 
 
 <div class="viewcode-block" id="Client.abandon_proposal">

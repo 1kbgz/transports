@@ -377,6 +377,31 @@ offline, and resends them after reconnect. An authoritative echo clears the matc
 Unlike ordinary patch proposals, CRDT operations survive a connection drop because resending one
 causal dot is safe. Use <code class="docutils literal notranslate"><span class="pre">pendingCrdtOps(id)</span></code> to inspect the outbox.</p>
 </section>
+<section id="publish-ephemeral-awareness">
+<h2>Publish ephemeral awareness<a class="headerlink" href="#publish-ephemeral-awareness" title="Link to this heading">¶</a></h2>
+<p>Awareness carries transient state for a shared <code class="docutils literal notranslate"><span class="pre">Hub</span></code> model. It is suitable for cursor positions,
+selections, typing state, and other hints that should disappear when a connection closes. The Hub
+does not store awareness in the model, replay log, CRDT state, or persistence callbacks.</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="nx">client</span><span class="p">.</span><span class="nx">onAwareness</span><span class="p">(({</span><span class="w"> </span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="nx">peer</span><span class="p">,</span><span class="w"> </span><span class="nx">state</span><span class="w"> </span><span class="p">})</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">id</span><span class="w"> </span><span class="o">!==</span><span class="w"> </span><span class="nx">documentId</span><span class="p">)</span><span class="w"> </span><span class="k">return</span><span class="p">;</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">state</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="nx">removePeerCursor</span><span class="p">(</span><span class="nx">peer</span><span class="p">);</span>
+<span class="w">  </span><span class="k">else</span><span class="w"> </span><span class="nx">updatePeerCursor</span><span class="p">(</span><span class="nx">peer</span><span class="p">,</span><span class="w"> </span><span class="nx">state</span><span class="p">);</span>
+<span class="p">});</span>
+
+<span class="nx">client</span><span class="p">.</span><span class="nx">setAwareness</span><span class="p">(</span><span class="nx">documentId</span><span class="p">,</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="nx">selection</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">anchor</span><span class="o">:</span><span class="w"> </span><span class="kt">12</span><span class="p">,</span><span class="w"> </span><span class="nx">head</span><span class="o">:</span><span class="w"> </span><span class="kt">18</span><span class="w"> </span><span class="p">},</span>
+<span class="p">});</span>
+</pre></div>
+</div>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span><span class="o">.</span><span class="n">on_awareness</span><span class="p">(</span><span class="n">handle_awareness</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">set_awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">"selection"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"anchor"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"head"</span><span class="p">:</span> <span class="mi">18</span><span class="p">}})</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">awareness(id)</span></code> returns the latest remote state keyed by the Hub-assigned peer id. Pass <code class="docutils literal notranslate"><span class="pre">null</span></code> in
+JavaScript or <code class="docutils literal notranslate"><span class="pre">None</span></code> in Python to clear local state before closing. The Hub also sends a removal when
+the connection closes. Read-only subscribers may publish awareness; it does not grant model write
+access. Payload meaning, user identity, names, colors, and rendering remain application concerns.</p>
+</section>
 <section id="mirror-the-server-in-python">
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code> runs a receive loop until the WebSocket closes.</p>
@@ -558,6 +583,7 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <li><a class="reference internal" href="#">How to connect live clients</a><ul>
 <li><a class="reference internal" href="#serve-a-session-over-websocket">Serve a session over WebSocket</a></li>
 <li><a class="reference internal" href="#mirror-the-server-in-a-browser">Mirror the server in a browser</a></li>
+<li><a class="reference internal" href="#publish-ephemeral-awareness">Publish ephemeral awareness</a></li>
 <li><a class="reference internal" href="#mirror-the-server-in-python">Mirror the server in Python</a></li>
 <li><a class="reference internal" href="#use-messagepack-on-a-connection">Use MessagePack on a connection</a></li>
 <li><a class="reference internal" href="#stream-receive-only-updates-over-sse">Stream receive-only updates over SSE</a></li>
