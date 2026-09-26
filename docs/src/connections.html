@@ -250,7 +250,8 @@
           <section class="tex2jax_ignore mathjax_ignore" id="how-to-connect-live-clients">
 <h1>How to connect live clients<a class="headerlink" href="#how-to-connect-live-clients" title="Link to this heading">¶</a></h1>
 <p>This guide shows you how to serve a <code class="docutils literal notranslate"><span class="pre">Session</span></code> or <code class="docutils literal notranslate"><span class="pre">Hub</span></code> over the connection adapters transports ships
-today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom messages.</p>
+today: WebSocket, WebRTC data channels, Server-Sent Events, Jupyter comm, and anywidget custom
+messages.</p>
 <section id="serve-a-session-over-websocket">
 <h2>Serve a session over WebSocket<a class="headerlink" href="#serve-a-session-over-websocket" title="Link to this heading">¶</a></h2>
 <p>Install the WebSocket dependencies:</p>
@@ -397,10 +398,32 @@ does not store awareness in the model, replay log, CRDT state, or persistence ca
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">set_awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">"selection"</span><span class="p">:</span> <span class="p">{</span><span class="s2">"anchor"</span><span class="p">:</span> <span class="mi">12</span><span class="p">,</span> <span class="s2">"head"</span><span class="p">:</span> <span class="mi">18</span><span class="p">}})</span>
 </pre></div>
 </div>
-<p><code class="docutils literal notranslate"><span class="pre">awareness(id)</span></code> returns the latest remote state keyed by the Hub-assigned peer id. Pass <code class="docutils literal notranslate"><span class="pre">null</span></code> in
-JavaScript or <code class="docutils literal notranslate"><span class="pre">None</span></code> in Python to clear local state before closing. The Hub also sends a removal when
-the connection closes. Read-only subscribers may publish awareness; it does not grant model write
-access. Payload meaning, user identity, names, colors, and rendering remain application concerns.</p>
+<p><code class="docutils literal notranslate"><span class="pre">awareness(id)</span></code> returns the latest remote state keyed by the Hub-assigned peer id. A client retains
+its latest local state and republishes it whenever a managed connection opens, including a resume
+that produces no model frame. Pass <code class="docutils literal notranslate"><span class="pre">null</span></code> in JavaScript or <code class="docutils literal notranslate"><span class="pre">None</span></code> in Python to clear that state. The
+Hub also sends a removal when the connection closes. Read-only subscribers may publish awareness;
+it does not grant model write access. Payload meaning, user identity, names, colors, and rendering
+remain application concerns.</p>
+</section>
+<section id="use-an-existing-webrtc-data-channel">
+<h2>Use an existing WebRTC data channel<a class="headerlink" href="#use-an-existing-webrtc-data-channel" title="Link to this heading">¶</a></h2>
+<p>transports can manage an <code class="docutils literal notranslate"><span class="pre">RTCDataChannel</span></code> after your application negotiates it. Signaling and
+<code class="docutils literal notranslate"><span class="pre">RTCPeerConnection</span></code> ownership remain with the application:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">connectDataChannel</span><span class="p">(</span><span class="nx">peerConnection</span><span class="p">.</span><span class="nx">createDataChannel</span><span class="p">(</span><span class="s2">"transports"</span><span class="p">));</span>
+</pre></div>
+</div>
+<p>The adapter receives frames, sends proposals, flushes queued CRDT operations and awareness when the
+channel opens, and reports connection lifecycle through the same hooks as <code class="docutils literal notranslate"><span class="pre">connect()</span></code>. The remote
+endpoint must speak the transports protocol with the same codec.</p>
+<p>Pyodide uses the same browser channel through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">()</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect_data_channel</span><span class="p">(</span><span class="n">channel</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">connect_data_channel</span></code> runs until the channel closes. Native Python intentionally does not install
+<code class="docutils literal notranslate"><span class="pre">aiortc</span></code>; browser peer-to-peer sessions are the supported WebRTC path. transports does not yet
+provide signaling or turn two clients into a peer-hosted <code class="docutils literal notranslate"><span class="pre">Hub</span></code>.</p>
 </section>
 <section id="mirror-the-server-in-python">
 <h2>Mirror the server in Python<a class="headerlink" href="#mirror-the-server-in-python" title="Link to this heading">¶</a></h2>
@@ -584,6 +607,7 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <li><a class="reference internal" href="#serve-a-session-over-websocket">Serve a session over WebSocket</a></li>
 <li><a class="reference internal" href="#mirror-the-server-in-a-browser">Mirror the server in a browser</a></li>
 <li><a class="reference internal" href="#publish-ephemeral-awareness">Publish ephemeral awareness</a></li>
+<li><a class="reference internal" href="#use-an-existing-webrtc-data-channel">Use an existing WebRTC data channel</a></li>
 <li><a class="reference internal" href="#mirror-the-server-in-python">Mirror the server in Python</a></li>
 <li><a class="reference internal" href="#use-messagepack-on-a-connection">Use MessagePack on a connection</a></li>
 <li><a class="reference internal" href="#stream-receive-only-updates-over-sse">Stream receive-only updates over SSE</a></li>

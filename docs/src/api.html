@@ -468,6 +468,8 @@ fire-and-forget callback; check <cite>connected</cite> (or the return) when it m
 <dt class="sig sig-object py" id="transports.Client.set_awareness">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">set_awareness</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">state</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.set_awareness"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.set_awareness" title="Link to this definition">¶</a></dt>
 <dd><p>Publish ephemeral state for one model, or clear it with <code class="docutils literal notranslate"><span class="pre">None</span></code>.</p>
+<p>The latest non-null state is retained locally and republished when a managed connection
+opens. This keeps presence visible across reconnects without adding it to durable state.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -523,7 +525,7 @@ Returns an unsubscribe function.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.attach">
 <em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">attach</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">sender</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.attach"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.attach" title="Link to this definition">¶</a></dt>
-<dd><p>Attach an open duplex channel’s sender and flush queued CRDT operations.</p>
+<dd><p>Attach an open duplex channel and flush queued CRDT operations and awareness.</p>
 <p>Feed inbound frames to <cite>recv</cite>. When the channel closes, pass the same sender object to
 <cite>detach</cite>; sender identity prevents a late close from detaching a replacement channel. An
 existing channel is disconnected before its replacement is attached.</p>
@@ -630,6 +632,15 @@ server snapshot, reapply queued operations locally, and resend them.</p>
 <p>Under Pyodide (<code class="docutils literal notranslate"><span class="pre">sys.platform</span> <span class="pre">==</span> <span class="pre">&quot;emscripten&quot;</span></code>) the browser gives Python no raw sockets, so
 this rides the browser’s native <code class="docutils literal notranslate"><span class="pre">WebSocket</span></code> through the <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI instead of the
 <code class="docutils literal notranslate"><span class="pre">websockets</span></code> library — same API, same wire.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.connect_data_channel">
+<em class="property"><span class="k"><span class="pre">async</span></span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">connect_data_channel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">channel</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.connect_data_channel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.connect_data_channel" title="Link to this definition">¶</a></dt>
+<dd><p>Mirror over an externally negotiated browser <code class="docutils literal notranslate"><span class="pre">RTCDataChannel</span></code> until it closes.</p>
+<p>Signaling and peer-connection ownership stay with the application. Under Pyodide the
+channel rides the browser’s <code class="docutils literal notranslate"><span class="pre">js</span></code> FFI; native Python deliberately has no <code class="docutils literal notranslate"><span class="pre">aiortc</span></code>
+dependency.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1331,6 +1342,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <li><a class="reference internal" href="#transports.Client.edit_ops"><code class="docutils literal notranslate"><span class="pre">Client.edit_ops()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.edit_crdt"><code class="docutils literal notranslate"><span class="pre">Client.edit_crdt()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
+<li><a class="reference internal" href="#transports.Client.connect_data_channel"><code class="docutils literal notranslate"><span class="pre">Client.connect_data_channel()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.run"><code class="docutils literal notranslate"><span class="pre">Client.run()</span></code></a></li>
 <li><a class="reference internal" href="#transports.Client.connect_sse"><code class="docutils literal notranslate"><span class="pre">Client.connect_sse()</span></code></a></li>
 </ul>
