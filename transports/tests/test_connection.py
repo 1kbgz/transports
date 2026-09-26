@@ -1,5 +1,6 @@
 import json
 
+import pytest
 from pydantic import BaseModel
 
 from transports import Client, Server, Session, protocol, register_codec, to_value, unregister_codec, ws_endpoint
@@ -444,6 +445,124 @@ def test_browser_websocket_path_mirrors_frames():
             assert acknowledgements[0]["proposal"] == "browser-1"
             assert disconnects == [True]
             assert not client.connected
+
+        asyncio.run(run())
+    finally:
+        for name, mod in saved.items():
+            if mod is None:
+                sys.modules.pop(name, None)
+            else:
+                sys.modules[name] = mod
+
+
+def test_browser_data_channel_path_mirrors_frames():
+    """Pyodide adapts an externally negotiated RTCDataChannel without owning signaling."""
+    import asyncio
+    import sys
+    import types
+
+    class FakeBuffer:
+        def __init__(self, data: bytes):
+            self._data = data
+
+        def to_bytes(self) -> bytes:
+            return self._data
+
+    class FakeEvent:
+        def __init__(self, data=None):
+            self.data = data
+
+    class FakeProxy:
+        def __init__(self, fn):
+            self._fn = fn
+
+        def __call__(self, *args):
+            return self._fn(*args)
+
+        def destroy(self) -> None:
+            pass
+
+    class FakeDataChannel:
+        def __init__(self, state="connecting"):
+            self.readyState = state
+            self.binaryType = "blob"
+            self.listeners = {}
+            self.sent = []
+
+        def addEventListener(self, name, callback) -> None:
+            self.listeners[name] = callback
+
+        def send(self, frame) -> None:
+            self.sent.append(frame)
+
+    pyodide_mod = types.ModuleType("pyodide")
+    ffi_mod = types.ModuleType("pyodide.ffi")
+    ffi_mod.create_proxy = FakeProxy
+    ffi_mod.to_js = lambda value: value
+    pyodide_mod.ffi = ffi_mod
+    saved = {name: sys.modules.get(name) for name in ("pyodide", "pyodide.ffi")}
+    sys.modules.update({"pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
+    try:
+
+        async def run():
+            session = Session()
+            mid = session.host(Device(name="lamp"))
+            server = Server(session)
+            client = Client(codec="msgpack")
+            channel = FakeDataChannel()
+
+            task = asyncio.create_task(client.connect_data_channel(channel))
+            await asyncio.sleep(0)
+            assert channel.binaryType == "arraybuffer"
+            assert client.connected is False
+
+            channel.readyState = "open"
+            channel.listeners["open"](FakeEvent())
+            await asyncio.sleep(0)
+            assert client.connected is True
+            assert await client.send(b"outbound") is True
+            assert channel.sent == [b"outbound"]
+
+            for wire in server.open("rtc", codec="msgpack"):
+                channel.listeners["message"](FakeEvent(FakeBuffer(wire)))
+            assert client.model(mid, Device).name == "lamp"
+
+            channel.readyState = "closed"
+            channel.listeners["close"](FakeEvent())
+            await task
+            assert client.connected is False
+
+            already_open = FakeDataChannel("open")
+            open_task = asyncio.create_task(client.connect_data_channel(already_open))
+            await asyncio.sleep(0)
+            assert client.connected is True
+            already_open.listeners["close"](FakeEvent())
+            await open_task
+
+            open_then_closed = FakeDataChannel()
+            race_task = asyncio.create_task(client.connect_data_channel(open_then_closed))
+            await asyncio.sleep(0)
+            open_then_closed.listeners["open"](FakeEvent())
+            open_then_closed.listeners["close"](FakeEvent())
+            await race_task
+            await asyncio.sleep(0)
+            assert client.connected is False
+
+            closed = FakeDataChannel("closed")
+            await client.connect_data_channel(closed)
+            assert client.connected is False
+
+            failing = FakeDataChannel()
+
+            async def fail_attach(_sender):
+                raise RuntimeError("channel failed")
+
+            client.attach = fail_attach
+            failed_task = asyncio.create_task(client.connect_data_channel(failing))
+            await asyncio.sleep(0)
+            failing.listeners["open"](FakeEvent())
+            with pytest.raises(RuntimeError, match="channel failed"):
+                await failed_task
 
         asyncio.run(run())
     finally:

@@ -2,8 +2,9 @@
 
 `Client.recv(text)` applies snapshot/patch messages to a local mirror using the core `apply`, so the
 client tracks each remote model's value without hosting it. `connect(url)` runs a real WebSocket
-client loop for live use; `attach(sender)` and `detach(sender)` manage application-owned duplex
-channels while inbound frames continue through `recv`.
+client loop for live use; `connect_data_channel(channel)` does the same for an externally negotiated
+WebRTC data channel under Pyodide. `attach(sender)` and `detach(sender)` manage other
+application-owned duplex channels while inbound frames continue through `recv`.
 """
 
 import contextlib
@@ -39,6 +40,7 @@ class Client:
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
         self._awareness: dict[int, dict[str, Any]] = {}
+        self._local_awareness: dict[int, str | bytes] = {}
         self._awareness_cbs: list[Callable[[dict], None]] = []
         self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
@@ -91,8 +93,17 @@ class Client:
         return await self.send(frame)
 
     async def set_awareness(self, mid: int, state: Any | None) -> bool:
-        """Publish ephemeral state for one model, or clear it with ``None``."""
-        return await self.send(protocol.encode(protocol.awareness_msg(mid, state), self._codec))
+        """Publish ephemeral state for one model, or clear it with ``None``.
+
+        The latest non-null state is retained locally and republished when a managed connection
+        opens. This keeps presence visible across reconnects without adding it to durable state.
+        """
+        frame = protocol.encode(protocol.awareness_msg(mid, state), self._codec)
+        if state is None:
+            self._local_awareness.pop(mid, None)
+        else:
+            self._local_awareness[mid] = frame
+        return await self.send(frame)
 
     async def _send_proposal(self, frame: str | bytes) -> bool:
         proposal = protocol.decode(frame, self._codec)["proposal"]
@@ -159,7 +170,7 @@ class Client:
             callback()
 
     async def attach(self, sender: Callable[[str | bytes], Any]) -> None:
-        """Attach an open duplex channel's sender and flush queued CRDT operations.
+        """Attach an open duplex channel and flush queued CRDT operations and awareness.
 
         Feed inbound frames to `recv`. When the channel closes, pass the same sender object to
         `detach`; sender identity prevents a late close from detaching a replacement channel. An
@@ -168,6 +179,7 @@ class Client:
         self._activate(sender)
         try:
             await self._flush_crdt_outbox(sender)
+            await self._flush_awareness(sender)
         except Exception:
             self.detach(sender)
             raise
@@ -207,6 +219,12 @@ class Client:
     async def _flush_crdt_outbox(self, sender: Callable[[str | bytes], Any]) -> None:
         for pending in list(self._crdt_outbox):
             frame = protocol.encode(protocol.crdt_msg(pending["id"], pending["ops"]), self._codec)
+            result = sender(frame)
+            if inspect.isawaitable(result):
+                await result
+
+    async def _flush_awareness(self, sender: Callable[[str | bytes], Any]) -> None:
+        for frame in list(self._local_awareness.values()):
             result = sender(frame)
             if inspect.isawaitable(result):
                 await result
@@ -443,7 +461,7 @@ class Client:
 
     @staticmethod
     def _send_browser(ws: Any, frame: str | bytes) -> None:
-        """Send a frame over a browser `WebSocket`: text as-is, binary converted for the FFI."""
+        """Send a frame over a browser channel: text as-is, binary converted for the FFI."""
         if isinstance(frame, str):
             ws.send(frame)
         else:
@@ -495,6 +513,58 @@ class Client:
         finally:
             if opened:
                 self.detach(sender)
+            for proxy in proxies:
+                proxy.destroy()
+
+    async def connect_data_channel(self, channel: Any) -> None:
+        """Mirror over an externally negotiated browser ``RTCDataChannel`` until it closes.
+
+        Signaling and peer-connection ownership stay with the application. Under Pyodide the
+        channel rides the browser's ``js`` FFI; native Python deliberately has no ``aiortc``
+        dependency.
+        """
+        import asyncio
+
+        from pyodide.ffi import create_proxy
+
+        channel.binaryType = "arraybuffer"
+        closed: asyncio.Future = asyncio.get_running_loop().create_future()
+        sender = lambda frame: self._send_browser(channel, frame)
+        attachment: asyncio.Task | None = None
+
+        def _on_message(event: Any) -> None:
+            data = event.data
+            self.recv(data if isinstance(data, str) else bytes(data.to_bytes()))
+
+        def _on_close(_event: Any) -> None:
+            if not closed.done():
+                closed.set_result(None)
+
+        def _on_open(_event: Any) -> None:
+            nonlocal attachment
+            attachment = asyncio.create_task(self.attach(sender))
+
+            def _attached(task: asyncio.Task) -> None:
+                if not task.cancelled() and task.exception() is not None and not closed.done():
+                    closed.set_exception(task.exception())
+
+            attachment.add_done_callback(_attached)
+
+        proxies = [create_proxy(_on_message), create_proxy(_on_open), create_proxy(_on_close)]
+        for name, proxy in zip(("message", "open", "close"), proxies):
+            channel.addEventListener(name, proxy)
+        try:
+            if channel.readyState == "open":
+                await self.attach(sender)
+            elif channel.readyState == "closed":
+                return
+            await closed
+        finally:
+            if attachment is not None and not attachment.done():
+                attachment.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await attachment
+            self.detach(sender)
             for proxy in proxies:
                 proxy.destroy()
 

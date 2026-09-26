@@ -212,6 +212,14 @@ def test_shared_awareness_is_ephemeral_and_connection_scoped():
     assert writer_client.detach(sender) is True
     assert updates[-1]["state"] is None
 
+    resent = []
+    replacement_sender = resent.append
+    assert asyncio.run(writer_client.set_awareness(sid, {"selection": {"anchor": 5}})) is False
+    asyncio.run(writer_client.attach(replacement_sender))
+    assert protocol.decode(resent[0])["state"] == {"selection": {"anchor": 5}}
+    assert asyncio.run(writer_client.set_awareness(sid, None)) is True
+    writer_client.detach(replacement_sender)
+
     outsider = ("outsider", "a")
     h.open(outsider)
     assert h.recv(outsider, protocol.awareness_msg(sid, state)) == {}

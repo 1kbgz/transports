@@ -1,7 +1,8 @@
 # How to connect live clients
 
 This guide shows you how to serve a `Session` or `Hub` over the connection adapters transports ships
-today: WebSocket, Server-Sent Events, Jupyter comm, and anywidget custom messages.
+today: WebSocket, WebRTC data channels, Server-Sent Events, Jupyter comm, and anywidget custom
+messages.
 
 ## Serve a session over WebSocket
 
@@ -171,10 +172,37 @@ client.on_awareness(handle_awareness)
 await client.set_awareness(document_id, {"selection": {"anchor": 12, "head": 18}})
 ```
 
-`awareness(id)` returns the latest remote state keyed by the Hub-assigned peer id. Pass `null` in
-JavaScript or `None` in Python to clear local state before closing. The Hub also sends a removal when
-the connection closes. Read-only subscribers may publish awareness; it does not grant model write
-access. Payload meaning, user identity, names, colors, and rendering remain application concerns.
+`awareness(id)` returns the latest remote state keyed by the Hub-assigned peer id. A client retains
+its latest local state and republishes it whenever a managed connection opens, including a resume
+that produces no model frame. Pass `null` in JavaScript or `None` in Python to clear that state. The
+Hub also sends a removal when the connection closes. Read-only subscribers may publish awareness;
+it does not grant model write access. Payload meaning, user identity, names, colors, and rendering
+remain application concerns.
+
+## Use an existing WebRTC data channel
+
+transports can manage an `RTCDataChannel` after your application negotiates it. Signaling and
+`RTCPeerConnection` ownership remain with the application:
+
+```ts
+const client = new Client();
+client.connectDataChannel(peerConnection.createDataChannel("transports"));
+```
+
+The adapter receives frames, sends proposals, flushes queued CRDT operations and awareness when the
+channel opens, and reports connection lifecycle through the same hooks as `connect()`. The remote
+endpoint must speak the transports protocol with the same codec.
+
+Pyodide uses the same browser channel through the `js` FFI:
+
+```python
+client = transports.Client()
+await client.connect_data_channel(channel)
+```
+
+`connect_data_channel` runs until the channel closes. Native Python intentionally does not install
+`aiortc`; browser peer-to-peer sessions are the supported WebRTC path. transports does not yet
+provide signaling or turn two clients into a peer-hosted `Hub`.
 
 ## Mirror the server in Python
 
