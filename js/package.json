@@ -50,11 +50,7 @@
     "watch": "nodemon --watch src -e ts,css,html --exec \"pnpm build:debug\""
   },
   "devDependencies": {
-<<<<<<< before updating
-    "@playwright/test": "^1.62.1",
-=======
     "@playwright/test": "^1.63.0",
->>>>>>> after updating
     "cpy": "^13.2.3",
     "esbuild": "^0.28.2",
     "http-server": "^14.1.1",
@@ -62,11 +58,7 @@
     "nodemon": "^3.1.14",
     "npm-run-all": "^4.1.5",
     "oxfmt": "^0.70.0",
-<<<<<<< before updating
-    "oxlint": "^1.81.0",
-=======
     "oxlint": "^1.85.0",
->>>>>>> after updating
     "typescript": "^7.0.2"
   }
 }
