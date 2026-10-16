@@ -531,6 +531,24 @@ tier at this scale.</p>
 <p>Private-tier memory grows with each tenant’s bounded resume logs (512 patches per model by
 default); <code class="docutils literal notranslate"><span class="pre">Session(log_cap=...)</span></code> tunes the retention/memory trade for large-tenant deployments.</p>
 </section>
+<section id="private-patch-cost">
+<h2>Private patch cost<a class="headerlink" href="#private-patch-cost" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">benchmarks/test_private_patch_cost.py</span></code> measures synchronous <code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code> after changing one
+integer field in each tenant’s private model. It excludes sockets, client processing, and mutation
+setup. The local 2026-10-15 development run recorded a median 7.5 ms for 1,000 tenants.
+This is not comparable to the network fan-out latency or a stable CI timing threshold.</p>
+<benched-report src="../../_static/benched/reports/results-1ff357c8bc76.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>A separate cProfile run spent 100 ms of 171 ms of cumulative Hub flush time in Session draining;
+the native Store mutation calls accounted for 7 ms across 11,000 updates. Python model conversion
+and JSON encode/decode remain material costs. These measurements do not justify replacing the
+connection stack or moving tenant orchestration into Rust.</p>
+<p>Reproduce the profile separately from timing measurements:</p>
+<div class="highlight-sh notranslate"><div class="highlight"><pre><span></span>python<span class="w"> </span>-m<span class="w"> </span>cProfile<span class="w"> </span>-o<span class="w"> </span>private-patch.prof<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>benchmarks/test_private_patch_cost.py
+python<span class="w"> </span>-m<span class="w"> </span>pstats<span class="w"> </span>private-patch.prof
+</pre></div>
+</div>
+<p>The run records retain machine, revision, dirty-checkout, and local-dependency labels. Collect idle,
+repeatable target-deployment baselines before enforcing absolute latency budgets.</p>
+</section>
 <section id="recorded-workload">
 <h2>Recorded workload<a class="headerlink" href="#recorded-workload" title="Link to this heading">¶</a></h2>
 <p>These ranges come from two clean runs recorded on August 27, 2026:</p>
@@ -620,6 +638,7 @@ timing runs and filters.</p>
 <li><a class="reference internal" href="#event-loop-comparison">Event loop comparison</a></li>
 <li><a class="reference internal" href="#permessage-deflate">Permessage-deflate</a></li>
 <li><a class="reference internal" href="#multi-tenant-hub">Multi-tenant hub</a></li>
+<li><a class="reference internal" href="#private-patch-cost">Private patch cost</a></li>
 <li><a class="reference internal" href="#recorded-workload">Recorded workload</a></li>
 <li><a class="reference internal" href="#interactive-results">Interactive results</a></li>
 </ul>

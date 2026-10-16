@@ -115,6 +115,35 @@ tier at this scale.
 Private-tier memory grows with each tenant's bounded resume logs (512 patches per model by
 default); `Session(log_cap=...)` tunes the retention/memory trade for large-tenant deployments.
 
+## Private patch cost
+
+`benchmarks/test_private_patch_cost.py` measures synchronous `Hub.flush()` after changing one
+integer field in each tenant's private model. It excludes sockets, client processing, and mutation
+setup. The local 2026-10-15 development run recorded a median 7.5 ms for 1,000 tenants.
+This is not comparable to the network fan-out latency or a stable CI timing threshold.
+
+```{benched} ../../benchmarks/results
+:view: trend
+:metric: median
+:benchmark-filter: *test_private_patch_cost*
+:x-axis: time
+```
+
+A separate cProfile run spent 100 ms of 171 ms of cumulative Hub flush time in Session draining;
+the native Store mutation calls accounted for 7 ms across 11,000 updates. Python model conversion
+and JSON encode/decode remain material costs. These measurements do not justify replacing the
+connection stack or moving tenant orchestration into Rust.
+
+Reproduce the profile separately from timing measurements:
+
+```sh
+python -m cProfile -o private-patch.prof -m pytest benchmarks/test_private_patch_cost.py
+python -m pstats private-patch.prof
+```
+
+The run records retain machine, revision, dirty-checkout, and local-dependency labels. Collect idle,
+repeatable target-deployment baselines before enforcing absolute latency budgets.
+
 ## Recorded workload
 
 These ranges come from two clean runs recorded on August 27, 2026:

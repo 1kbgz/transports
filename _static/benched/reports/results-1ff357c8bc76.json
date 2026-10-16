@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-10-15T23:33:55.546921+00:00",
+  "source_run_ids": [
+    "8cc1a4ed70014f9d96286f040debd484"
+  ],
+  "runs": [
+    {
+      "run_id": "8cc1a4ed70014f9d96286f040debd484",
+      "started_at": "2026-10-15T23:33:54.985268+00:00",
+      "status": "success",
+      "suite": {
+        "name": "transports",
+        "repository": "https://github.com/1kbgz/transports",
+        "version": "0.10.0",
+        "revision": "8973b210d351c537f2367fbc250d4d518150cc82",
+        "branch": "keyed-collection-diffs",
+        "dirty": true,
+        "labels": {}
+      },
+      "subject": {
+        "name": "transports",
+        "repository": "https://github.com/1kbgz/transports",
+        "version": "0.10.0",
+        "revision": "8973b210d351c537f2367fbc250d4d518150cc82",
+        "branch": "keyed-collection-diffs",
+        "dirty": true,
+        "labels": {
+          "transports": "local-keyed-diffs"
+        }
+      },
+      "machine": {
+        "id": "mbp-m5",
+        "fingerprint": "4947e1f640c8e065b0bdc2b3f1c521f706461fb493daa642d995091105a41e96",
+        "metadata": {
+          "architecture": "arm64",
+          "cpu_count": 18,
+          "memory_gib": 64.0,
+          "processor": "arm",
+          "release": "25.6.0",
+          "system": "Darwin"
+        },
+        "labels": {}
+      },
+      "environment": {
+        "fingerprint": "5b9c9aaa5c636d501770437337ffaf3148e2469f74b46acdccd9298815e39f9a",
+        "python_implementation": "CPython",
+        "python_version": "3.13.14",
+        "platform": "Darwin",
+        "architecture": "arm64",
+        "labels": {}
+      }
+    }
+  ],
+  "benchmarks": [
+    {
+      "benchmark_id": "benchmarks/test_private_patch_cost.py::test_private_patch_cost|tenants=100",
+      "nodeid": "benchmarks/test_private_patch_cost.py::test_private_patch_cost[100]",
+      "name": "test_private_patch_cost[100]",
+      "group": null,
+      "parameters": {
+        "tenants": 100
+      },
+      "unit": "seconds",
+      "series": [
+        {
+          "run_id": "8cc1a4ed70014f9d96286f040debd484",
+          "metrics": {
+            "median": 0.0010005414951592684,
+            "mean": 0.0012698957696557045,
+            "min": 0.0008162078447639942,
+            "max": 0.0033864169381558895,
+            "ops": 787.4662030499724,
+            "peak_memory": null
+          }
+        }
+      ]
+    },
+    {
+      "benchmark_id": "benchmarks/test_private_patch_cost.py::test_private_patch_cost|tenants=1000",
+      "nodeid": "benchmarks/test_private_patch_cost.py::test_private_patch_cost[1000]",
+      "name": "test_private_patch_cost[1000]",
+      "group": null,
+      "parameters": {
+        "tenants": 1000
+      },
+      "unit": "seconds",
+      "series": [
+        {
+          "run_id": "8cc1a4ed70014f9d96286f040debd484",
+          "metrics": {
+            "median": 0.007502645952627063,
+            "mean": 0.007549395738169551,
+            "min": 0.006577665917575359,
+            "max": 0.008881708141416311,
+            "ops": 132.4609325941182,
+            "peak_memory": null
+          }
+        }
+      ]
+    },
+    {
+      "benchmark_id": "benchmarks/test_private_patch_cost.py::test_private_patch_cost|tenants=1000:peak-memory",
+      "nodeid": "benchmarks/test_private_patch_cost.py::test_private_patch_cost[1000]",
+      "name": "test_private_patch_cost[1000] peak memory",
+      "group": null,
+      "parameters": {
+        "tenants": 1000
+      },
+      "unit": "bytes",
+      "series": [
+        {
+          "run_id": "8cc1a4ed70014f9d96286f040debd484",
+          "metrics": {
+            "median": null,
+            "mean": null,
+            "min": null,
+            "max": null,
+            "ops": null,
+            "peak_memory": 82984960.0
+          }
+        }
+      ]
+    },
+    {
+      "benchmark_id": "benchmarks/test_private_patch_cost.py::test_private_patch_cost|tenants=100:peak-memory",
+      "nodeid": "benchmarks/test_private_patch_cost.py::test_private_patch_cost[100]",
+      "name": "test_private_patch_cost[100] peak memory",
+      "group": null,
+      "parameters": {
+        "tenants": 100
+      },
+      "unit": "bytes",
+      "series": [
+        {
+          "run_id": "8cc1a4ed70014f9d96286f040debd484",
+          "metrics": {
+            "median": null,
+            "mean": null,
+            "min": null,
+            "max": null,
+            "ops": null,
+            "peak_memory": 82984960.0
+          }
+        }
+      ]
+    }
+  ],
+  "warnings": []
+}

@@ -265,8 +265,8 @@ message where available, so callers can put it on the wire (the <cite>reject</ci
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Session.host">
-<span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.host"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.host" title="Link to this definition">¶</a></dt>
-<dd><p>Host a model: register its schema, store its value in the core, and watch it. Returns id.</p>
+<span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.host"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.host" title="Link to this definition">¶</a></dt>
+<dd><p>Host and watch a model. Optional list_keys records define exact list and item-key paths.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -349,6 +349,30 @@ gap (the next needed patch was evicted) — then the caller should send a fresh 
 </section>
 <section id="model-bridge">
 <h2>Model bridge<a class="headerlink" href="#model-bridge" title="Link to this heading">¶</a></h2>
+<section id="list-identity-policy">
+<h3>List identity policy<a class="headerlink" href="#list-identity-policy" title="Link to this heading">¶</a></h3>
+<p><code class="docutils literal notranslate"><span class="pre">Session.host(model,</span> <span class="pre">list_keys=...)</span></code> and <code class="docutils literal notranslate"><span class="pre">Hub.share(model,</span> <span class="pre">list_keys=...)</span></code> accept a list of
+<code class="docutils literal notranslate"><span class="pre">{&quot;path&quot;:</span> <span class="pre">[...],</span> <span class="pre">&quot;key&quot;:</span> <span class="pre">[...]}</span></code> records. <code class="docutils literal notranslate"><span class="pre">path</span></code> addresses a list from the model root;
+<code class="docutils literal notranslate"><span class="pre">key</span></code> addresses its identity within each item. Segments are <code class="docutils literal notranslate"><span class="pre">{&quot;Key&quot;:</span> <span class="pre">&quot;field&quot;}</span></code> or
+<code class="docutils literal notranslate"><span class="pre">{&quot;Index&quot;:</span> <span class="pre">0}</span></code>. Empty paths address the root. Paths are exact; wildcards are not supported.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">rules</span> <span class="o">=</span> <span class="p">[{</span><span class="s2">"path"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"Key"</span><span class="p">:</span> <span class="s2">"rows"</span><span class="p">}],</span> <span class="s2">"key"</span><span class="p">:</span> <span class="p">[{</span><span class="s2">"Key"</span><span class="p">:</span> <span class="s2">"id"</span><span class="p">}]}]</span>
+<span class="n">model_id</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">list_keys</span><span class="o">=</span><span class="n">rules</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The low-level Python <code class="docutils literal notranslate"><span class="pre">diff(old,</span> <span class="pre">new,</span> <span class="pre">list_keys=json_string)</span></code> and
+<code class="docutils literal notranslate"><span class="pre">Store.host(type_name,</span> <span class="pre">value_json,</span> <span class="pre">list_keys=json_string)</span></code> take JSON-encoded policy records.
+JavaScript’s <code class="docutils literal notranslate"><span class="pre">diff(old,</span> <span class="pre">new,</span> <span class="pre">listKeys)</span></code> and <code class="docutils literal notranslate"><span class="pre">Store.host(typeName,</span> <span class="pre">valueJson,</span> <span class="pre">listKeys)</span></code>
+take the same optional JSON string as their third argument.</p>
+<p>Keys are unique strings or integers; string <code class="docutils literal notranslate"><span class="pre">&quot;1&quot;</span></code> and integer <code class="docutils literal notranslate"><span class="pre">1</span></code> are distinct.
+Use strings for integer identifiers outside JavaScript’s safe integer range when mirroring to a browser.
+Missing, duplicate, or unsupported item keys select the existing default list diff for that list.
+Duplicate policy paths, unknown policy fields, and malformed paths raise an error.
+The default policy remains unchanged when the argument is omitted.</p>
+<p>Retained identities emit existing move/reorder operations, followed by field updates at their new
+positions. Added and removed identities emit insert/remove operations. Policy metadata is host
+configuration and is not included in snapshots or patches; configure it again when restoring a host.
+Client proposals are still positional and server-authoritative, not concurrency-safe keyed intents.
+<code class="docutils literal notranslate"><span class="pre">list_keys</span></code> cannot be combined with <code class="docutils literal notranslate"><span class="pre">crdt_spec</span></code>; CRDT identity remains governed by its schema.</p>
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.to_value">
 <span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">to_value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../../_modules/transports/_bridge.html#to_value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.to_value" title="Link to this definition">¶</a></dt>
@@ -373,6 +397,7 @@ gap (the next needed patch was evicted) — then the caller should send a fresh 
 <dd><p>Render a core <cite>Schema</cite> as a TypeScript interface declaration.</p>
 </dd></dl>
 
+</section>
 </section>
 <section id="connections">
 <h2>Connections<a class="headerlink" href="#connections" title="Link to this heading">¶</a></h2>
@@ -788,7 +813,7 @@ return the messages to send keyed by connection; an adapter such as <cite>ws_end
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.share">
-<span class="sig-name descname"><span class="pre">share</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_or_value:</span> <span class="pre">~typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge:</span> <span class="pre">~typing.Any</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'transports.hub.LastWriteWins'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replay:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rev:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_state:</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crdt_spec:</span> <span class="pre">~transports.crdt.CrdtSpec</span> <span class="pre">|</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crdt_state:</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replica:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.share"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.share" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">share</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model_or_value:</span> <span class="pre">~typing.Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">type_name:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">*</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge:</span> <span class="pre">~typing.Any</span> <span class="pre">=</span> <span class="pre">&lt;class</span> <span class="pre">'transports.hub.LastWriteWins'&gt;</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replay:</span> <span class="pre">bool</span> <span class="pre">=</span> <span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rev:</span> <span class="pre">int</span> <span class="pre">=</span> <span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">merge_state:</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crdt_spec:</span> <span class="pre">~transports.crdt.CrdtSpec</span> <span class="pre">|</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crdt_state:</span> <span class="pre">dict</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">replica:</span> <span class="pre">str</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_keys:</span> <span class="pre">list[dict]</span> <span class="pre">|</span> <span class="pre">None</span> <span class="pre">=</span> <span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.share"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.share" title="Link to this definition">¶</a></dt>
 <dd><p>Register a shared data structure; returns its shared id.</p>
 <p>Pass a model instance (pydantic/dataclass/msgspec) to capture its value and type name, or a
 core <cite>Value</cite> dict together with <cite>type_name</cite>. <cite>merge</cite> is a <cite>MergeStrategy</cite> subclass (each shared
@@ -797,7 +822,9 @@ so a joining worker can catch up by delta (see <a class="reference internal" hre
 To <strong>restore</strong> a model from a durable checkpoint on startup, pass <code class="docutils literal notranslate"><span class="pre">rev</span></code> and <code class="docutils literal notranslate"><span class="pre">merge_state</span></code>
 (from a prior <a class="reference internal" href="#transports.Hub.snapshot_shared" title="transports.Hub.snapshot_shared"><code class="xref py py-meth docutils literal notranslate"><span class="pre">snapshot_shared()</span></code></a>) alongside the saved value. Pass <code class="docutils literal notranslate"><span class="pre">crdt_spec</span></code> to use
 the shared schema-directed reducer instead of <code class="docutils literal notranslate"><span class="pre">merge</span></code>; <code class="docutils literal notranslate"><span class="pre">crdt_state</span></code> restores its reducer
-metadata and <code class="docutils literal notranslate"><span class="pre">replica</span></code> overrides this hub’s unique operation identity.</p>
+metadata and <code class="docutils literal notranslate"><span class="pre">replica</span></code> overrides this hub’s unique operation identity.
+<code class="docutils literal notranslate"><span class="pre">list_keys</span></code> configures ordinary list diff identity using exact list and item-key paths;
+it cannot be combined with <code class="docutils literal notranslate"><span class="pre">crdt_spec</span></code> and must be configured again on host restore.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1128,7 +1155,7 @@ registered custom codec produces — so the caller sends a text or binary frame 
 <h2>Core<a class="headerlink" href="#core" title="Link to this heading">¶</a></h2>
 <dl class="py function">
 <dt class="sig sig-object py" id="transports.diff">
-<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.diff" title="Link to this definition">¶</a></dt>
+<span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">old</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_keys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.diff" title="Link to this definition">¶</a></dt>
 <dd><p>Diff two JSON-encoded models, returning the JSON-encoded patch.</p>
 </dd></dl>
 
@@ -1210,7 +1237,7 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Store.host">
-<span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value_json</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.Store.host" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">type_name</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value_json</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_keys</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.Store.host" title="Link to this definition">¶</a></dt>
 <dd><p>Host a model from its JSON; returns the assigned id.</p>
 </dd></dl>
 
@@ -1299,10 +1326,13 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 </ul>
 </li>
 <li><a class="reference internal" href="#model-bridge">Model bridge</a><ul>
+<li><a class="reference internal" href="#list-identity-policy">List identity policy</a><ul>
 <li><a class="reference internal" href="#transports.to_value"><code class="docutils literal notranslate"><span class="pre">to_value()</span></code></a></li>
 <li><a class="reference internal" href="#transports.from_value"><code class="docutils literal notranslate"><span class="pre">from_value()</span></code></a></li>
 <li><a class="reference internal" href="#transports.schema_of"><code class="docutils literal notranslate"><span class="pre">schema_of()</span></code></a></li>
 <li><a class="reference internal" href="#transports.schema_to_ts"><code class="docutils literal notranslate"><span class="pre">schema_to_ts()</span></code></a></li>
+</ul>
+</li>
 </ul>
 </li>
 <li><a class="reference internal" href="#connections">Connections</a><ul>
