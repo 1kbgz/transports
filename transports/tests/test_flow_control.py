@@ -279,6 +279,17 @@ def test_stuck_state_consumer_coalesces_instead_of_disconnecting():
 
 @pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
 def test_stuck_hot_model_exceeding_the_byte_bound_is_disconnected(codec):
+    delivered = asyncio.Event()
+
+    class FastWireConn(FakeConn):
+        async def send_text(self, msg: str) -> None:
+            await super().send_text(msg)
+            delivered.set()
+
+        async def send_bytes(self, msg: bytes) -> None:
+            await super().send_bytes(msg)
+            delivered.set()
+
     class StuckWireConn(StuckConn):
         async def send_bytes(self, msg: bytes) -> None:
             await asyncio.Event().wait()
@@ -288,15 +299,18 @@ def test_stuck_hot_model_exceeding_the_byte_bound_is_disconnected(codec):
         model = Counter()
         session.host(model)
         server = transports.Server(session)
-        fast, stuck = FakeConn(), StuckWireConn()
+        fast, stuck = FastWireConn(), StuckWireConn()
         server.open(fast, codec=codec)
         server.open(stuck, codec=codec)
 
         sync_task = asyncio.create_task(transports.autosync(server, interval=0.001, max_queue=1000, max_queue_bytes=512))
         try:
             for expected in range(1, 100):
+                delivered.clear()
                 model.n = expected
-                await asyncio.sleep(0.002)
+                # Each revision must reach autosync before the next mutation; fixed sleeps can
+                # coalesce host edits on Pyodide and never exercise the composed queue byte limit.
+                await asyncio.wait_for(delivered.wait(), timeout=5)
                 if stuck not in server._codecs:
                     break
 

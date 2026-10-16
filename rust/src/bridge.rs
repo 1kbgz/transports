@@ -9,7 +9,7 @@ use crate::codec::{codec_for, Codec, JsonCodec};
 use crate::crdt::{
     CrdtDocument, CrdtMutation, CrdtOp, CrdtPath, CrdtSpec, CrdtState, VersionVector,
 };
-use crate::diff::{apply, diff, Patch};
+use crate::diff::{apply, diff, diff_with_list_keys, ListKey, Patch};
 use crate::message::Message;
 use crate::store::Store;
 use crate::value::{ModelId, Value};
@@ -19,6 +19,36 @@ pub fn diff_json(old: &str, new: &str) -> Result<String, String> {
     let old: Value = serde_json::from_str(old).map_err(|e| e.to_string())?;
     let new: Value = serde_json::from_str(new).map_err(|e| e.to_string())?;
     serde_json::to_string(&diff(&old, &new)).map_err(|e| e.to_string())
+}
+
+fn parse_list_keys(json: Option<&str>) -> Result<Vec<ListKey>, String> {
+    let keys: Vec<ListKey> =
+        serde_json::from_str(json.unwrap_or("[]")).map_err(|e| e.to_string())?;
+    for (index, key) in keys.iter().enumerate() {
+        if keys[..index]
+            .iter()
+            .any(|previous| previous.path == key.path)
+        {
+            return Err("duplicate list_keys path".into());
+        }
+    }
+    Ok(keys)
+}
+
+/// Diff JSON models with optional list identity metadata shared by both bindings.
+pub fn diff_json_with_list_keys(
+    old: &str,
+    new: &str,
+    list_keys: Option<&str>,
+) -> Result<String, String> {
+    let old: Value = serde_json::from_str(old).map_err(|e| e.to_string())?;
+    let new: Value = serde_json::from_str(new).map_err(|e| e.to_string())?;
+    serde_json::to_string(&diff_with_list_keys(
+        &old,
+        &new,
+        &parse_list_keys(list_keys)?,
+    ))
+    .map_err(|e| e.to_string())
 }
 
 /// Apply a JSON-encoded patch to a JSON-encoded model, returning the JSON-encoded result.
@@ -187,6 +217,19 @@ impl JsonStore {
     pub fn host(&mut self, type_name: &str, value_json: &str) -> Result<u64, String> {
         let value: Value = serde_json::from_str(value_json).map_err(|e| e.to_string())?;
         Ok(self.inner.host(type_name, value).0)
+    }
+
+    pub fn host_with_list_keys(
+        &mut self,
+        type_name: &str,
+        value_json: &str,
+        list_keys: Option<&str>,
+    ) -> Result<u64, String> {
+        let value: Value = serde_json::from_str(value_json).map_err(|e| e.to_string())?;
+        Ok(self
+            .inner
+            .host_with_list_keys(type_name, value, parse_list_keys(list_keys)?)
+            .0)
     }
 
     /// `{"type_name":..,"rev":..,"value":..}` for a hosted model, or `None` if unknown.

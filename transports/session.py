@@ -24,6 +24,7 @@ class Session:
     def __init__(self, *, log_cap: int = 512) -> None:
         self._store = _CoreStore()
         self._models: dict[int, Any] = {}
+        self._list_keys: dict[int, str | None] = {}
         self._schemas: dict[str, dict] = {}
         self._dirty: set[int] = set()
         self._suppress: set[int] = set()  # ids whose observation is suspended (during inbound apply)
@@ -35,11 +36,13 @@ class Session:
         #: message where available, so callers can put it on the wire (the `reject` frame)
         self.reject_reason: str | None = None
 
-    def host(self, model: Any) -> int:
-        """Host a model: register its schema, store its value in the core, and watch it. Returns id."""
+    def host(self, model: Any, *, list_keys: list[dict] | None = None) -> int:
+        """Host and watch a model. Optional list_keys records define exact list and item-key paths."""
         type_name = type(model).__name__
         self._schemas[type_name] = schema_of(type(model))
-        mid = self._store.host(type_name, json.dumps(to_value(model)))
+        policy = json.dumps(list_keys) if list_keys is not None else None
+        mid = self._store.host(type_name, json.dumps(to_value(model)), list_keys=policy)
+        self._list_keys[mid] = policy
 
         def _watcher(obj: object, method: str, ref: object, call_args: tuple, call_kwargs: dict, _mid: int = mid) -> None:
             if _mid not in self._suppress:  # ignore writes we make ourselves while applying inbound patches
@@ -135,7 +138,7 @@ class Session:
             # invalid / malformed — rejected (the caller re-sends state so the proposer reverts)
             self.reject_reason = error or "invalid edit"
             return None
-        ops = json.loads(_diff(json.dumps(cur), json.dumps(canonical))).get("ops", [])
+        ops = json.loads(_diff(json.dumps(cur), json.dumps(canonical), list_keys=self._list_keys.get(mid))).get("ops", [])
         authoritative = {"rev": parsed["rev"] + 1, "ops": ops}
         if not self._apply_authoritative(mid, authoritative):
             self.reject_reason = "malformed patch"

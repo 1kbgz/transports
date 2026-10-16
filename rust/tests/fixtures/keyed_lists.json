@@ -1,0 +1,176 @@
+[
+  {
+    "name": "move_changed",
+    "old": {
+      "rows": [
+        {
+          "id": "a",
+          "label": "A"
+        },
+        {
+          "id": "b",
+          "label": "B"
+        },
+        {
+          "id": "c",
+          "label": "C"
+        }
+      ]
+    },
+    "new": {
+      "rows": [
+        {
+          "id": "c",
+          "label": "changed"
+        },
+        {
+          "id": "a",
+          "label": "A"
+        },
+        {
+          "id": "b",
+          "label": "B"
+        }
+      ]
+    },
+    "kinds": [
+      "Move",
+      "Set"
+    ]
+  },
+  {
+    "name": "remove_insert_changed",
+    "old": {
+      "rows": [
+        {
+          "id": 1,
+          "label": "A"
+        },
+        {
+          "id": 2,
+          "label": "B"
+        },
+        {
+          "id": 3,
+          "label": "C"
+        }
+      ]
+    },
+    "new": {
+      "rows": [
+        {
+          "id": 3,
+          "label": "changed"
+        },
+        {
+          "id": 4,
+          "label": "D"
+        },
+        {
+          "id": 1,
+          "label": "A"
+        }
+      ]
+    },
+    "kinds": [
+      "RemoveAt",
+      "Move",
+      "Set",
+      "Insert"
+    ]
+  },
+  {
+    "name": "key_type",
+    "old": {
+      "rows": [
+        {
+          "id": "1",
+          "label": "A"
+        },
+        {
+          "id": 1,
+          "label": "B"
+        }
+      ]
+    },
+    "new": {
+      "rows": [
+        {
+          "id": 1,
+          "label": "changed"
+        },
+        {
+          "id": "1",
+          "label": "A"
+        }
+      ]
+    },
+    "kinds": [
+      "Move",
+      "Set"
+    ]
+  },
+  {
+    "name": "empty",
+    "old": {
+      "rows": []
+    },
+    "new": {
+      "rows": [
+        {
+          "id": 1,
+          "label": "A"
+        }
+      ]
+    },
+    "kinds": [
+      "Insert"
+    ]
+  },
+  {
+    "name": "duplicate",
+    "old": {
+      "rows": [
+        {
+          "id": 1,
+          "label": "A"
+        },
+        {
+          "id": 1,
+          "label": "B"
+        }
+      ]
+    },
+    "new": {
+      "rows": [
+        {
+          "id": 1,
+          "label": "changed"
+        },
+        {
+          "id": 1,
+          "label": "A"
+        }
+      ]
+    },
+    "fallback": true
+  },
+  {
+    "name": "missing",
+    "old": {
+      "rows": [
+        {
+          "label": "A"
+        }
+      ]
+    },
+    "new": {
+      "rows": [
+        {
+          "label": "B"
+        }
+      ]
+    },
+    "fallback": true
+  }
+]

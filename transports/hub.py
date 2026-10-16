@@ -169,12 +169,14 @@ class _Shared:
         rev: int = 0,
         log_cap: int = 512,
         crdt: CrdtDocument | None = None,
+        list_keys: str | None = None,
     ) -> None:
         self.type_name = type_name
         self.value = value
         self.rev = rev
         self.merge = merge
         self.crdt = crdt
+        self.list_keys = list_keys
         self.subs: dict[Any, str] = {}  # tenant key -> mode
         self.replay = replay
         self.log: list[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
@@ -227,6 +229,7 @@ class Hub:
         crdt_spec: CrdtSpec | dict | None = None,
         crdt_state: dict | None = None,
         replica: str | None = None,
+        list_keys: list[dict] | None = None,
     ) -> int:
         """Register a shared data structure; returns its shared id.
 
@@ -238,6 +241,8 @@ class Hub:
         (from a prior :meth:`snapshot_shared`) alongside the saved value. Pass ``crdt_spec`` to use
         the shared schema-directed reducer instead of ``merge``; ``crdt_state`` restores its reducer
         metadata and ``replica`` overrides this hub's unique operation identity.
+        ``list_keys`` configures ordinary list diff identity using exact list and item-key paths;
+        it cannot be combined with ``crdt_spec`` and must be configured again on host restore.
         """
         if type_name is None:
             type_name = type(model_or_value).__name__
@@ -255,6 +260,11 @@ class Hub:
             crdt_state = merge_state.get("crdt_state")
         if crdt_state is not None and crdt_spec is None:
             raise ValueError("crdt_state requires crdt_spec")
+        policy = json.dumps(list_keys) if list_keys is not None else None
+        if policy is not None:
+            if crdt_spec is not None:
+                raise ValueError("list_keys cannot be combined with crdt_spec")
+            _diff(json.dumps(value), json.dumps(value), list_keys=policy)
         if crdt_spec is not None:
             spec = crdt_spec if isinstance(crdt_spec, CrdtSpec) else CrdtSpec.from_dict(crdt_spec)
             replica = replica or f"{self._replica}-{sid}"
@@ -262,7 +272,7 @@ class Hub:
             value = _value_of(crdt.value)
         elif merge_state is not None:
             strategy.restore(merge_state)
-        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev, crdt=crdt)
+        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev, crdt=crdt, list_keys=policy)
         return sid
 
     def subscribe(self, tenant_key: Any, sid: int, mode: str = READ) -> None:
@@ -594,7 +604,7 @@ class Hub:
         if self._shared[sid].crdt is not None:
             raise ValueError("use mutate_shared_crdt for a CRDT-backed shared model")
         value = new_value_or_model if isinstance(new_value_or_model, dict) else to_value(new_value_or_model)
-        patch = json.loads(_diff(json.dumps(self._shared[sid].value), json.dumps(value)))
+        patch = json.loads(_diff(json.dumps(self._shared[sid].value), json.dumps(value), list_keys=self._shared[sid].list_keys))
         if not patch["ops"]:
             return
         fan = self._write_shared(sid, patch, origin="<host>")
@@ -766,7 +776,7 @@ class Hub:
         """Merge a write into a shared model; return the authoritative fan-out patch (or None)."""
         sh = self._shared[sid]
         new = sh.merge.merge(sh.value, patch, origin)
-        fan = json.loads(_diff(json.dumps(sh.value), json.dumps(new)))
+        fan = json.loads(_diff(json.dumps(sh.value), json.dumps(new), list_keys=sh.list_keys))
         if not fan["ops"]:
             return None
         sh.value = new
