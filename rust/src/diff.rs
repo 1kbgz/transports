@@ -28,6 +28,14 @@ pub enum PathSeg {
 /// A path from the model root to a value.
 pub type Path = Vec<PathSeg>;
 
+/// An exact model path to a list and an item-relative string/integer identity path.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ListKey {
+    pub path: Path,
+    pub key: Path,
+}
+
 /// A single mutation.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Op {
@@ -70,8 +78,13 @@ impl Patch {
 /// Compute the patch that turns `old` into `new`. The returned patch has `rev == 0`; callers that
 /// track revisions (e.g. [`crate::Store`]) set it.
 pub fn diff(old: &Value, new: &Value) -> Patch {
+    diff_with_list_keys(old, new, &[])
+}
+
+/// Diff with application-owned list identity. Invalid or duplicate item keys use the default diff.
+pub fn diff_with_list_keys(old: &Value, new: &Value, list_keys: &[ListKey]) -> Patch {
     let mut ops = Vec::new();
-    diff_value(&Vec::new(), old, new, &mut ops);
+    diff_value(&Vec::new(), old, new, &mut ops, list_keys);
     Patch { rev: 0, ops }
 }
 
@@ -91,10 +104,22 @@ fn child_path(path: &Path, seg: PathSeg) -> Path {
     p
 }
 
-fn diff_list_positionally(path: &Path, old: &[Value], new: &[Value], ops: &mut Vec<Op>) {
+fn diff_list_positionally(
+    path: &Path,
+    old: &[Value],
+    new: &[Value],
+    ops: &mut Vec<Op>,
+    list_keys: &[ListKey],
+) {
     let shared = old.len().min(new.len());
     for i in 0..shared {
-        diff_value(&child_path(path, PathSeg::Index(i)), &old[i], &new[i], ops);
+        diff_value(
+            &child_path(path, PathSeg::Index(i)),
+            &old[i],
+            &new[i],
+            ops,
+            list_keys,
+        );
     }
     if new.len() > old.len() {
         for (i, value) in new.iter().enumerate().skip(old.len()) {
@@ -153,13 +178,101 @@ fn permutation_move_count(order: &[usize]) -> usize {
     order.len() - tails.len()
 }
 
+fn item_keys(items: &[Value], path: &[PathSeg]) -> Option<Vec<String>> {
+    let mut seen = std::collections::BTreeSet::new();
+    items
+        .iter()
+        .map(|item| {
+            let mut value = item;
+            for segment in path {
+                value = match (value, segment) {
+                    (Value::Map(map), PathSeg::Key(key)) => map.get(key)?,
+                    (Value::List(list), PathSeg::Index(index)) => list.get(*index)?,
+                    _ => return None,
+                };
+            }
+            if !matches!(value, Value::Str(_) | Value::Int(_)) {
+                return None;
+            }
+            let key = serde_json::to_string(value).ok()?;
+            seen.insert(key.clone()).then_some(key)
+        })
+        .collect()
+}
+
+fn diff_keyed_list(
+    path: &Path,
+    old: &[Value],
+    new: &[Value],
+    key: &[PathSeg],
+    ops: &mut Vec<Op>,
+    list_keys: &[ListKey],
+) -> bool {
+    let (Some(old_keys), Some(new_keys)) = (item_keys(old, key), item_keys(new, key)) else {
+        return false;
+    };
+    let old_items: BTreeMap<_, _> = old_keys.iter().zip(old).collect();
+    let new_set: std::collections::BTreeSet<_> = new_keys.iter().collect();
+    // Remove absent identities before reordering survivors. No operation replaces a retained key.
+    for (index, key) in old_keys.iter().enumerate().rev() {
+        if !new_set.contains(key) {
+            ops.push(Op::RemoveAt {
+                path: path.clone(),
+                index,
+            });
+        }
+    }
+    let retained_old = Value::List(
+        old_keys
+            .iter()
+            .filter(|key| new_set.contains(key))
+            .map(|key| Value::Str(key.clone()))
+            .collect(),
+    );
+    let retained_new = Value::List(
+        new_keys
+            .iter()
+            .filter(|key| old_items.contains_key(key))
+            .map(|key| Value::Str(key.clone()))
+            .collect(),
+    );
+    // Exact permutations use the bounded sparse-move/dense-reorder implementation.
+    if retained_old != retained_new {
+        diff_value(path, &retained_old, &retained_new, ops, &[]);
+    }
+    for (index, key) in new_keys.iter().enumerate() {
+        if let Some(old_item) = old_items.get(key) {
+            diff_value(
+                &child_path(path, PathSeg::Index(index)),
+                old_item,
+                &new[index],
+                ops,
+                list_keys,
+            );
+        } else {
+            ops.push(Op::Insert {
+                path: path.clone(),
+                index,
+                value: new[index].clone(),
+            });
+        }
+    }
+    true
+}
+
 #[allow(clippy::needless_range_loop)] // indices here are op positions
-fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
+fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>, list_keys: &[ListKey]) {
     match (old, new) {
         (Value::Map(om), Value::Map(nm)) => {
             for (k, nv) in nm {
                 match om.get(k) {
-                    Some(ov) => diff_value(&child_path(path, PathSeg::Key(k.clone())), ov, nv, ops),
+                    Some(ov) => diff_value(
+                        &child_path(path, PathSeg::Key(k.clone())),
+                        ov,
+                        nv,
+                        ops,
+                        list_keys,
+                    ),
                     None => ops.push(Op::Set {
                         path: child_path(path, PathSeg::Key(k.clone())),
                         value: nv.clone(),
@@ -175,6 +288,11 @@ fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
             }
         }
         (Value::List(ol), Value::List(nl)) => {
+            if let Some(rule) = list_keys.iter().find(|rule| rule.path == *path) {
+                if diff_keyed_list(path, ol, nl, &rule.key, ops, list_keys) {
+                    return;
+                }
+            }
             // Reconcile exact-value matches first so a reorder becomes moves rather than positional
             // replacement. Unmatched values still recurse positionally: generic Value lists carry
             // no application key metadata, so guessing that a changed record is the same item would
@@ -284,6 +402,7 @@ fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
                     &working[i],
                     target,
                     &mut list_ops,
+                    list_keys,
                 );
                 working[i] = target.clone();
                 i += 1;
@@ -296,7 +415,7 @@ fn diff_value(path: &Path, old: &Value, new: &Value, ops: &mut Vec<Op>) {
                         order,
                     });
                 } else {
-                    diff_list_positionally(path, ol, nl, ops);
+                    diff_list_positionally(path, ol, nl, ops, list_keys);
                 }
             } else {
                 for i in (nl.len()..working.len()).rev() {

@@ -7,8 +7,9 @@ use pyo3::types::PyBytes;
 
 /// Diff two JSON-encoded models, returning the JSON-encoded patch.
 #[pyfunction]
-pub fn diff(old: &str, new: &str) -> PyResult<String> {
-    transports::diff_json(old, new).map_err(PyValueError::new_err)
+#[pyo3(signature = (old, new, *, list_keys=None))]
+pub fn diff(old: &str, new: &str, list_keys: Option<&str>) -> PyResult<String> {
+    transports::diff_json_with_list_keys(old, new, list_keys).map_err(PyValueError::new_err)
 }
 
 /// Apply a JSON-encoded patch to a JSON-encoded model, returning the JSON-encoded result.
@@ -232,9 +233,15 @@ impl Store {
     }
 
     /// Host a model from its JSON; returns the assigned id.
-    fn host(&mut self, type_name: &str, value_json: &str) -> PyResult<u64> {
+    #[pyo3(signature = (type_name, value_json, *, list_keys=None))]
+    fn host(
+        &mut self,
+        type_name: &str,
+        value_json: &str,
+        list_keys: Option<&str>,
+    ) -> PyResult<u64> {
         self.inner
-            .host(type_name, value_json)
+            .host_with_list_keys(type_name, value_json, list_keys)
             .map_err(PyValueError::new_err)
     }
 

@@ -7,8 +7,11 @@ export * as wasm from "../../dist/pkg/transports";
 export const placeholder = "";
 
 /** Diff two JSON-encoded models, returning the JSON-encoded patch. */
-export const diff = (oldModel: string, newModel: string): string =>
-  wasm.diff(oldModel, newModel);
+export const diff = (
+  oldModel: string,
+  newModel: string,
+  listKeys?: string,
+): string => wasm.diff(oldModel, newModel, listKeys);
 
 /** Apply a JSON-encoded patch to a JSON-encoded model, returning the JSON-encoded result. */
 export const apply = (model: string, patch: string): string =>

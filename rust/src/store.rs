@@ -10,13 +10,14 @@
 
 use std::collections::BTreeMap;
 
-use crate::diff::{apply as apply_patch, diff, Patch};
+use crate::diff::{apply as apply_patch, diff_with_list_keys, ListKey, Patch};
 use crate::value::{ModelId, Value};
 
 struct Held {
     type_name: String,
     value: Value,
     rev: u64,
+    list_keys: Vec<ListKey>,
 }
 
 /// Holds hosted/mirrored models by id.
@@ -36,6 +37,16 @@ impl Store {
 
     /// Host a new model value; returns its freshly assigned id (rev starts at 0).
     pub fn host(&mut self, type_name: impl Into<String>, value: Value) -> ModelId {
+        self.host_with_list_keys(type_name, value, Vec::new())
+    }
+
+    /// Host with an application-owned list identity policy. The policy is not sent to mirrors.
+    pub fn host_with_list_keys(
+        &mut self,
+        type_name: impl Into<String>,
+        value: Value,
+        list_keys: Vec<ListKey>,
+    ) -> ModelId {
         let id = ModelId(self.next_id);
         self.next_id += 1;
         self.models.insert(
@@ -44,6 +55,7 @@ impl Store {
                 type_name: type_name.into(),
                 value,
                 rev: 0,
+                list_keys,
             },
         );
         id
@@ -60,7 +72,7 @@ impl Store {
     /// change. Returns `None` if `id` is unknown, or an empty patch (still rev-bumped) if unchanged.
     pub fn mutate(&mut self, id: ModelId, value: Value) -> Option<Patch> {
         let held = self.models.get_mut(&id)?;
-        let mut patch = diff(&held.value, &value);
+        let mut patch = diff_with_list_keys(&held.value, &value, &held.list_keys);
         held.value = value;
         held.rev += 1;
         patch.rev = held.rev;

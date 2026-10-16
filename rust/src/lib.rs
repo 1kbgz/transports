@@ -24,6 +24,7 @@ mod schema;
 mod store;
 mod value;
 
+pub use bridge::diff_json_with_list_keys;
 pub use bridge::{
     apply_json, cbor_to_json, crdt_spec_hash_json, decode_as, decode_json, decode_message,
     diff_json, encode_as, encode_json, encode_message, json_to_cbor, json_to_msgpack,
@@ -37,7 +38,7 @@ pub use crdt::{
     CrdtPathSegment, CrdtPolicy, CrdtSpec, CrdtState, Dot, ElementId, SequenceDeltaElement,
     SequenceMaterialization, VersionVector,
 };
-pub use diff::{apply, diff, Op, Patch, Path, PathSeg};
+pub use diff::{apply, diff, diff_with_list_keys, ListKey, Op, Patch, Path, PathSeg};
 pub use frame::{Frame, FrameError, FrameKind};
 pub use message::Message;
 pub use schema::{Field, FieldType, Registry, Schema};
