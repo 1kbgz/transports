@@ -69,6 +69,7 @@ develop = [
     "httpx-sse",
     "ipykernel",
     "mdformat",
+    "mdformat-frontmatter",
     "mdformat-tables>=1",
     "psutil",
     "pytest",
@@ -177,7 +178,7 @@ xbuild-tools = ["cargo", "rustc", "rustup"]
 [tool.coverage.run]
 branch = true
 omit = [
-    "transports/tests/integration/",
+    "transports/tests/integration/*",
 ]
 
 [tool.coverage.report]
@@ -221,9 +222,10 @@ packages = [
     "Cargo.lock",
 ]
 exclude = [
-    "transports/*.dll",
-    "transports/*.dylib",
-    "transports/*.so",
+    "*.dll",
+    "*.dylib",
+    "*.so",
+    "*.pyd",
     "transports/extension",
     "js/dist",
     "js/node_modules",
@@ -232,6 +234,12 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
+artifacts = [
+    "transports/*.dll",
+    "transports/*.dylib",
+    "transports/*.so",
+    "transports/extension",
+]
 packages = [
     "transports",
 ]
