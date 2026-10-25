@@ -44,11 +44,11 @@ def main() -> None:
     if args.loop == "uvloop":
         import uvloop
 
-        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())  # ty: ignore[deprecated]
     elif args.loop == "rsloop":
         import rsloop
 
-        asyncio.set_event_loop_policy(rsloop.EventLoopPolicy())
+        asyncio.set_event_loop_policy(rsloop.EventLoopPolicy())  # ty: ignore[deprecated]
 
     session = transports.Session()
     models = [Stream() for _ in range(args.models)]

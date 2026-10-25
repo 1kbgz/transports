@@ -380,7 +380,7 @@ class Hub:
         except (TypeError, ValueError):
             return {}
         if msg.get("t") == "awareness":
-            sid = msg.get("id")
+            sid = msg["id"]
             key = self._conn_key.get(conn)
             shared = self._shared.get(sid)
             if shared is None or key not in shared.subs:
@@ -566,7 +566,7 @@ class Hub:
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
         for codec, codec_conns in groups.items():
             try:
-                encoded = [(mid, protocol.encode(msg, codec)) for mid, msg in msgs]
+                encoded: list[tuple[int | None, Wire]] = [(mid, protocol.encode(msg, codec)) for mid, msg in msgs]
             except Exception:  # noqa: BLE001
                 for conn in codec_conns:
                     self.close(conn)

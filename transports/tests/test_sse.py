@@ -84,11 +84,11 @@ def test_browser_sse_path_mirrors_events():
             self.closed = True
 
     js_mod = types.ModuleType("js")
-    js_mod.EventSource = types.SimpleNamespace(new=FakeSource)
+    js_mod.__dict__["EventSource"] = types.SimpleNamespace(new=FakeSource)
     pyodide_mod = types.ModuleType("pyodide")
     ffi_mod = types.ModuleType("pyodide.ffi")
-    ffi_mod.create_proxy = FakeProxy
-    pyodide_mod.ffi = ffi_mod
+    ffi_mod.__dict__["create_proxy"] = FakeProxy
+    pyodide_mod.__dict__["ffi"] = ffi_mod
     saved = {name: sys.modules.get(name) for name in ("js", "pyodide", "pyodide.ffi")}
     sys.modules.update({"js": js_mod, "pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
     try:

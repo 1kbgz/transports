@@ -21,7 +21,9 @@ def test_session_since_returns_delta_up_to_date_or_gap():
     for v in (1, 2, 3):
         _bump(s, mid, v)
     assert s.snapshot(mid)["rev"] == 3
-    assert [p["rev"] for p in s.since(mid, 1)] == [2, 3]  # the patches after rev 1
+    replay = s.since(mid, 1)
+    assert replay is not None
+    assert [p["rev"] for p in replay] == [2, 3]  # the patches after rev 1
     assert s.since(mid, 3) == []  # already current
     s._log[mid] = s._log[mid][-1:]  # evict all but rev 3 — rev 2 is gone
     assert s.since(mid, 1) is None  # gap: can't bridge from rev 1, caller must re-snapshot

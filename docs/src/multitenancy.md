@@ -136,8 +136,7 @@ Host code uses `hub.mutate_shared_crdt(sid, mutations)`. With a `RelayBroadcaste
 `await relay.mutate_shared_crdt(...)` so the operation also reaches other workers.
 
 To persist the model, store all arguments delivered to `Hub.on_shared_write`. Its `merge_state`
-argument contains `crdt_spec` and `crdt_state`; pass it back to `share(..., rev=...,
-merge_state=...)` after a restart. `Hub.snapshot_shared()` returns the same nested `merge_state`
+argument contains `crdt_spec` and `crdt_state`; pass it back to `share(..., rev=..., merge_state=...)` after a restart. `Hub.snapshot_shared()` returns the same nested `merge_state`
 shape for explicit checkpoints.
 
 `Hub` binds each observed client replica ID to its tenant key for that process lifetime and rejects

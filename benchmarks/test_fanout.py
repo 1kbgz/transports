@@ -40,7 +40,7 @@ def percentile(samples: list[float], q: float) -> float:
 def _grid() -> list[tuple[int, int]]:
     spec = os.environ.get("TRANSPORTS_BENCH")
     if spec:
-        return [tuple(int(part) for part in combo.split(":")) for combo in spec.split(",")]
+        return [(int(sessions), int(streams)) for sessions, streams in (combo.split(":") for combo in spec.split(","))]
     return [(10, 1), (100, 10), (250, 20)]
 
 

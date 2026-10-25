@@ -388,7 +388,9 @@ def test_since_shared_returns_delta_or_none():
     for r in range(1, 4):
         hub.apply_shared(sid, _patch(r, (f"k{r}", r)), f"c{r}")
     assert hub.since_shared(sid, 3) == []  # already current
-    assert len(hub.since_shared(sid, 1)) == 2  # patches for rev 2 and 3
+    replay = hub.since_shared(sid, 1)
+    assert replay is not None
+    assert len(replay) == 2  # patches for rev 2 and 3
     no_replay = hub.share({"Map": {}}, "Doc2", merge=DeepLwwCrdt)  # replay=False
     assert hub.since_shared(no_replay, 0) is None
 
