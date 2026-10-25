@@ -241,7 +241,7 @@ class Client:
                 retained.append({"id": pending["id"], "ops": remaining})
         self._crdt_outbox = retained
 
-    def recv(self, data: str | bytes) -> dict | None:
+    def recv(self, data: str | bytes) -> dict | list[dict] | None:
         """Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.
 
         Returns the accepted change so reactive consumers can update only its paths —
@@ -465,7 +465,7 @@ class Client:
         if isinstance(frame, str):
             ws.send(frame)
         else:
-            from pyodide.ffi import to_js
+            from pyodide.ffi import to_js  # ty: ignore[unresolved-import]
 
             ws.send(to_js(frame))
 
@@ -477,9 +477,9 @@ class Client:
         testable with fake modules injected into ``sys.modules`` off-browser."""
         import asyncio
 
-        from pyodide.ffi import create_proxy
+        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
 
-        from js import WebSocket  # the browser global via the Pyodide FFI
+        from js import WebSocket  # ty: ignore[unresolved-import]  # browser global via the Pyodide FFI
 
         ws = WebSocket.new(self._connect_url(url))
         ws.binaryType = "arraybuffer"
@@ -525,7 +525,7 @@ class Client:
         """
         import asyncio
 
-        from pyodide.ffi import create_proxy
+        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
 
         channel.binaryType = "arraybuffer"
         closed: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -545,8 +545,8 @@ class Client:
             attachment = asyncio.create_task(self.attach(sender))
 
             def _attached(task: asyncio.Task) -> None:
-                if not task.cancelled() and task.exception() is not None and not closed.done():
-                    closed.set_exception(task.exception())
+                if not task.cancelled() and (error := task.exception()) is not None and not closed.done():
+                    closed.set_exception(error)
 
             attachment.add_done_callback(_attached)
 
@@ -634,9 +634,9 @@ class Client:
         """Mirror over the browser's native `EventSource` (the Pyodide path) until it errors/closes."""
         import asyncio
 
-        from pyodide.ffi import create_proxy
+        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
 
-        from js import EventSource  # the browser global via the Pyodide FFI
+        from js import EventSource  # ty: ignore[unresolved-import]  # browser global via the Pyodide FFI
 
         source = EventSource.new(url)
         closed: asyncio.Future = asyncio.get_running_loop().create_future()

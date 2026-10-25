@@ -33,6 +33,12 @@ def json_to_msgpack(json: str) -> bytes:
 def msgpack_to_json(data: bytes) -> str:
     """Convert MessagePack bytes back to a JSON document."""
 
+def json_to_cbor(json: str) -> bytes:
+    """Convert an arbitrary JSON document to CBOR bytes."""
+
+def cbor_to_json(data: bytes) -> str:
+    """Convert CBOR bytes back to a JSON document."""
+
 def normalize_message(json: str) -> str:
     """Parse and serialize one typed live protocol message as compact JSON."""
 

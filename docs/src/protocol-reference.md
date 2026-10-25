@@ -7,16 +7,16 @@ binary frame.
 
 A model value is an externally tagged enum.
 
-| Variant | Shape | Notes |
-|---|---|---|
-| Null | `"Null"` | Null value. |
-| Bool | `{"Bool": true}` | Boolean. |
-| Int | `{"Int": 1}` | Signed integer. |
-| Float | `{"Float": 1.5}` | Floating-point number. |
-| Str | `{"Str": "lamp"}` | String. |
-| List | `{"List": [Value, ...]}` | Ordered values. |
-| Map | `{"Map": {"field": Value}}` | String-keyed map. |
-| Submodel | `{"Submodel": 1}` | Core model reference. Current Python and JavaScript bridges inline nested models as maps. |
+| Variant  | Shape                       | Notes                                                                                     |
+| -------- | --------------------------- | ----------------------------------------------------------------------------------------- |
+| Null     | `"Null"`                    | Null value.                                                                               |
+| Bool     | `{"Bool": true}`            | Boolean.                                                                                  |
+| Int      | `{"Int": 1}`                | Signed integer.                                                                           |
+| Float    | `{"Float": 1.5}`            | Floating-point number.                                                                    |
+| Str      | `{"Str": "lamp"}`           | String.                                                                                   |
+| List     | `{"List": [Value, ...]}`    | Ordered values.                                                                           |
+| Map      | `{"Map": {"field": Value}}` | String-keyed map.                                                                         |
+| Submodel | `{"Submodel": 1}`           | Core model reference. Current Python and JavaScript bridges inline nested models as maps. |
 
 Example:
 
@@ -31,12 +31,12 @@ A `CrdtSpec` assigns merge semantics to the model's `Value` tree. The current fo
 with SHA-256. A replica must reject a different hash instead of joining a model with incompatible
 semantics.
 
-| Policy   | Required shape                                                                   | Meaning                                                                                                                                                          |
-| -------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Register | `{"kind": "register"}`                                                           | One deterministic last-writer-wins value.                                                                                                                        |
-| Map      | `{"kind": "map", "fields": {...}, "values": policy?}`                            | Recursively merge named fields; `values` supplies the policy for other keys.                                                                                     |
-| Set      | `{"kind": "set", "keys": [["id"]], "element": policy}`                          | Add-wins observed-remove members. Each entry in `keys` is a field path; several paths form a composite key. An empty list identifies members by whole value.     |
-| Sequence | `{"kind": "sequence", "materialization": "list" or "string", "element": policy}` | Stable-ID ordered elements. IDs are CRDT metadata, not positional indexes.                                                                                       |
+| Policy   | Required shape                                                                   | Meaning                                                                                                                                                      |
+| -------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Register | `{"kind": "register"}`                                                           | One deterministic last-writer-wins value.                                                                                                                    |
+| Map      | `{"kind": "map", "fields": {...}, "values": policy?}`                            | Recursively merge named fields; `values` supplies the policy for other keys.                                                                                 |
+| Set      | `{"kind": "set", "keys": [["id"]], "element": policy}`                           | Add-wins observed-remove members. Each entry in `keys` is a field path; several paths form a composite key. An empty list identifies members by whole value. |
+| Sequence | `{"kind": "sequence", "materialization": "list" or "string", "element": policy}` | Stable-ID ordered elements. IDs are CRDT metadata, not positional indexes.                                                                                   |
 
 Map `values` and `element` default to a register. Sequence materialization defaults to `list`;
 `string` sequences require register elements because each element materializes as one Unicode scalar
@@ -137,10 +137,10 @@ Rust implementation for new Python and JavaScript integrations.
 
 Patch operations address values by paths from the model root.
 
-| Segment | Shape |
-|---|---|
-| Map key | `{"Key": "name"}` |
-| List index | `{"Index": 0}` |
+| Segment    | Shape             |
+| ---------- | ----------------- |
+| Map key    | `{"Key": "name"}` |
+| List index | `{"Index": 0}`    |
 
 An empty path addresses the whole model value.
 
@@ -376,10 +376,10 @@ session-local ids.
 
 ## Built-in codecs
 
-| Name accepted | Canonical codec | Frame type |
-|---|---|---|
-| `json`, `application/json`, empty, `None` | `json` | Text frame. |
-| `msgpack`, `application/msgpack`, `x-msgpack`, `application/x-msgpack` | `msgpack` | Binary frame. |
+| Name accepted                                                          | Canonical codec | Frame type    |
+| ---------------------------------------------------------------------- | --------------- | ------------- |
+| `json`, `application/json`, empty, `None`                              | `json`          | Text frame.   |
+| `msgpack`, `application/msgpack`, `x-msgpack`, `application/x-msgpack` | `msgpack`       | Binary frame. |
 
 A WebSocket connection selects a codec with the `codec` query parameter. `Server` and `Hub` encode
 each outbound message for the target connection's codec.
@@ -390,10 +390,10 @@ SSE, Jupyter comm, and anywidget adapters use JSON text only.
 
 A custom codec is registered under a content type and provides two functions:
 
-| Function | Input | Output |
-|---|---|---|
-| `encode` | JSON-able protocol message or `Value` object | `str` or `bytes` |
-| `decode` | `str` or `bytes` | JSON-able protocol message or `Value` object |
+| Function | Input                                        | Output                                       |
+| -------- | -------------------------------------------- | -------------------------------------------- |
+| `encode` | JSON-able protocol message or `Value` object | `str` or `bytes`                             |
+| `decode` | `str` or `bytes`                             | JSON-able protocol message or `Value` object |
 
 Built-in codec names cannot be overridden. Custom codecs are binding-local; register matching
 implementations in every Python or JavaScript process that uses the content type.

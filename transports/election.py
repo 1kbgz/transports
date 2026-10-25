@@ -18,7 +18,7 @@ import asyncio
 import json
 import os
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import Callable, Coroutine
 
 from .backplane import Backplane
 
@@ -62,7 +62,7 @@ class Election:
             self._singleton.cancel()
             self._singleton = None
 
-    async def run_singleton(self, factory: Callable[[], Awaitable]) -> None:
+    async def run_singleton(self, factory: Callable[[], Coroutine]) -> None:
         """Run ``factory()`` (a coroutine function) on whichever member is the leader: (re)start it on
         gaining leadership, cancel it on losing it. Runs until :meth:`stop`. Waits one beacon round first
         so ids are exchanged before the first decision (reducing startup overlap)."""

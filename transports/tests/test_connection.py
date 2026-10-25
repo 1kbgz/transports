@@ -404,11 +404,11 @@ def test_browser_websocket_path_mirrors_frames():
             self.listeners[name] = cb
 
     js_mod = types.ModuleType("js")
-    js_mod.WebSocket = types.SimpleNamespace(new=FakeSocket)
+    js_mod.__dict__["WebSocket"] = types.SimpleNamespace(new=FakeSocket)
     pyodide_mod = types.ModuleType("pyodide")
     ffi_mod = types.ModuleType("pyodide.ffi")
-    ffi_mod.create_proxy = FakeProxy
-    pyodide_mod.ffi = ffi_mod
+    ffi_mod.__dict__["create_proxy"] = FakeProxy
+    pyodide_mod.__dict__["ffi"] = ffi_mod
     saved = {name: sys.modules.get(name) for name in ("js", "pyodide", "pyodide.ffi")}
     sys.modules.update({"js": js_mod, "pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
     try:
@@ -432,12 +432,14 @@ def test_browser_websocket_path_mirrors_frames():
             assert client.connected
 
             for wire in server.open(("conn"), "msgpack"):  # binary frames, as the browser delivers them
+                assert isinstance(wire, bytes)
                 sock.listeners["message"](FakeEvent(FakeBuffer(wire)))
             d.name = "beacon"
             for msgs in server.flush().values():
                 for wire in msgs:
                     message = protocol.decode(wire, "msgpack")
                     tagged = protocol.encode(protocol.patch_msg(mid, message["patch"], "browser-1"), "msgpack")
+                    assert isinstance(tagged, bytes)
                     sock.listeners["message"](FakeEvent(FakeBuffer(tagged)))
             sock.listeners["close"](FakeEvent(None))
             await asyncio.wait_for(task, 1)
@@ -497,9 +499,9 @@ def test_browser_data_channel_path_mirrors_frames():
 
     pyodide_mod = types.ModuleType("pyodide")
     ffi_mod = types.ModuleType("pyodide.ffi")
-    ffi_mod.create_proxy = FakeProxy
-    ffi_mod.to_js = lambda value: value
-    pyodide_mod.ffi = ffi_mod
+    ffi_mod.__dict__["create_proxy"] = FakeProxy
+    ffi_mod.__dict__["to_js"] = lambda value: value
+    pyodide_mod.__dict__["ffi"] = ffi_mod
     saved = {name: sys.modules.get(name) for name in ("pyodide", "pyodide.ffi")}
     sys.modules.update({"pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
     try:
@@ -698,12 +700,12 @@ def test_browser_run_reconnects_with_resume_and_client_authority():
             self.sent.append(frame)
 
     js_mod = types.ModuleType("js")
-    js_mod.WebSocket = types.SimpleNamespace(new=FakeSocket)
+    js_mod.__dict__["WebSocket"] = types.SimpleNamespace(new=FakeSocket)
     pyodide_mod = types.ModuleType("pyodide")
     ffi_mod = types.ModuleType("pyodide.ffi")
-    ffi_mod.create_proxy = FakeProxy
-    ffi_mod.to_js = lambda x: x
-    pyodide_mod.ffi = ffi_mod
+    ffi_mod.__dict__["create_proxy"] = FakeProxy
+    ffi_mod.__dict__["to_js"] = lambda x: x
+    pyodide_mod.__dict__["ffi"] = ffi_mod
     saved = {name: sys.modules.get(name) for name in ("js", "pyodide", "pyodide.ffi")}
     sys.modules.update({"js": js_mod, "pyodide": pyodide_mod, "pyodide.ffi": ffi_mod})
     try:

@@ -180,6 +180,7 @@ class Server:
             groups.setdefault((codec, conn in self._batched), []).append(conn)
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
         for (codec, wants_batch), codec_conns in groups.items():
+            encoded: list[tuple[int | None, Wire]]
             try:
                 if wants_batch and batched is not None:
                     encoded = [(None, protocol.encode(batched, codec))]

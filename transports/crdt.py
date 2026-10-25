@@ -172,4 +172,4 @@ class CrdtDocument:
 
     def compact(self, frontier: Mapping[str, int]) -> int:
         """Discard metadata covered by a caller-provided causally stable frontier."""
-        return cast(int, self._inner.compact(json.dumps(dict(frontier), allow_nan=False)))
+        return self._inner.compact(json.dumps(dict(frontier), allow_nan=False))

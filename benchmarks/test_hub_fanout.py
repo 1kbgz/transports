@@ -27,7 +27,7 @@ MODE = os.environ.get("TRANSPORTS_BENCH_HUB_MODE", "mixed")
 def _grid() -> list[tuple[int, int, int]]:
     spec = os.environ.get("TRANSPORTS_BENCH_HUB")
     if spec:
-        return [tuple(int(part) for part in combo.split(":")) for combo in spec.split(",")]
+        return [(int(tenants), int(private), int(shared)) for tenants, private, shared in (combo.split(":") for combo in spec.split(","))]
     return [(50, 2, 2), (250, 2, 5)]
 
 

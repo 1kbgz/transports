@@ -28,7 +28,7 @@ Live message kinds:
 
 import json
 from collections.abc import Callable
-from typing import Any
+from typing import Any, cast
 
 from .transports import (
     decode_as as _core_decode_as,
@@ -198,7 +198,7 @@ def decode(data: str | bytes, codec: str | None = None) -> dict:
             raw = data.encode() if isinstance(data, str) else bytes(data)
             return json.loads(_decode_message(raw, c))
         if c == CBOR:
-            return json.loads(_decode_message(bytes(data), c))
+            return json.loads(_decode_message(bytes(cast(bytes, data)), c))
     if isinstance(data, (bytes, bytearray)):
         return json.loads(_decode_message(bytes(data), MSGPACK))
     return json.loads(_normalize_message(data))

@@ -66,5 +66,6 @@ def test_python_binding_matches_shared_message_codec_trace():
 def test_python_client_applies_shared_batch_fixture_in_order():
     client = transports.Client()
     accepted = client.recv(json.dumps(FIXTURE["batch"]))
+    assert isinstance(accepted, list)
     assert [change["t"] for change in accepted] == ["snapshot", "patch"]
     assert client.value(8) == {"Map": {"count": {"Int": 6}}}

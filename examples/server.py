@@ -10,6 +10,7 @@ and the incremental patches the `Session` emits.
 """
 
 import asyncio
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from pydantic import BaseModel
@@ -45,9 +46,11 @@ async def _ticker():
         counter.tick += 1  # mutate the model; the Session emits a patch on the next flush
 
 
-async def _startup():
+@asynccontextmanager
+async def _lifespan(_app):
     asyncio.create_task(transports.autosync(server, 0.05))  # broadcast patches to all clients
     asyncio.create_task(_ticker())
+    yield
 
 
 app = Starlette(
@@ -56,7 +59,7 @@ app = Starlette(
         WebSocketRoute("/ws", transports.ws_endpoint(server)),
         Mount("/pkg", app=StaticFiles(directory=str(PKG))),
     ],
-    on_startup=[_startup],
+    lifespan=_lifespan,
 )
 
 

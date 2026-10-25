@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from transports import CrdtDocument, CrdtSpec
+from transports import CrdtDocument, CrdtPolicy, CrdtSpec
 
 FIXTURE = json.loads((Path(__file__).parents[2] / "rust" / "tests" / "fixtures" / "crdt_spec.json").read_text())
 
@@ -18,7 +18,7 @@ def test_python_binding_matches_shared_crdt_spec_fixture():
 
 
 def test_python_crdt_spec_constructors_are_equivalent_and_hashable():
-    root = {"kind": "map", "fields": {"document": {"kind": "sequence", "materialization": "string"}}}
+    root: CrdtPolicy = {"kind": "map", "fields": {"document": {"kind": "sequence", "materialization": "string"}}}
     constructed = CrdtSpec(root)
     from_json = CrdtSpec.from_json(constructed.to_json())
     from_dict = CrdtSpec.from_dict(constructed.to_dict())
@@ -27,7 +27,7 @@ def test_python_crdt_spec_constructors_are_equivalent_and_hashable():
     assert len({constructed, from_json, from_dict}) == 1
     assert CrdtSpec.from_dict(constructed.to_dict()).to_dict() == constructed.to_dict()
 
-    element = {"kind": "map", "fields": {"meta": {"kind": "map"}}}
+    element: CrdtPolicy = {"kind": "map", "fields": {"meta": {"kind": "map"}}}
     first = CrdtSpec({"kind": "set", "keys": [["tenant"], ["meta", "id"]], "element": element})
     reversed_keys = CrdtSpec({"kind": "set", "keys": [["meta", "id"], ["tenant"]], "element": element})
     assert first == reversed_keys

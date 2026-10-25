@@ -133,6 +133,7 @@ class ZmqBackplane(Backplane):
         self._task = asyncio.create_task(self._read())
 
     async def _read(self) -> None:
+        assert self._sub is not None
         try:
             while not self._closed:
                 self._deliver(await self._sub.recv())
@@ -140,6 +141,7 @@ class ZmqBackplane(Backplane):
             pass
 
     async def publish(self, data: bytes) -> None:
+        assert self._pub is not None
         await self._pub.send(self._frame(data))
 
     async def stop(self) -> None:
@@ -222,6 +224,7 @@ class UnixSocketBackplane(Backplane):
             pass
 
     async def publish(self, data: bytes) -> None:
+        assert self._writer is not None
         frame = self._frame(data)
         self._writer.write(struct.pack(">I", len(frame)) + frame)
         await self._writer.drain()

@@ -439,7 +439,7 @@ def test_deep_lww_converges_over_every_order():
     results = []
     for perm in itertools.permutations(writes):
         crdt = DeepLwwCrdt()
-        v = _NESTED
+        v: dict = _NESTED
         for patch, origin in perm:
             v = crdt.merge(v, patch, origin)
         results.append(v)
