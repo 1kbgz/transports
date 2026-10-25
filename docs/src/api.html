@@ -1,253 +1,563 @@
-<!doctype html>
-<html class="no-js" lang="en" data-content_root="../../">
-  <head><meta charset="utf-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <meta name="color-scheme" content="light dark"><meta name="viewport" content="width=device-width, initial-scale=1" />
-<link rel="index" title="Index" href="../../genindex.html"><link rel="search" title="Search" href="../../search.html"><link rel="prev" title="Wire protocol reference" href="protocol-reference.html">
+<!DOCTYPE html>
 
-    <!-- Generated with Sphinx 8.2.3 and Furo 2025.12.19 -->
-        <title>API Reference - transports v0.10.0</title>
-      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
-    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo.css?v=7bdb33bb" />
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>API Reference &#8212; transports v0.10.0</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
+    <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=9324ae27" />
+    <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
     <link rel="stylesheet" type="text/css" href="../../_static/mystnb.11b39860a7a0cbfd473a3ad8a317855267ff0bd372690045ca344a6b62be495e.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=8486d09b" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
-    <link rel="stylesheet" type="text/css" href="../../_static/searchlite.css?v=4235115c" />
-    <link rel="stylesheet" type="text/css" href="../../_static/styles/furo-extensions.css?v=8dab3a3b" />
-    <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=890fd012" />
-    
-    
-
-
-<style>
-  body {
-    --color-code-background: #eeffcc;
-  --color-code-foreground: black;
-  
-  }
-  @media not print {
-    body[data-theme="dark"] {
-      --color-code-background: #202020;
-  --color-code-foreground: #d0d0d0;
-  
-    }
-    @media (prefers-color-scheme: dark) {
-      body:not([data-theme="light"]) {
-        --color-code-background: #202020;
-  --color-code-foreground: #d0d0d0;
-  
-      }
-    }
-  }
-</style></head>
-  <body>
-    
+    <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
+    <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
+    <script src="../../_static/documentation_options.js?v=82662543"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
+    <script src="../../_static/copybutton.js?v=f281be69"></script>
+    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
+    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
+    <script defer="defer" src="../../_static/fuma.js?v=88a16a98"></script>
+    <script src="../../_static/js/custom.js?v=956e5d78"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+    <link rel="prev" title="Wire protocol reference" href="protocol-reference.html" />
     <script>
-      document.body.dataset.theme = localStorage.getItem("theme") || "auto";
+      (function () {
+        var root = document.documentElement;
+        try {
+          var stored = localStorage.getItem("fuma-theme");
+          if (stored) {
+            root.classList.add(stored === "dark" ? "dark" : "light");
+            root.style.colorScheme = stored === "dark" ? "dark" : "light";
+          }
+          if (localStorage.getItem("fuma-sidebar") === "collapsed") root.dataset.sidebarCollapsed = "true";
+        } catch (e) {}
+      })();
     </script>
-    
+  </head>
+<body class="fd-body" data-layout="docs" data-toc-style="normal" data-open-level="0">
+<div id="fd-layout"><header id="fd-subnav">
+  <div class="fd-subnav-inner">
+    <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.10.0</span>
+</a>
 
-<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
-  <symbol id="svg-toc" viewBox="0 0 24 24">
-    <title>Contents</title>
-    <svg stroke="currentColor" fill="currentColor" stroke-width="0" viewBox="0 0 1024 1024">
-      <path d="M408 442h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8zm-8 204c0 4.4 3.6 8 8 8h480c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8H408c-4.4 0-8 3.6-8 8v56zm504-486H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zm0 632H120c-4.4 0-8 3.6-8 8v56c0 4.4 3.6 8 8 8h784c4.4 0 8-3.6 8-8v-56c0-4.4-3.6-8-8-8zM115.4 518.9L271.7 642c5.8 4.6 14.4.5 14.4-6.9V388.9c0-7.4-8.5-11.5-14.4-6.9L115.4 505.1a8.74 8.74 0 0 0 0 13.8z"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-menu" viewBox="0 0 24 24">
-    <title>Menu</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-menu">
-      <line x1="3" y1="12" x2="21" y2="12"></line>
-      <line x1="3" y1="6" x2="21" y2="6"></line>
-      <line x1="3" y1="18" x2="21" y2="18"></line>
-    </svg>
-  </symbol>
-  <symbol id="svg-arrow-right" viewBox="0 0 24 24">
-    <title>Expand</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather-chevron-right">
-      <polyline points="9 18 15 12 9 6"></polyline>
-    </svg>
-  </symbol>
-  <symbol id="svg-sun" viewBox="0 0 24 24">
-    <title>Light mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="feather-sun">
-      <circle cx="12" cy="12" r="5"></circle>
-      <line x1="12" y1="1" x2="12" y2="3"></line>
-      <line x1="12" y1="21" x2="12" y2="23"></line>
-      <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
-      <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line>
-      <line x1="1" y1="12" x2="3" y2="12"></line>
-      <line x1="21" y1="12" x2="23" y2="12"></line>
-      <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
-      <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
-    </svg>
-  </symbol>
-  <symbol id="svg-moon" viewBox="0 0 24 24">
-    <title>Dark mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-moon">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M12 3c.132 0 .263 0 .393 0a7.5 7.5 0 0 0 7.92 12.446a9 9 0 1 1 -8.313 -12.454z" />
-    </svg>
-  </symbol>
-  <symbol id="svg-sun-with-moon" viewBox="0 0 24 24">
-    <title>Auto light/dark, in light mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
-      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
-      <path style="opacity: 50%" d="M 5.411 14.504 C 5.471 14.504 5.532 14.504 5.591 14.504 C 3.639 16.319 4.383 19.569 6.931 20.352 C 7.693 20.586 8.512 20.551 9.25 20.252 C 8.023 23.207 4.056 23.725 2.11 21.184 C 0.166 18.642 1.702 14.949 4.874 14.536 C 5.051 14.512 5.231 14.5 5.411 14.5 L 5.411 14.504 Z"/>
-      <line x1="14.5" y1="3.25" x2="14.5" y2="1.25"/>
-      <line x1="14.5" y1="15.85" x2="14.5" y2="17.85"/>
-      <line x1="10.044" y1="5.094" x2="8.63" y2="3.68"/>
-      <line x1="19" y1="14.05" x2="20.414" y2="15.464"/>
-      <line x1="8.2" y1="9.55" x2="6.2" y2="9.55"/>
-      <line x1="20.8" y1="9.55" x2="22.8" y2="9.55"/>
-      <line x1="10.044" y1="14.006" x2="8.63" y2="15.42"/>
-      <line x1="19" y1="5.05" x2="20.414" y2="3.636"/>
-      <circle cx="14.5" cy="9.55" r="3.6"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-moon-with-sun" viewBox="0 0 24 24">
-    <title>Auto light/dark, in dark mode</title>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round"
-      class="icon-custom-derived-from-feather-sun-and-tabler-moon">
-      <path d="M 8.282 7.007 C 8.385 7.007 8.494 7.007 8.595 7.007 C 5.18 10.184 6.481 15.869 10.942 17.24 C 12.275 17.648 13.706 17.589 15 17.066 C 12.851 22.236 5.91 23.143 2.505 18.696 C -0.897 14.249 1.791 7.786 7.342 7.063 C 7.652 7.021 7.965 7 8.282 7 L 8.282 7.007 Z"/>
-      <line style="opacity: 50%" x1="18" y1="3.705" x2="18" y2="2.5"/>
-      <line style="opacity: 50%" x1="18" y1="11.295" x2="18" y2="12.5"/>
-      <line style="opacity: 50%" x1="15.316" y1="4.816" x2="14.464" y2="3.964"/>
-      <line style="opacity: 50%" x1="20.711" y1="10.212" x2="21.563" y2="11.063"/>
-      <line style="opacity: 50%" x1="14.205" y1="7.5" x2="13.001" y2="7.5"/>
-      <line style="opacity: 50%" x1="21.795" y1="7.5" x2="23" y2="7.5"/>
-      <line style="opacity: 50%" x1="15.316" y1="10.184" x2="14.464" y2="11.036"/>
-      <line style="opacity: 50%" x1="20.711" y1="4.789" x2="21.563" y2="3.937"/>
-      <circle style="opacity: 50%" cx="18" cy="7.5" r="2.169"/>
-    </svg>
-  </symbol>
-  <symbol id="svg-pencil" viewBox="0 0 24 24">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-pencil-code">
-      <path d="M4 20h4l10.5 -10.5a2.828 2.828 0 1 0 -4 -4l-10.5 10.5v4" />
-      <path d="M13.5 6.5l4 4" />
-      <path d="M20 21l2 -2l-2 -2" />
-      <path d="M17 17l-2 2l2 2" />
-    </svg>
-  </symbol>
-  <symbol id="svg-eye" viewBox="0 0 24 24">
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1" stroke-linecap="round" stroke-linejoin="round" class="icon-tabler-eye-code">
-      <path stroke="none" d="M0 0h24v24H0z" fill="none" />
-      <path d="M10 12a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
-      <path
-        d="M11.11 17.958c-3.209 -.307 -5.91 -2.293 -8.11 -5.958c2.4 -4 5.4 -6 9 -6c3.6 0 6.6 2 9 6c-.21 .352 -.427 .688 -.647 1.008" />
-      <path d="M20 21l2 -2l-2 -2" />
-      <path d="M17 17l-2 2l2 2" />
-    </svg>
-  </symbol>
-</svg>
-
-<input type="checkbox" class="sidebar-toggle" name="__navigation" id="__navigation" aria-label="Toggle site navigation sidebar">
-<input type="checkbox" class="sidebar-toggle" name="__toc" id="__toc" aria-label="Toggle table of contents sidebar">
-<label class="overlay sidebar-overlay" for="__navigation"></label>
-<label class="overlay toc-overlay" for="__toc"></label>
-
-<a class="skip-to-content muted-link" href="#furo-main-content">Skip to content</a>
-
-
-
-<div class="page">
-  <header class="mobile-header">
-    <div class="header-left">
-      <label class="nav-overlay-icon" for="__navigation">
-        <span class="icon"><svg><use href="#svg-menu"></use></svg></span>
-      </label>
+    <div class="fd-nav-actions">
+      <button type="button" class="fd-icon-button" data-fd-search-open aria-label="Search" title="Search"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
+      <a class="fd-icon-button" href="https://github.com/1kbgz/transports" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
+      <button type="button" class="fd-icon-button fd-theme-toggle" aria-label="Toggle theme" title="Toggle theme">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon fd-icon-light"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon fd-icon-dark"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></svg>
+      </button>
     </div>
-    <div class="header-center">
-      <a href="../../index.html"><div class="brand">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.10.0</code></div></a>
+  </div>
+</header>
+
+<aside id="fd-sidebar" aria-label="Documentation">
+  <div class="fd-sidebar-header">
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.10.0</span>
+</a>
+      <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
-    <div class="header-right">
-      <div class="theme-toggle-container theme-toggle-header">
-        <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
-          <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
-          <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
-          <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
-          <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
-        </button>
-      </div>
-      <label class="toc-overlay-icon toc-header-icon" for="__toc">
-        <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
-      </label>
-    </div>
-  </header>
-  <aside class="sidebar-drawer">
-    <div class="sidebar-container">
+    <button type="button" class="fd-search-trigger" data-fd-search-open title="Search">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg><span>Search</span><kbd class="fd-kbd">/</kbd>
+    </button>
+  </div>
+
+  <nav class="fd-sidebar-nav">
+    <div class="fd-sidebar-group">
       
-      <div class="sidebar-sticky"><a class="sidebar-brand" href="../../index.html">
-  
-  <span class="sidebar-brand-text">transports <code style='font-size: var(--font-size--small--4);color: var(--sd-color-primary);'>v0.10.0</code></span>
-  
-</a><form class="sidebar-search-container" method="get" action="../../search.html" role="search">
-  <input class="sidebar-search" placeholder="Search" name="q" aria-label="Search">
-  <input type="hidden" name="check_keywords" value="yes">
-  <input type="hidden" name="area" value="default">
-</form>
-<div id="searchbox"></div><div class="sidebar-scroll"><div class="sidebar-tree">
-  <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="quickstart.html">Quickstart</a></li>
-<li class="toctree-l1"><a class="reference internal" href="concepts.html">Concepts</a></li>
-<li class="toctree-l1"><a class="reference internal" href="bridges.html">How to bridge models and objects</a></li>
-<li class="toctree-l1"><a class="reference internal" href="connections.html">How to connect live clients</a></li>
-<li class="toctree-l1"><a class="reference internal" href="codecs.html">How to use codecs</a></li>
-<li class="toctree-l1"><a class="reference internal" href="multitenancy.html">How to isolate tenants and share models</a></li>
-<li class="toctree-l1"><a class="reference internal" href="pyodide.html">How to run transports in a browser with Pyodide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="benchmarks.html">Server fan-out benchmark results</a></li>
-<li class="toctree-l1"><a class="reference internal" href="protocol-reference.html">Wire protocol reference</a></li>
-<li class="toctree-l1 current current-page"><a class="current reference internal" href="#">API Reference</a></li>
+<ul class="fd-tree">
+  <li class="fd-tree-item">
+    <a class="fd-link" href="quickstart.html">
+      <span class="fd-link-text">Quickstart</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="concepts.html">
+      <span class="fd-link-text">Concepts</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="bridges.html">
+      <span class="fd-link-text">How to bridge models and objects</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="connections.html">
+      <span class="fd-link-text">How to connect live clients</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="codecs.html">
+      <span class="fd-link-text">How to use codecs</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="multitenancy.html">
+      <span class="fd-link-text">How to isolate tenants and share models</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="pyodide.html">
+      <span class="fd-link-text">How to run transports in a browser with Pyodide</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="benchmarks.html">
+      <span class="fd-link-text">Server fan-out benchmark results</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link" href="protocol-reference.html">
+      <span class="fd-link-text">Wire protocol reference</span>
+    </a>
+  </li>
+  <li class="fd-tree-item">
+    <a class="fd-link fd-current" href="#">
+      <span class="fd-link-text">API Reference</span>
+    </a>
+  </li>
 </ul>
-
-</div>
-</div>
-
-      </div>
-      
     </div>
-  </aside>
-  <div class="main">
-    <div class="content">
-      <div class="article-container">
-        <a href="#" class="back-to-top muted-link">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-            <path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8v12z"></path>
-          </svg>
-          <span>Back to top</span>
-        </a>
-        <div class="content-icon-container">
-          <div class="view-this-page">
-  <a class="muted-link" href="../../_sources/docs/src/api.md.txt" title="View this page">
-    <svg><use href="#svg-eye"></use></svg>
-    <span class="visually-hidden">View this page</span>
-  </a>
+  </nav>
+
+  <div class="fd-sidebar-footer">
+    <div class="fd-toolbar">
+      <a class="fd-toolbar-item" href="https://github.com/1kbgz/transports" target="_blank" rel="noopener" aria-label="GitHub" title="GitHub"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.4 5.4 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4"/><path d="M9 18c-4.51 2-5-2-7-2"/></svg></a>
+      <div class="fd-theme-switch" role="group" aria-label="Theme">
+        <button type="button" class="fd-theme-option" data-fd-theme="light" aria-label="Light theme" title="Light theme"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg></button>
+        <button type="button" class="fd-theme-option" data-fd-theme="dark" aria-label="Dark theme" title="Dark theme"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9"/></svg></button>
+      </div>
+    </div>
+  </div>
+</aside>
+<button type="button" id="fd-sidebar-restore" class="fd-icon-button" aria-label="Expand sidebar" title="Expand sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
+<div class="fd-sidebar-scrim" hidden></div>
+  <div id="fd-toc-popover">
+    <button type="button" class="fd-toc-trigger" aria-expanded="false" aria-controls="fd-toc-mobile" title="On this page">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg><span>On this page</span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    <div id="fd-toc-mobile" hidden><ul class="fd-toc-list">
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#session">Session</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Session">Session</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.reject_reason">Session.reject_reason</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.host">Session.host()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.ids">Session.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.on_patch">Session.on_patch()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.flush">Session.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.update">Session.update()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.drain">Session.drain()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.snapshot">Session.snapshot()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.value">Session.value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.apply_patch">Session.apply_patch()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.submit">Session.submit()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.since">Session.since()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.schema">Session.schema()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#model-bridge">Model bridge</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#list-identity-policy">List identity policy</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.to_value">to_value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.from_value">from_value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.schema_of">schema_of()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.schema_to_ts">schema_to_ts()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#connections">Connections</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Server">Server</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.open">Server.open()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.recv">Server.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.flush">Server.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.close">Server.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Client">Client</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connected">Client.connected</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.send">Client.send()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose">Client.propose()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose_ops">Client.propose_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose_crdt">Client.propose_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.set_awareness">Client.set_awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_change">Client.on_change()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_reject">Client.on_reject()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_awareness">Client.on_awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_ack">Client.on_ack()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_disconnect">Client.on_disconnect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_connect">Client.on_connect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_abandon">Client.on_abandon()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.attach">Client.attach()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.detach">Client.detach()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.recv">Client.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.value">Client.value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.crdt_spec">Client.crdt_spec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.model">Client.model()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.ids">Client.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.pending_proposals">Client.pending_proposals()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.pending_crdt_ops">Client.pending_crdt_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.awareness">Client.awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.abandon_proposal">Client.abandon_proposal()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit">Client.edit()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit_ops">Client.edit_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit_crdt">Client.edit_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect">Client.connect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect_data_channel">Client.connect_data_channel()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.run">Client.run()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect_sse">Client.connect_sse()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.ws_endpoint">ws_endpoint()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.sse_endpoint">sse_endpoint()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.serve_comm">serve_comm()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.serve_anywidget">serve_anywidget()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.autosync">autosync()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.sync">sync()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#multi-tenancy-and-sharing">Multi-tenancy and sharing</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.READ">READ</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.WRITE">WRITE</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Hub">Hub</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.tenant">Hub.tenant()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.share">Hub.share()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.subscribe">Hub.subscribe()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.open">Hub.open()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.recv">Hub.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.flush">Hub.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.set_shared">Hub.set_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_shared">Hub.apply_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.mutate_shared_crdt">Hub.mutate_shared_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_crdt_shared">Hub.apply_crdt_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.compact_shared_crdt">Hub.compact_shared_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.on_shared_write">Hub.on_shared_write()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.snapshot_shared">Hub.snapshot_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.since_shared">Hub.since_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_snapshot_shared">Hub.apply_snapshot_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_delta_shared">Hub.apply_delta_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.close">Hub.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.MergeStrategy">MergeStrategy</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.MergeStrategy.restore">MergeStrategy.restore()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.MergeStrategy.state">MergeStrategy.state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.LastWriteWins">LastWriteWins</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.LwwMapCrdt">LwwMapCrdt</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.LwwMapCrdt.restore">LwwMapCrdt.restore()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.LwwMapCrdt.state">LwwMapCrdt.state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#crdt-specifications">CRDT specifications</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.CrdtSpec">CrdtSpec</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.from_dict">CrdtSpec.from_dict()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.from_json">CrdtSpec.from_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.to_dict">CrdtSpec.to_dict()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.to_json">CrdtSpec.to_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.hash">CrdtSpec.hash</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.require_hash">CrdtSpec.require_hash()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.CrdtDocument">CrdtDocument</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.from_state">CrdtDocument.from_state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.value">CrdtDocument.value</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.state">CrdtDocument.state</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.mutate">CrdtDocument.mutate()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.apply">CrdtDocument.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.member_key">CrdtDocument.member_key()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.compact">CrdtDocument.compact()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#protocol-helpers">Protocol helpers</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.normalize_codec">normalize_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.snapshot_msg">snapshot_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.crdt_snapshot_msg">crdt_snapshot_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.patch_msg">patch_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.crdt_msg">crdt_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.encode">encode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.decode">decode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#core">Core</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.diff">diff()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.apply">apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.encode">encode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.decode">decode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.encode_as">encode_as()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.decode_as">decode_as()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.json_to_msgpack">json_to_msgpack()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.msgpack_to_json">msgpack_to_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.register_codec">register_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.unregister_codec">unregister_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.registered_codecs">registered_codecs()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Store">Store</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.apply">Store.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.host">Store.host()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.mutate">Store.mutate()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.snapshot">Store.snapshot()</a>
+  </li>
+</ul>
 </div>
-<div class="theme-toggle-container theme-toggle-content">
-            <button class="theme-toggle" aria-label="Toggle Light / Dark / Auto color theme">
-              <svg class="theme-icon-when-auto-light"><use href="#svg-sun-with-moon"></use></svg>
-              <svg class="theme-icon-when-auto-dark"><use href="#svg-moon-with-sun"></use></svg>
-              <svg class="theme-icon-when-dark"><use href="#svg-moon"></use></svg>
-              <svg class="theme-icon-when-light"><use href="#svg-sun"></use></svg>
-            </button>
-          </div>
-          <label class="toc-overlay-icon toc-content-icon" for="__toc">
-            <span class="icon"><svg><use href="#svg-toc"></use></svg></span>
-          </label>
-        </div>
-        <article role="main" id="furo-main-content">
-          <section class="tex2jax_ignore mathjax_ignore" id="api-reference">
+  </div>
+
+  <main id="fd-main">
+    <article class="fd-page">
+      <div class="fd-prose">
+  <section class="tex2jax_ignore mathjax_ignore" id="api-reference">
 <h1>API Reference<a class="headerlink" href="#api-reference" title="Link to this heading">¶</a></h1>
 <p>This reference lists the Python surface exposed by <code class="docutils literal notranslate"><span class="pre">transports</span></code>.</p>
 <section id="session">
@@ -564,7 +874,7 @@ existing channel is disconnected before its replacement is attached.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.recv">
-<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.recv" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">recv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.recv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.recv" title="Link to this definition">¶</a></dt>
 <dd><p>Apply an inbound snapshot or patch message (text or binary frame) to the local mirror.</p>
 <p>Returns the accepted change so reactive consumers can update only its paths —
 <code class="docutils literal notranslate"><span class="pre">{&quot;t&quot;:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">&quot;id&quot;,</span> <span class="pre">&quot;rev&quot;}</span></code> for a snapshot, the decoded patch message for a patch — or
@@ -1258,243 +1568,450 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 </section>
 </section>
 
-        </article>
+
       </div>
-      <footer>
-        
-        <div class="related-pages">
-          
-          <a class="prev-page" href="protocol-reference.html">
-              <svg class="furo-related-icon"><use href="#svg-arrow-right"></use></svg>
-              <div class="page-info">
-                <div class="context">
-                  <span>Previous</span>
-                </div>
-                
-                <div class="title">Wire protocol reference</div>
-                
-              </div>
-            </a>
-        </div>
-        <div class="bottom-of-page">
-          <div class="left-details">
-            <div class="copyright">
-                Copyright &#169; 1kbgz
-            </div>
-            Made with <a href="https://www.sphinx-doc.org/">Sphinx</a> and <a class="muted-link" href="https://pradyunsg.me">@pradyunsg</a>'s
-            
-            <a href="https://github.com/pradyunsg/furo">Furo</a>
-            
-          </div>
-          <div class="right-details">
-            
-          </div>
-        </div>
-        
-      </footer>
-    </div>
-    <aside class="toc-drawer">
-      
-      
-      <div class="toc-sticky toc-scroll">
-        <div class="toc-title-container">
-          <span class="toc-title">
-            On this page
-          </span>
-        </div>
-        <div class="toc-tree-container">
-          <div class="toc-tree">
-            <ul>
-<li><a class="reference internal" href="#">API Reference</a><ul>
-<li><a class="reference internal" href="#session">Session</a><ul>
-<li><a class="reference internal" href="#transports.Session"><code class="docutils literal notranslate"><span class="pre">Session</span></code></a><ul>
-<li><a class="reference internal" href="#transports.Session.reject_reason"><code class="docutils literal notranslate"><span class="pre">Session.reject_reason</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.host"><code class="docutils literal notranslate"><span class="pre">Session.host()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.ids"><code class="docutils literal notranslate"><span class="pre">Session.ids()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.on_patch"><code class="docutils literal notranslate"><span class="pre">Session.on_patch()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.flush"><code class="docutils literal notranslate"><span class="pre">Session.flush()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.update"><code class="docutils literal notranslate"><span class="pre">Session.update()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.drain"><code class="docutils literal notranslate"><span class="pre">Session.drain()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.snapshot"><code class="docutils literal notranslate"><span class="pre">Session.snapshot()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.value"><code class="docutils literal notranslate"><span class="pre">Session.value()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.apply_patch"><code class="docutils literal notranslate"><span class="pre">Session.apply_patch()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.submit"><code class="docutils literal notranslate"><span class="pre">Session.submit()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.since"><code class="docutils literal notranslate"><span class="pre">Session.since()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Session.schema"><code class="docutils literal notranslate"><span class="pre">Session.schema()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#model-bridge">Model bridge</a><ul>
-<li><a class="reference internal" href="#list-identity-policy">List identity policy</a><ul>
-<li><a class="reference internal" href="#transports.to_value"><code class="docutils literal notranslate"><span class="pre">to_value()</span></code></a></li>
-<li><a class="reference internal" href="#transports.from_value"><code class="docutils literal notranslate"><span class="pre">from_value()</span></code></a></li>
-<li><a class="reference internal" href="#transports.schema_of"><code class="docutils literal notranslate"><span class="pre">schema_of()</span></code></a></li>
-<li><a class="reference internal" href="#transports.schema_to_ts"><code class="docutils literal notranslate"><span class="pre">schema_to_ts()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#connections">Connections</a><ul>
-<li><a class="reference internal" href="#transports.Server"><code class="docutils literal notranslate"><span class="pre">Server</span></code></a><ul>
-<li><a class="reference internal" href="#transports.Server.open"><code class="docutils literal notranslate"><span class="pre">Server.open()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Server.recv"><code class="docutils literal notranslate"><span class="pre">Server.recv()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Server.flush"><code class="docutils literal notranslate"><span class="pre">Server.flush()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Server.close"><code class="docutils literal notranslate"><span class="pre">Server.close()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#transports.Client"><code class="docutils literal notranslate"><span class="pre">Client</span></code></a><ul>
-<li><a class="reference internal" href="#transports.Client.connected"><code class="docutils literal notranslate"><span class="pre">Client.connected</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.send"><code class="docutils literal notranslate"><span class="pre">Client.send()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.propose"><code class="docutils literal notranslate"><span class="pre">Client.propose()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.propose_ops"><code class="docutils literal notranslate"><span class="pre">Client.propose_ops()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.propose_crdt"><code class="docutils literal notranslate"><span class="pre">Client.propose_crdt()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.set_awareness"><code class="docutils literal notranslate"><span class="pre">Client.set_awareness()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_change"><code class="docutils literal notranslate"><span class="pre">Client.on_change()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_reject"><code class="docutils literal notranslate"><span class="pre">Client.on_reject()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_awareness"><code class="docutils literal notranslate"><span class="pre">Client.on_awareness()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_ack"><code class="docutils literal notranslate"><span class="pre">Client.on_ack()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_disconnect"><code class="docutils literal notranslate"><span class="pre">Client.on_disconnect()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_connect"><code class="docutils literal notranslate"><span class="pre">Client.on_connect()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.on_abandon"><code class="docutils literal notranslate"><span class="pre">Client.on_abandon()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.attach"><code class="docutils literal notranslate"><span class="pre">Client.attach()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.detach"><code class="docutils literal notranslate"><span class="pre">Client.detach()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.recv"><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.value"><code class="docutils literal notranslate"><span class="pre">Client.value()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.crdt_spec"><code class="docutils literal notranslate"><span class="pre">Client.crdt_spec()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.model"><code class="docutils literal notranslate"><span class="pre">Client.model()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.ids"><code class="docutils literal notranslate"><span class="pre">Client.ids()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.pending_proposals"><code class="docutils literal notranslate"><span class="pre">Client.pending_proposals()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.pending_crdt_ops"><code class="docutils literal notranslate"><span class="pre">Client.pending_crdt_ops()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.awareness"><code class="docutils literal notranslate"><span class="pre">Client.awareness()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.abandon_proposal"><code class="docutils literal notranslate"><span class="pre">Client.abandon_proposal()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.edit"><code class="docutils literal notranslate"><span class="pre">Client.edit()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.edit_ops"><code class="docutils literal notranslate"><span class="pre">Client.edit_ops()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.edit_crdt"><code class="docutils literal notranslate"><span class="pre">Client.edit_crdt()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.connect"><code class="docutils literal notranslate"><span class="pre">Client.connect()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.connect_data_channel"><code class="docutils literal notranslate"><span class="pre">Client.connect_data_channel()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.run"><code class="docutils literal notranslate"><span class="pre">Client.run()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Client.connect_sse"><code class="docutils literal notranslate"><span class="pre">Client.connect_sse()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#transports.ws_endpoint"><code class="docutils literal notranslate"><span class="pre">ws_endpoint()</span></code></a></li>
-<li><a class="reference internal" href="#transports.sse_endpoint"><code class="docutils literal notranslate"><span class="pre">sse_endpoint()</span></code></a></li>
-<li><a class="reference internal" href="#transports.serve_comm"><code class="docutils literal notranslate"><span class="pre">serve_comm()</span></code></a></li>
-<li><a class="reference internal" href="#transports.serve_anywidget"><code class="docutils literal notranslate"><span class="pre">serve_anywidget()</span></code></a></li>
-<li><a class="reference internal" href="#transports.autosync"><code class="docutils literal notranslate"><span class="pre">autosync()</span></code></a></li>
-<li><a class="reference internal" href="#transports.sync"><code class="docutils literal notranslate"><span class="pre">sync()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#multi-tenancy-and-sharing">Multi-tenancy and sharing</a><ul>
-<li><a class="reference internal" href="#transports.READ"><code class="docutils literal notranslate"><span class="pre">READ</span></code></a></li>
-<li><a class="reference internal" href="#transports.WRITE"><code class="docutils literal notranslate"><span class="pre">WRITE</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub"><code class="docutils literal notranslate"><span class="pre">Hub</span></code></a><ul>
-<li><a class="reference internal" href="#transports.Hub.tenant"><code class="docutils literal notranslate"><span class="pre">Hub.tenant()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.share"><code class="docutils literal notranslate"><span class="pre">Hub.share()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.subscribe"><code class="docutils literal notranslate"><span class="pre">Hub.subscribe()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.open"><code class="docutils literal notranslate"><span class="pre">Hub.open()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.recv"><code class="docutils literal notranslate"><span class="pre">Hub.recv()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.flush"><code class="docutils literal notranslate"><span class="pre">Hub.flush()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.set_shared"><code class="docutils literal notranslate"><span class="pre">Hub.set_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.apply_shared"><code class="docutils literal notranslate"><span class="pre">Hub.apply_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.mutate_shared_crdt"><code class="docutils literal notranslate"><span class="pre">Hub.mutate_shared_crdt()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.apply_crdt_shared"><code class="docutils literal notranslate"><span class="pre">Hub.apply_crdt_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.compact_shared_crdt"><code class="docutils literal notranslate"><span class="pre">Hub.compact_shared_crdt()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.on_shared_write"><code class="docutils literal notranslate"><span class="pre">Hub.on_shared_write()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.snapshot_shared"><code class="docutils literal notranslate"><span class="pre">Hub.snapshot_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.since_shared"><code class="docutils literal notranslate"><span class="pre">Hub.since_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.apply_snapshot_shared"><code class="docutils literal notranslate"><span class="pre">Hub.apply_snapshot_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.apply_delta_shared"><code class="docutils literal notranslate"><span class="pre">Hub.apply_delta_shared()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Hub.close"><code class="docutils literal notranslate"><span class="pre">Hub.close()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#transports.MergeStrategy"><code class="docutils literal notranslate"><span class="pre">MergeStrategy</span></code></a><ul>
-<li><a class="reference internal" href="#transports.MergeStrategy.restore"><code class="docutils literal notranslate"><span class="pre">MergeStrategy.restore()</span></code></a></li>
-<li><a class="reference internal" href="#transports.MergeStrategy.state"><code class="docutils literal notranslate"><span class="pre">MergeStrategy.state()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#transports.LastWriteWins"><code class="docutils literal notranslate"><span class="pre">LastWriteWins</span></code></a></li>
-<li><a class="reference internal" href="#transports.LwwMapCrdt"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt</span></code></a><ul>
-<li><a class="reference internal" href="#transports.LwwMapCrdt.restore"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt.restore()</span></code></a></li>
-<li><a class="reference internal" href="#transports.LwwMapCrdt.state"><code class="docutils literal notranslate"><span class="pre">LwwMapCrdt.state()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#crdt-specifications">CRDT specifications</a><ul>
-<li><a class="reference internal" href="#transports.CrdtSpec"><code class="docutils literal notranslate"><span class="pre">CrdtSpec</span></code></a><ul>
-<li><a class="reference internal" href="#transports.CrdtSpec.from_dict"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.from_dict()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtSpec.from_json"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.from_json()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtSpec.to_dict"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.to_dict()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtSpec.to_json"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.to_json()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtSpec.hash"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.hash</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtSpec.require_hash"><code class="docutils literal notranslate"><span class="pre">CrdtSpec.require_hash()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#transports.CrdtDocument"><code class="docutils literal notranslate"><span class="pre">CrdtDocument</span></code></a><ul>
-<li><a class="reference internal" href="#transports.CrdtDocument.from_state"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.from_state()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.value"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.value</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.state"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.state</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.mutate"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.mutate()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.apply"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.apply()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.member_key"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.member_key()</span></code></a></li>
-<li><a class="reference internal" href="#transports.CrdtDocument.compact"><code class="docutils literal notranslate"><span class="pre">CrdtDocument.compact()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-<li><a class="reference internal" href="#protocol-helpers">Protocol helpers</a><ul>
-<li><a class="reference internal" href="#transports.protocol.normalize_codec"><code class="docutils literal notranslate"><span class="pre">normalize_codec()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.snapshot_msg"><code class="docutils literal notranslate"><span class="pre">snapshot_msg()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.crdt_snapshot_msg"><code class="docutils literal notranslate"><span class="pre">crdt_snapshot_msg()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.patch_msg"><code class="docutils literal notranslate"><span class="pre">patch_msg()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.crdt_msg"><code class="docutils literal notranslate"><span class="pre">crdt_msg()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
-<li><a class="reference internal" href="#transports.protocol.decode"><code class="docutils literal notranslate"><span class="pre">decode()</span></code></a></li>
-</ul>
-</li>
-<li><a class="reference internal" href="#core">Core</a><ul>
-<li><a class="reference internal" href="#transports.diff"><code class="docutils literal notranslate"><span class="pre">diff()</span></code></a></li>
-<li><a class="reference internal" href="#transports.apply"><code class="docutils literal notranslate"><span class="pre">apply()</span></code></a></li>
-<li><a class="reference internal" href="#transports.encode"><code class="docutils literal notranslate"><span class="pre">encode()</span></code></a></li>
-<li><a class="reference internal" href="#transports.decode"><code class="docutils literal notranslate"><span class="pre">decode()</span></code></a></li>
-<li><a class="reference internal" href="#transports.encode_as"><code class="docutils literal notranslate"><span class="pre">encode_as()</span></code></a></li>
-<li><a class="reference internal" href="#transports.decode_as"><code class="docutils literal notranslate"><span class="pre">decode_as()</span></code></a></li>
-<li><a class="reference internal" href="#transports.json_to_msgpack"><code class="docutils literal notranslate"><span class="pre">json_to_msgpack()</span></code></a></li>
-<li><a class="reference internal" href="#transports.msgpack_to_json"><code class="docutils literal notranslate"><span class="pre">msgpack_to_json()</span></code></a></li>
-<li><a class="reference internal" href="#transports.register_codec"><code class="docutils literal notranslate"><span class="pre">register_codec()</span></code></a></li>
-<li><a class="reference internal" href="#transports.unregister_codec"><code class="docutils literal notranslate"><span class="pre">unregister_codec()</span></code></a></li>
-<li><a class="reference internal" href="#transports.registered_codecs"><code class="docutils literal notranslate"><span class="pre">registered_codecs()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Store"><code class="docutils literal notranslate"><span class="pre">Store</span></code></a><ul>
-<li><a class="reference internal" href="#transports.Store.apply"><code class="docutils literal notranslate"><span class="pre">Store.apply()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Store.host"><code class="docutils literal notranslate"><span class="pre">Store.host()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Store.mutate"><code class="docutils literal notranslate"><span class="pre">Store.mutate()</span></code></a></li>
-<li><a class="reference internal" href="#transports.Store.snapshot"><code class="docutils literal notranslate"><span class="pre">Store.snapshot()</span></code></a></li>
-</ul>
-</li>
-</ul>
-</li>
-</ul>
-</li>
+<nav class="fd-pagination" aria-label="Pagination">
+  <a class="fd-pagination-card fd-pagination-prev" href="protocol-reference.html" title="Previous: Wire protocol reference">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="m15 18-6-6 6-6"/></svg>
+    <span class="fd-pagination-text">
+      <span class="fd-pagination-label">Previous</span>
+      <span class="fd-pagination-title">Wire protocol reference</span>
+    </span>
+  </a>
+</nav>
+<footer id="fd-footer">
+  <p class="fd-footer-meta"><span>&#169; 1kbgz</span><span>Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.</span>
+  </p>
+</footer>
+    </article>
+  </main>
+<nav id="fd-toc" aria-label="On this page">
+  <p class="fd-toc-title"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01"/><path d="M3 12h.01"/><path d="M3 18h.01"/></svg>On this page</p>
+  <div class="fd-toc-body"><svg class="fd-toc-rail" aria-hidden="true" preserveAspectRatio="none">
+      <path class="fd-toc-track" fill="none" />
+      <path class="fd-toc-thumb" fill="none" />
+    </svg><ul class="fd-toc-list">
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#session">Session</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Session">Session</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.reject_reason">Session.reject_reason</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.host">Session.host()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.ids">Session.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.on_patch">Session.on_patch()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.flush">Session.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.update">Session.update()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.drain">Session.drain()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.snapshot">Session.snapshot()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.value">Session.value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.apply_patch">Session.apply_patch()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.submit">Session.submit()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.since">Session.since()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.schema">Session.schema()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#model-bridge">Model bridge</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#list-identity-policy">List identity policy</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.to_value">to_value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.from_value">from_value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.schema_of">schema_of()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.schema_to_ts">schema_to_ts()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#connections">Connections</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Server">Server</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.open">Server.open()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.recv">Server.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.flush">Server.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Server.close">Server.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Client">Client</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connected">Client.connected</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.send">Client.send()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose">Client.propose()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose_ops">Client.propose_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.propose_crdt">Client.propose_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.set_awareness">Client.set_awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_change">Client.on_change()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_reject">Client.on_reject()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_awareness">Client.on_awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_ack">Client.on_ack()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_disconnect">Client.on_disconnect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_connect">Client.on_connect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.on_abandon">Client.on_abandon()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.attach">Client.attach()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.detach">Client.detach()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.recv">Client.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.value">Client.value()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.crdt_spec">Client.crdt_spec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.model">Client.model()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.ids">Client.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.pending_proposals">Client.pending_proposals()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.pending_crdt_ops">Client.pending_crdt_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.awareness">Client.awareness()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.abandon_proposal">Client.abandon_proposal()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit">Client.edit()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit_ops">Client.edit_ops()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.edit_crdt">Client.edit_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect">Client.connect()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect_data_channel">Client.connect_data_channel()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.run">Client.run()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.connect_sse">Client.connect_sse()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.ws_endpoint">ws_endpoint()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.sse_endpoint">sse_endpoint()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.serve_comm">serve_comm()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.serve_anywidget">serve_anywidget()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.autosync">autosync()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.sync">sync()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#multi-tenancy-and-sharing">Multi-tenancy and sharing</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.READ">READ</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.WRITE">WRITE</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Hub">Hub</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.tenant">Hub.tenant()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.share">Hub.share()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.subscribe">Hub.subscribe()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.open">Hub.open()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.recv">Hub.recv()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.flush">Hub.flush()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.set_shared">Hub.set_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_shared">Hub.apply_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.mutate_shared_crdt">Hub.mutate_shared_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_crdt_shared">Hub.apply_crdt_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.compact_shared_crdt">Hub.compact_shared_crdt()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.on_shared_write">Hub.on_shared_write()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.snapshot_shared">Hub.snapshot_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.since_shared">Hub.since_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_snapshot_shared">Hub.apply_snapshot_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.apply_delta_shared">Hub.apply_delta_shared()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.close">Hub.close()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.MergeStrategy">MergeStrategy</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.MergeStrategy.restore">MergeStrategy.restore()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.MergeStrategy.state">MergeStrategy.state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.LastWriteWins">LastWriteWins</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.LwwMapCrdt">LwwMapCrdt</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.LwwMapCrdt.restore">LwwMapCrdt.restore()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.LwwMapCrdt.state">LwwMapCrdt.state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#crdt-specifications">CRDT specifications</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.CrdtSpec">CrdtSpec</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.from_dict">CrdtSpec.from_dict()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.from_json">CrdtSpec.from_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.to_dict">CrdtSpec.to_dict()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.to_json">CrdtSpec.to_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.hash">CrdtSpec.hash</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtSpec.require_hash">CrdtSpec.require_hash()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.CrdtDocument">CrdtDocument</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.from_state">CrdtDocument.from_state()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.value">CrdtDocument.value</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.state">CrdtDocument.state</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.mutate">CrdtDocument.mutate()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.apply">CrdtDocument.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.member_key">CrdtDocument.member_key()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.compact">CrdtDocument.compact()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#protocol-helpers">Protocol helpers</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.normalize_codec">normalize_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.snapshot_msg">snapshot_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.crdt_snapshot_msg">crdt_snapshot_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.patch_msg">patch_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.crdt_msg">crdt_msg()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.encode">encode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.protocol.decode">decode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#core">Core</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.diff">diff()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.apply">apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.encode">encode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.decode">decode()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.encode_as">encode_as()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.decode_as">decode_as()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.json_to_msgpack">json_to_msgpack()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.msgpack_to_json">msgpack_to_json()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.register_codec">register_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.unregister_codec">unregister_codec()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.registered_codecs">registered_codecs()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#transports.Store">Store</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.apply">Store.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.host">Store.host()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.mutate">Store.mutate()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.snapshot">Store.snapshot()</a>
+  </li>
 </ul>
 
-          </div>
-        </div>
-      </div>
-      
-      
-    </aside>
   </div>
-</div><script src="../../_static/documentation_options.js?v=82662543"></script>
-    <script src="../../_static/doctools.js?v=9bcbadda"></script>
-    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
-    <script src="../../_static/scripts/furo.js?v=46bd48cc"></script>
-    <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
-    <script src="../../_static/copybutton.js?v=f281be69"></script>
-    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
-    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
-    <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
-    <script data-searchlite-adopt="true" defer="defer" src="../../_static/searchlite-ui.js?v=4e4bdd69"></script>
-    <script src="../../_static/js/custom.js?v=956e5d78"></script>
-    </body>
+  <div class="fd-toc-actions">
+    <a class="fd-toc-action" href="https://github.com/1kbgz/transports/edit/HEAD/docs/src/api.md" target="_blank" rel="noopener" title="Edit this page"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/></svg><span>Edit this page</span></a>
+    <a class="fd-toc-action" href="../../_sources/docs/src/api.md.txt" rel="nofollow" title="View source"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg><span>View source</span></a>
+  </div>
+</nav>
+</div>
+<dialog id="fd-search-dialog" aria-label="Search">
+  <form class="fd-search-panel" method="dialog" role="search">
+    <div class="fd-search-field">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      <input type="search" id="fd-search-input" autocomplete="off" spellcheck="false" placeholder="Search documentation..." aria-label="Search" />
+      <kbd class="fd-kbd">Esc</kbd>
+    </div>
+    <div id="fd-search-results" role="listbox" aria-label="Search results"></div>
+    <p id="fd-search-empty" class="fd-search-empty" hidden>No results found.</p>
+  </form>
+</dialog>
+  </body>
 </html>
