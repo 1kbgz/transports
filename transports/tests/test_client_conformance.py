@@ -69,3 +69,21 @@ def test_python_client_applies_shared_batch_fixture_in_order():
     assert isinstance(accepted, list)
     assert [change["t"] for change in accepted] == ["snapshot", "patch"]
     assert client.value(8) == {"Map": {"count": {"Int": 6}}}
+
+
+def test_model_types_are_available_during_notifications_and_after_disconnect():
+    client = transports.Client()
+    seen = []
+    client.on_change(lambda change: seen.append(client.type_name(change["id"])))
+    assert client.type_name(7) is None
+    client.recv(json.dumps(FIXTURE["snapshot"]))
+    assert seen == ["Counter"]
+    assert client.type_name(7) == "Counter"
+    client.recv(json.dumps(FIXTURE["patch"]))
+    assert seen == ["Counter", "Counter"]
+    state = transports.ClientState()
+    effect = state.prepare(json.dumps(FIXTURE["snapshot"]))
+    assert state.type_name(7) is None
+    state.commit(effect)
+    state.disconnect()
+    assert state.type_name(7) == "Counter"

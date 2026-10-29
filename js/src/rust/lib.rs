@@ -142,6 +142,10 @@ impl ClientState {
         self.inner.disconnect_json().map_err(|e| JsError::new(&e))
     }
 
+    pub fn type_name(&self, id: u64) -> Option<String> {
+        self.inner.type_name(id).map(str::to_owned)
+    }
+
     pub fn revisions(&self) -> Result<String, JsError> {
         self.inner.revisions_json().map_err(|e| JsError::new(&e))
     }

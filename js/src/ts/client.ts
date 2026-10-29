@@ -79,8 +79,8 @@ export type ReceiveChange =
   | CrdtMsg;
 
 type ClientEffect =
-  | { effect: "snapshot"; id: number; rev: number }
-  | { effect: "crdt_snapshot"; id: number; rev: number }
+  | { effect: "snapshot"; id: number; rev: number; type?: string }
+  | { effect: "crdt_snapshot"; id: number; rev: number; type?: string }
   | {
       effect: "patch" | "stale_patch";
       id: number;
@@ -116,6 +116,7 @@ interface ClientStateAdapter {
   proposal(id: number, ops: PatchOp[], proposal?: string): string;
   disconnect(): Extract<ClientEffect, { effect: "disconnect" }>;
   revisions(): Record<string, number>;
+  typeName(id: number): string | undefined;
   pending(): string[];
   abandon(proposal: string): boolean;
 }
@@ -137,6 +138,10 @@ class SharedClientState implements ClientStateAdapter {
 
   disconnect(): Extract<ClientEffect, { effect: "disconnect" }> {
     return JSON.parse(this.inner.disconnect());
+  }
+
+  typeName(id: number): string | undefined {
+    return this.inner.type_name(BigInt(id));
   }
 
   revisions(): Record<string, number> {
@@ -725,6 +730,11 @@ export class Client {
   /** The canonical merge specification for a CRDT-backed model, else undefined. */
   crdtSpec(id: number): CrdtSpec | undefined {
     return this.crdt.get(id)?.spec;
+  }
+
+  /** Type from the last accepted snapshot, retained across reconnects. */
+  typeName(id: number): string | undefined {
+    return this.state.typeName(id);
   }
 
   ids(): number[] {

@@ -85,3 +85,29 @@ fn shared_message_codec_trace() {
         assert!(Message::from_json(&message).is_ok());
     }
 }
+
+#[test]
+fn model_metadata_commits_atomically_and_survives_disconnect() {
+    let mut state = ClientState::new();
+    let snapshot = r#"{"t":"snapshot","id":7,"rev":0,"type":"Orders","value":"Null"}"#;
+    let effect = state.prepare_json(snapshot).unwrap();
+    assert_eq!(state.type_name(7), None);
+    state.commit_json(&effect).unwrap();
+    assert_eq!(state.type_name(7), Some("Orders"));
+    state.disconnect();
+    assert_eq!(state.type_name(7), Some("Orders"));
+    let effect = state
+        .prepare_json(
+            &snapshot
+                .replace("snapshot", "crdt_snapshot")
+                .replace("Orders", "SharedOrders"),
+        )
+        .unwrap();
+    state.commit_json(&effect).unwrap();
+    assert_eq!(state.type_name(7), Some("SharedOrders"));
+    assert_eq!(state.type_name(8), None);
+    assert!(state
+        .prepare_json(r#"{"t":"snapshot","id":7,"rev":0,"type":5}"#)
+        .is_err());
+    assert_eq!(state.type_name(7), Some("SharedOrders"));
+}
