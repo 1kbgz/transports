@@ -68,7 +68,7 @@
     ]
   },
   "effects": {
-    "snapshot": { "effect": "snapshot", "id": 7, "rev": 2 },
+    "snapshot": { "effect": "snapshot", "id": 7, "rev": 2, "type": "Counter" },
     "patch": {
       "effect": "patch",
       "id": 7,

@@ -17,10 +17,14 @@ pub enum ClientEffect {
     Snapshot {
         id: u64,
         rev: u64,
+        #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+        type_name: Option<String>,
     },
     CrdtSnapshot {
         id: u64,
         rev: u64,
+        #[serde(default, rename = "type", skip_serializing_if = "Option::is_none")]
+        type_name: Option<String>,
     },
     Patch {
         id: u64,
@@ -77,6 +81,7 @@ impl ClientEffect {
 #[derive(Default)]
 pub struct ClientState {
     revisions: BTreeMap<u64, u64>,
+    types: BTreeMap<u64, String>,
     crdt_ids: BTreeSet<u64>,
     pending: BTreeSet<String>,
     next_proposal: u64,
@@ -86,9 +91,19 @@ pub struct ClientState {
 #[serde(tag = "t")]
 enum ClientMessage {
     #[serde(rename = "snapshot")]
-    Snapshot { id: u64, rev: u64 },
+    Snapshot {
+        id: u64,
+        rev: u64,
+        #[serde(default, rename = "type")]
+        type_name: Option<String>,
+    },
     #[serde(rename = "crdt_snapshot")]
-    CrdtSnapshot { id: u64, rev: u64 },
+    CrdtSnapshot {
+        id: u64,
+        rev: u64,
+        #[serde(default, rename = "type")]
+        type_name: Option<String>,
+    },
     #[serde(rename = "patch")]
     Patch {
         id: u64,
@@ -131,6 +146,7 @@ impl ClientState {
     pub fn new() -> Self {
         Self {
             revisions: BTreeMap::new(),
+            types: BTreeMap::new(),
             crdt_ids: BTreeSet::new(),
             pending: BTreeSet::new(),
             next_proposal: 1,
@@ -140,10 +156,26 @@ impl ClientState {
     /// Classify one non-batch message without changing state.
     pub fn prepare(&self, message: &Message) -> Result<ClientEffect, String> {
         match message {
-            Message::Snapshot { id, rev, .. } => Ok(ClientEffect::Snapshot { id: *id, rev: *rev }),
-            Message::CrdtSnapshot { id, rev, .. } => {
-                Ok(ClientEffect::CrdtSnapshot { id: *id, rev: *rev })
-            }
+            Message::Snapshot {
+                id,
+                rev,
+                model_type: type_name,
+                ..
+            } => Ok(ClientEffect::Snapshot {
+                id: *id,
+                rev: *rev,
+                type_name: Some(type_name.clone()),
+            }),
+            Message::CrdtSnapshot {
+                id,
+                rev,
+                model_type: type_name,
+                ..
+            } => Ok(ClientEffect::CrdtSnapshot {
+                id: *id,
+                rev: *rev,
+                type_name: Some(type_name.clone()),
+            }),
             Message::Patch {
                 id,
                 patch,
@@ -210,8 +242,12 @@ impl ClientState {
         let message: ClientMessage =
             serde_json::from_str(message_json).map_err(|error| error.to_string())?;
         let effect = match message {
-            ClientMessage::Snapshot { id, rev } => ClientEffect::Snapshot { id, rev },
-            ClientMessage::CrdtSnapshot { id, rev } => ClientEffect::CrdtSnapshot { id, rev },
+            ClientMessage::Snapshot { id, rev, type_name } => {
+                ClientEffect::Snapshot { id, rev, type_name }
+            }
+            ClientMessage::CrdtSnapshot { id, rev, type_name } => {
+                ClientEffect::CrdtSnapshot { id, rev, type_name }
+            }
             ClientMessage::Patch {
                 id,
                 patch,
@@ -263,11 +299,20 @@ impl ClientState {
 
     /// Commit an effect after the binding has applied its local value change successfully.
     pub fn commit(&mut self, effect: &ClientEffect) {
+        if let ClientEffect::Snapshot { id, type_name, .. }
+        | ClientEffect::CrdtSnapshot { id, type_name, .. } = effect
+        {
+            if let Some(name) = type_name {
+                self.types.insert(*id, name.clone());
+            } else {
+                self.types.remove(id);
+            }
+        }
         match effect {
-            ClientEffect::Snapshot { id, rev } | ClientEffect::Patch { id, rev, .. } => {
+            ClientEffect::Snapshot { id, rev, .. } | ClientEffect::Patch { id, rev, .. } => {
                 self.revisions.insert(*id, *rev);
             }
-            ClientEffect::CrdtSnapshot { id, rev } => {
+            ClientEffect::CrdtSnapshot { id, rev, .. } => {
                 let current = self.revisions.entry(*id).or_default();
                 *current = (*current).max(*rev);
             }
@@ -349,6 +394,11 @@ impl ClientState {
 
     pub fn disconnect_json(&mut self) -> Result<String, String> {
         self.disconnect().to_json()
+    }
+
+    /// Type from the last accepted snapshot; retained across reconnects.
+    pub fn type_name(&self, id: u64) -> Option<&str> {
+        self.types.get(&id).map(String::as_str)
     }
 
     pub fn revisions_json(&self) -> Result<String, String> {

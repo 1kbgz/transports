@@ -149,6 +149,10 @@ impl ClientState {
         self.inner.disconnect_json().map_err(PyValueError::new_err)
     }
 
+    fn type_name(&self, id: u64) -> Option<String> {
+        self.inner.type_name(id).map(str::to_owned)
+    }
+
     fn revisions(&self) -> PyResult<String> {
         self.inner.revisions_json().map_err(PyValueError::new_err)
     }

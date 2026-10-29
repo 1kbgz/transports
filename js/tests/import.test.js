@@ -1410,3 +1410,26 @@ test("Client.edit is send-only; mirror updates on the server echo", async () => 
   );
   expect(c.value(1)).toEqual({ Map: { on: { Bool: true } } });
 });
+
+test("model types are available during notifications and survive disconnect", () => {
+  const client = new Client();
+  const seen = [];
+  client.onChange((change) => seen.push(client.typeName(change.id)));
+  expect(client.typeName(7)).toBeUndefined();
+  const snapshot = JSON.stringify({
+    t: "snapshot",
+    id: 7,
+    type: "Orders",
+    rev: 0,
+    value: toValue({ count: 1 }),
+  });
+  client.recv(snapshot);
+  expect(seen).toEqual(["Orders"]);
+  const state = new ClientState();
+  const effect = state.prepare(snapshot);
+  expect(state.type_name(7n)).toBeUndefined();
+  state.commit(effect);
+  state.disconnect();
+  expect(state.type_name(7n)).toBe("Orders");
+  expect(state.type_name(8n)).toBeUndefined();
+});

@@ -32,7 +32,6 @@ class Client:
 
     def __init__(self, codec: str = protocol.JSON) -> None:
         self._values: dict[int, Any] = {}
-        self._type: dict[int, str] = {}
         self._state = _ClientState()
         self._replica = f"client-{uuid.uuid4().hex}"
         self._crdt: dict[int, CrdtDocument] = {}
@@ -269,7 +268,6 @@ class Client:
             self._crdt.pop(mid, None)
             self._crdt_outbox = [pending for pending in self._crdt_outbox if pending["id"] != mid]
             self._values[mid] = msg["value"]
-            self._type[mid] = msg["type"]
             self._state.commit(effect_json)
             return self._accepted({"t": "snapshot", "id": mid, "rev": msg["rev"]})
         elif kind == "crdt_snapshot":
@@ -281,7 +279,6 @@ class Client:
                     document.apply(pending["ops"])
             self._crdt[mid] = document
             self._values[mid] = _value_of(document.value)
-            self._type[mid] = msg["type"]
             self._state.commit(effect_json)
             return self._accepted({"t": "crdt_snapshot", "id": mid, "rev": msg["rev"]})
         elif kind == "patch":
@@ -344,6 +341,10 @@ class Client:
     def model(self, mid: int, cls: type[M]) -> M:
         """Materialize the mirrored model as an instance of `cls`."""
         return from_value(self._values[mid], cls)
+
+    def type_name(self, mid: int) -> str | None:
+        """Type from the last accepted snapshot, retained across reconnects."""
+        return self._state.type_name(mid)
 
     def ids(self) -> list[int]:
         return list(self._values)

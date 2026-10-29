@@ -178,3 +178,11 @@ The codec registry functions (`encode_as`, `decode_as`, `register_codec`,
    :undoc-members:
    :member-order: bysource
 ```
+
+### Client model metadata
+
+`Client.type_name(id)` in Python and `Client.typeName(id)` in JavaScript return the type name from the
+last accepted snapshot, or `None` / `undefined` for an unknown ID. Ordinary and CRDT snapshots update
+this metadata through the shared Rust client state before change listeners run. Metadata survives
+disconnect and delta-only resume. `ids()` lists mirrored models; several IDs can have the same type.
+The accepted-change notification shape is unchanged.
