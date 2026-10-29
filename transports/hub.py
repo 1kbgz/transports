@@ -20,8 +20,10 @@ patch back.
 """
 
 import json
+import math
 import uuid
 from collections.abc import Callable
+from time import monotonic
 from typing import Any
 
 from . import protocol
@@ -189,9 +191,27 @@ class Hub:
     Construct with `key`, a function mapping a connection handle to its tenant key. Register shared
     models with `share()` and connect tenants to them with `subscribe()`. Like `Server`, the methods
     return the messages to send keyed by connection; an adapter such as `ws_endpoint(hub)` performs I/O.
+    Set tenant_idle_timeout (seconds, positive) to expire inactive tenants during flush()/autosync();
+    None retains them until explicitly retired.
     """
 
-    def __init__(self, key: Callable[[Any], Any], *, default_codec: str = protocol.JSON) -> None:
+    def __init__(
+        self,
+        key: Callable[[Any], Any],
+        *,
+        default_codec: str = protocol.JSON,
+        tenant_idle_timeout: float | None = None,
+    ) -> None:
+        if tenant_idle_timeout is not None and (
+            isinstance(tenant_idle_timeout, bool)
+            or not isinstance(tenant_idle_timeout, (int, float))
+            or not math.isfinite(tenant_idle_timeout)
+            or tenant_idle_timeout <= 0
+        ):
+            raise ValueError("tenant_idle_timeout must be a finite positive number or None")
+        self._tenant_idle_timeout = tenant_idle_timeout
+        self._idle_since: dict[Any, float] = {}
+        self._private_resume = True
         self._key = key
         self.default_codec = protocol.normalize_codec(default_codec)
         self._tenants: dict[Any, Session] = {}
@@ -211,11 +231,52 @@ class Hub:
         self._last_crdt_write: tuple[Any, int, str] | None = None
 
     def tenant(self, key: Any) -> Session:
-        """Get (or create) the `Session` holding a tenant's private models."""
+        """Get or create a tenant's private Session, first expiring it if its idle window elapsed."""
+        self._expire_tenant(key, monotonic())
         sess = self._tenants.get(key)
         if sess is None:
             sess = self._tenants[key] = Session()
+            self._mark_idle(key)
         return sess
+
+    def retire_tenant(self, key: Any) -> bool:
+        """Remove an inactive tenant's Session and subscriptions; return whether it existed.
+
+        Raises ValueError while any connection remains. Shared models and their CRDT replica
+        ownership remain intact. Reusing a key creates a fresh Session with no subscriptions.
+        After a retirement, private reconnects use snapshots because revision numbers alone
+        cannot distinguish the old Session from a replacement.
+        """
+        if self._conns_by_key.get(key):
+            raise ValueError("cannot retire a tenant with active connections")
+        if key not in self._tenants:
+            return False
+        del self._tenants[key]
+        self._idle_since.pop(key, None)
+        for shared in self._shared.values():
+            shared.subs.pop(key, None)
+        # Avoid retaining a tombstone per retired key just to invalidate old resume revisions.
+        self._private_resume = False
+        return True
+
+    def prune_tenants(self) -> list[Any]:
+        """Retire tenants whose configured idle timeout elapsed; return their keys.
+
+        flush()/autosync() also sweep. None disables expiration. Creation starts the initial idle
+        window; the last connection closing starts a new one. Host-side access does not renew it.
+        """
+        now = monotonic()
+        return [key for key in list(self._idle_since) if self._expire_tenant(key, now)]
+
+    def _mark_idle(self, key: Any) -> None:
+        if self._tenant_idle_timeout is not None and not self._conns_by_key.get(key):
+            self._idle_since[key] = monotonic()
+
+    def _expire_tenant(self, key: Any, now: float) -> bool:
+        idle = self._idle_since.get(key)
+        if self._tenant_idle_timeout is not None and idle is not None and now - idle >= self._tenant_idle_timeout and not self._conns_by_key.get(key):
+            return self.retire_tenant(key)
+        return False
 
     def share(
         self,
@@ -312,9 +373,11 @@ class Hub:
         # per-tenant and shared fan-outs, so its batching lands with that restructure.
         """Register a connection; return the messages to bring it up to date — its tenant's private models
         and its subscribed shared models. With ``since={mid: last_rev}`` a reconnecting client resumes its
-        **private** models from the delta (shared models re-snapshot — a shared replay log is a follow-on)."""
+        **private** models from the delta until the first tenant retirement; afterwards private
+        reconnects use snapshots to avoid reusing a retired Session's revisions. Shared models re-snapshot."""
         key = self._key(conn)
         codec = protocol.normalize_codec(codec or self.default_codec)
+        sess = self.tenant(key)
         if conn in self._conn_key:
             previous = self._conn_key[conn]
             if previous != key:
@@ -323,16 +386,17 @@ class Hub:
                     previous_conns.discard(conn)
                     if not previous_conns:
                         self._conns_by_key.pop(previous)
+                        self._mark_idle(previous)
         self._conn_key[conn] = key
         self._conns_by_key.setdefault(key, set()).add(conn)
+        self._idle_since.pop(key, None)
         self._codecs[conn] = codec
         self._peer_ids.setdefault(conn, uuid.uuid4().hex)
         try:
-            sess = self.tenant(key)
             out: list[Wire] = []
             for mid in sess.ids():
                 client_rev = since.get(mid) if since else None
-                delta = sess.since(mid, client_rev) if client_rev is not None else None
+                delta = sess.since(mid, client_rev) if client_rev is not None and self._private_resume else None
                 if delta is not None:
                     for patch in delta:
                         out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
@@ -521,8 +585,9 @@ class Hub:
         """`flush`, with each message tagged by its model id so `autosync` can coalesce (see
         `Server._flush_tagged`). Shared ids live above ``SHARED_ID_BASE``, so a connection's tenant
         and shared tags never collide."""
+        self.prune_tenants()
         out: dict[Any, list[tuple[int | None, Wire]]] = {}
-        for key in self._tenants:
+        for key in list(self._tenants):
             for conn, tagged in self._flush_tenant_tagged(key).items():
                 out.setdefault(conn, []).extend(tagged)
         for conn, tagged in self._flush_snapshots_tagged().items():
@@ -745,6 +810,8 @@ class Hub:
         return True
 
     def close(self, conn: Any) -> dict[Any, list[Wire]]:
+        if self._last_crdt_write is not None and self._last_crdt_write[0] == conn:
+            self._last_crdt_write = None
         peer = self._peer_ids.pop(conn, None)
         removed = [sid for sid, states in self._awareness.items() if conn in states]
         for sid in removed:
@@ -760,6 +827,7 @@ class Hub:
                 conns.discard(conn)
                 if not conns:
                     self._conns_by_key.pop(key)
+                    self._mark_idle(key)
         self._codecs.pop(conn, None)
         out: dict[Any, list[Wire]] = {}
         if peer is not None:

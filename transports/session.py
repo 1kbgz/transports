@@ -11,6 +11,7 @@ back it with fan-out, backpressure, and authorization.
 """
 
 import json
+import weakref
 from collections.abc import Callable
 from typing import Any
 
@@ -44,9 +45,12 @@ class Session:
         mid = self._store.host(type_name, json.dumps(to_value(model)), list_keys=policy)
         self._list_keys[mid] = policy
 
+        session_ref = weakref.ref(self)
+
         def _watcher(obj: object, method: str, ref: object, call_args: tuple, call_kwargs: dict, _mid: int = mid) -> None:
-            if _mid not in self._suppress:  # ignore writes we make ourselves while applying inbound patches
-                self._dirty.add(_mid)
+            session = session_ref()
+            if session is not None and _mid not in session._suppress:
+                session._dirty.add(_mid)
 
         self._models[mid] = watch(model, _watcher, deepstate=True)
         return mid

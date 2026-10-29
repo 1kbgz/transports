@@ -469,3 +469,15 @@ def test_cross_process_late_joiner_catches_up_over_a_real_backplane():
         pass
     assert res["b"] == res["a"], "a worker joining late did not catch up over the backplane"
     assert res["b"]["Map"]["x"] == {"Int": 10}
+
+
+def test_relay_flush_sweeps_local_inactive_tenants(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+    hub = Hub(key=lambda conn: conn, tenant_idle_timeout=5)
+    relay = RelayBroadcaster(hub, MemBackplane(_Bus()))
+    relay.open("idle")
+    relay.close("idle")
+    now[0] = 5
+    assert relay._flush_tagged() == {}
+    assert "idle" not in hub._tenants

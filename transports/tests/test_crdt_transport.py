@@ -814,3 +814,31 @@ def test_crdt_protocol_frames_round_trip_every_codec(codec: str) -> None:
         snapshot["crdt_state"],
     )
     assert protocol.decode(protocol.encode(message, codec), codec)["t"] == "crdt_snapshot"
+
+
+def test_retiring_tenant_keeps_shared_crdt_data_and_replica_ownership():
+    hub, sid = crdt_hub()
+    alice, bob = ("alice", 1), ("bob", 1)
+    client = Client()
+    hub.subscribe("alice", sid, WRITE)
+    hub.subscribe("bob", sid, WRITE)
+    for message in hub.open(alice):
+        client.recv(message)
+    hub.open(bob)
+    hub.recv(alice, protocol.awareness_msg(sid, {"cursor": 2}))
+    message = client.edit_crdt(sid, insert("kept"))
+    hub.recv(alice, message)
+    assert hub._last_crdt_write is not None
+    removals = hub.close(alice)
+    assert json.loads(removals[bob][0])["state"] is None
+    assert hub._last_crdt_write is None
+    assert hub.retire_tenant("alice")
+    assert hub.snapshot_shared(sid)["value"] == {"Str": "kept"}
+    rejected = hub.recv(bob, message)
+    assert "belongs to another writer" in json.loads(rejected[bob][0])["error"]
+    assert hub.open(alice) == []
+    hub.subscribe("alice", sid, WRITE)
+    assert len(hub.open(alice)) == 1
+    # The original owner can still resend an acknowledged CRDT operation after reauthorization.
+    hub.recv(alice, message)
+    assert hub.snapshot_shared(sid)["value"] == {"Str": "kept"}
