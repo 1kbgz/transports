@@ -523,3 +523,189 @@ def test_starlette_two_tenants_share_over_mixed_codecs():
 
         cb.recv(wb.receive_bytes())
         assert cb.awareness(sid) == {}
+
+
+def test_retire_tenant_releases_private_state_and_subscriptions():
+    import gc
+    import weakref
+
+    import pytest
+
+    h = hub()
+    session = h.tenant("leaving")
+    model = Doc(x=1)
+    session.host(model)
+    ref = weakref.ref(session)
+    sid = h.share(Doc(x=2))
+    h.subscribe("leaving", sid, WRITE)
+    h.subscribe("staying", sid, READ)
+    conn = ("leaving", "tab")
+    h.open(conn)
+    with pytest.raises(ValueError, match="active connections"):
+        h.retire_tenant("leaving")
+    h.close(conn)
+    del session
+    assert h.retire_tenant("leaving") is True
+    assert h.retire_tenant("leaving") is False
+    gc.collect()
+    assert ref() is None  # externally held models must not keep the old Session alive
+    model.x = 3  # its former watcher is harmless
+    assert h.tenant("leaving").ids() == []
+    assert h.open(conn) == []  # subscription permissions must be granted again
+    assert len(h.open(("staying", "tab"))) == 1
+    assert h.snapshot_shared(sid)["value"]["Map"]["x"] == {"Int": 2}
+
+
+def test_idle_timeout_preserves_reconnects_and_expires_after_last_connection(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+    h = Hub(key=lambda conn: conn[0], tenant_idle_timeout=10)
+    session = h.tenant("user")
+    session.host(Doc(x=1))
+    one, two = ("user", "one"), ("user", "two")
+    h.open(one)
+    h.open(two)
+    h.close(one)
+    now[0] = 100
+    assert h.prune_tenants() == []
+    h.close(two)
+    now[0] = 109
+    assert h.prune_tenants() == []
+    h.open(one)
+    assert h.tenant("user") is session
+    now[0] = 200
+    assert h.prune_tenants() == []
+    h.close(one)
+    now[0] = 209
+    h.close(one)  # duplicate closes must not extend the reconnect window
+    now[0] = 210
+    assert h.prune_tenants() == ["user"]
+    assert h.prune_tenants() == []
+    assert h.tenant("user") is not session
+
+
+def test_timeout_applies_to_unused_tenants_and_flush_and_late_reconnect(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+    h = Hub(key=lambda conn: conn, tenant_idle_timeout=5)
+    sid = h.share(Doc())
+    h.subscribe("never-connected", sid)
+    expired = h.tenant("late")
+    expired.host(Doc())
+    h.open("late")
+    h.close("late")
+    now[0] = 5
+    assert h.open("late") == []  # expire even if autosync has not run
+    assert h.tenant("late") is not expired
+    assert h.flush() == {}
+    assert "never-connected" not in h._tenants
+    assert "never-connected" not in h._shared[sid].subs
+    assert "late" in h._tenants
+
+
+def test_tenant_timeout_is_opt_in_and_none_is_a_valid_key(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+    for timeout in (None, 1):
+        h = Hub(key=lambda conn: conn, tenant_idle_timeout=timeout)
+        session = h.tenant(None)
+        h.open(None)
+        h.close(None)
+        now[0] += 100
+        h.flush()
+        assert (h.tenant(None) is session) == (timeout is None)
+
+
+def test_rekeyed_connection_starts_previous_tenants_idle_window(monkeypatch):
+    now = [0.0]
+    monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+    keys = {"conn": "old"}
+    h = Hub(key=keys.__getitem__, tenant_idle_timeout=5)
+    h.open("conn")
+    keys["conn"] = "new"
+    h.open("conn")
+    now[0] = 5
+    assert h.prune_tenants() == ["old"]
+    assert "new" in h._tenants
+
+
+def test_tenant_timeout_rejects_invalid_values():
+    import pytest
+
+    for timeout in (0, -1, float("nan"), float("inf"), True, "5"):
+        with pytest.raises(ValueError, match="tenant_idle_timeout"):
+            Hub(key=lambda conn: conn, tenant_idle_timeout=timeout)  # ty: ignore[invalid-argument-type]
+
+
+def test_retired_private_revision_numbers_are_not_reused_for_resume():
+    h = hub()
+    session = h.tenant("user")
+    model = Doc(x=1)
+    mid = session.host(model)
+    old = ("user", "old")
+    h.open(old)
+    model.x = 2
+    h.flush()
+    revision = session.snapshot(mid)["rev"]
+    h.close(old)
+    assert h.retire_tenant("user")
+    replacement = h.tenant("user")
+    assert replacement.host(Doc(x=3)) == mid
+    for name in ("reconnected-tab", "another-old-tab"):
+        [wire] = h.open(("user", name), since={mid: revision})
+        message = json.loads(wire)
+        assert message["t"] == "snapshot"
+        assert message["value"]["Map"]["x"] == {"Int": 3}
+
+
+def test_autosync_prunes_inactive_tenants(monkeypatch):
+    from contextlib import suppress
+
+    from transports import autosync
+
+    async def run():
+        now = [0.0]
+        monkeypatch.setattr("transports.hub.monotonic", lambda: now[0])
+        h = Hub(key=lambda conn: conn, tenant_idle_timeout=5)
+        h.open("user")
+        h.close("user")
+        retired = asyncio.Event()
+        original = h.retire_tenant
+
+        def retire(key):
+            result = original(key)
+            retired.set()
+            return result
+
+        monkeypatch.setattr(h, "retire_tenant", retire)
+        task = asyncio.create_task(autosync(h))
+        now[0] = 5
+        try:
+            await asyncio.wait_for(retired.wait(), timeout=1)
+            assert "user" not in h._tenants
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(run())
+
+
+def test_retiring_an_inactive_tenant_during_flush_does_not_interrupt_other_tenants():
+    h = hub()
+    inactive = Doc()
+    session = h.tenant("inactive")
+    session.host(inactive)
+
+    def retire(mid, patch):
+        h.retire_tenant("inactive")
+
+    session.on_patch(retire)
+    active = Doc()
+    h.tenant("active").host(active)
+    conn = ("active", "tab")
+    h.open(conn)
+    inactive.x = 1
+    active.x = 2
+    assert set(h.flush()) == {conn}
+    assert "inactive" not in h._tenants

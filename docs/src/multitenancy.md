@@ -33,6 +33,61 @@ hub.tenant("bob").host(Document(title="Bob notes"))
 A connection for `alice` receives only Alice's private snapshots. A private edit is echoed only to
 other Alice connections.
 
+## Retire inactive tenants
+
+Closing a connection removes its awareness and connection state. By default, the Hub retains its
+private Session and shared-model subscriptions for future reconnects.
+
+For temporary sessions, set `tenant_idle_timeout` to a finite positive number of seconds:
+
+```python
+hub = transports.Hub(
+    key=lambda ws: ws.path_params["tenant"],
+    tenant_idle_timeout=60,
+)
+```
+
+The idle window starts when the tenant is created and restarts when its last connection closes.
+An open connection prevents expiration; reconnecting within the window preserves the Session.
+Host-side reads and writes do not extend the window. `flush()` and `autosync(hub)` sweep expired
+tenants, and `tenant(key)` checks expiration before returning a Session. Without periodic flushing,
+call `hub.prune_tenants()` from your own maintenance loop; it returns the retired keys.
+
+For immediate application-controlled cleanup after disconnect, call:
+
+```python
+removed = hub.retire_tenant("alice")
+```
+
+It returns `False` for a missing tenant and raises `ValueError` if any connection remains. It removes
+the private Session and subscriptions, leaving shared models and other tenants intact. External
+references to a Session still belong to the application; retiring it only releases the Hub's ownership.
+Model watchers do not keep an otherwise unreferenced Session alive.
+
+Reusing a retired key creates an empty Session. Initialize its private models and grant subscriptions
+again during connection setup. A key function can do that before `Hub.open()` sends snapshots:
+
+```python
+def tenant_key(ws):
+    key = ws.path_params["tenant"]
+    session = hub.tenant(key)
+    if not session.ids():
+        session.host(Document(title=f"{key} notes"))
+    return key
+
+hub = transports.Hub(key=tenant_key, tenant_idle_timeout=60)
+```
+
+Retirement discards private state and replay history. After the first retirement, private reconnects
+on that Hub use snapshots instead of revision-only replay: model IDs and revisions may be reused by
+a fresh Session. This avoids retaining a record for every retired key. Clients retaining models that
+are no longer hosted should start a fresh Client; retirement does not send model-deletion frames.
+
+With `RelayBroadcaster`, configure the timeout on its Hub. Relay flushing performs the same sweep;
+retirement is local to that worker. Shared CRDT state and replica ownership are retained, so another
+tenant cannot claim a previously used replica ID. Their lifetime and compaction remain separate from
+private-session retirement.
+
 ## Share a model read-only
 
 Register a shared model and subscribe tenants with `READ` access.
