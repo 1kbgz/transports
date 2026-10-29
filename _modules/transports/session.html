@@ -576,6 +576,7 @@ window.runMermaid = runMermaid;</script>
 <span class="sd">"""</span>
 
 <span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">weakref</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
 
@@ -613,9 +614,12 @@ window.runMermaid = runMermaid;</script>
         <span class="n">mid</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">type_name</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">to_value</span><span class="p">(</span><span class="n">model</span><span class="p">)),</span> <span class="n">list_keys</span><span class="o">=</span><span class="n">policy</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_list_keys</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">policy</span>
 
+        <span class="n">session_ref</span> <span class="o">=</span> <span class="n">weakref</span><span class="o">.</span><span class="n">ref</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span>
+
         <span class="k">def</span><span class="w"> </span><span class="nf">_watcher</span><span class="p">(</span><span class="n">obj</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">method</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">ref</span><span class="p">:</span> <span class="nb">object</span><span class="p">,</span> <span class="n">call_args</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">,</span> <span class="n">call_kwargs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">_mid</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">mid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">_mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="p">:</span>  <span class="c1"># ignore writes we make ourselves while applying inbound patches</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_mid</span><span class="p">)</span>
+            <span class="n">session</span> <span class="o">=</span> <span class="n">session_ref</span><span class="p">()</span>
+            <span class="k">if</span> <span class="n">session</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">_mid</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">session</span><span class="o">.</span><span class="n">_suppress</span><span class="p">:</span>
+                <span class="n">session</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">_mid</span><span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span> <span class="o">=</span> <span class="n">watch</span><span class="p">(</span><span class="n">model</span><span class="p">,</span> <span class="n">_watcher</span><span class="p">,</span> <span class="n">deepstate</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
         <span class="k">return</span> <span class="n">mid</span></div>

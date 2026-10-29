@@ -363,6 +363,12 @@
     <a href="#transports.Hub.tenant">Hub.tenant()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.retire_tenant">Hub.retire_tenant()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.prune_tenants">Hub.prune_tenants()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Hub.share">Hub.share()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -1122,16 +1128,36 @@ errors defaults to ‘strict’.</p>
 
 <dl class="py class">
 <dt class="sig sig-object py" id="transports.Hub">
-<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Hub</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub" title="Link to this definition">¶</a></dt>
+<em class="property"><span class="k"><span class="pre">class</span></span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">transports.</span></span><span class="sig-name descname"><span class="pre">Hub</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">default_codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'json'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tenant_idle_timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../../_modules/transports/hub.html#Hub"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub" title="Link to this definition">¶</a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Route connections to per-tenant <cite>Session</cite> objects and fan shared data structures to subscribers.</p>
 <p>Construct with <cite>key</cite>, a function mapping a connection handle to its tenant key. Register shared
 models with <cite>share()</cite> and connect tenants to them with <cite>subscribe()</cite>. Like <cite>Server</cite>, the methods
-return the messages to send keyed by connection; an adapter such as <cite>ws_endpoint(hub)</cite> performs I/O.</p>
+return the messages to send keyed by connection; an adapter such as <cite>ws_endpoint(hub)</cite> performs I/O.
+Set tenant_idle_timeout (seconds, positive) to expire inactive tenants during flush()/autosync();
+None retains them until explicitly retired.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.tenant">
 <span class="sig-name descname"><span class="pre">tenant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#transports.Session" title="transports.session.Session"><span class="pre">Session</span></a></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.tenant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.tenant" title="Link to this definition">¶</a></dt>
-<dd><p>Get (or create) the <cite>Session</cite> holding a tenant’s private models.</p>
+<dd><p>Get or create a tenant’s private Session, first expiring it if its idle window elapsed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.retire_tenant">
+<span class="sig-name descname"><span class="pre">retire_tenant</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">key</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.retire_tenant"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.retire_tenant" title="Link to this definition">¶</a></dt>
+<dd><p>Remove an inactive tenant’s Session and subscriptions; return whether it existed.</p>
+<p>Raises ValueError while any connection remains. Shared models and their CRDT replica
+ownership remain intact. Reusing a key creates a fresh Session with no subscriptions.
+After a retirement, private reconnects use snapshots because revision numbers alone
+cannot distinguish the old Session from a replacement.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Hub.prune_tenants">
+<span class="sig-name descname"><span class="pre">prune_tenants</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.prune_tenants"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.prune_tenants" title="Link to this definition">¶</a></dt>
+<dd><p>Retire tenants whose configured idle timeout elapsed; return their keys.</p>
+<p>flush()/autosync() also sweep. None disables expiration. Creation starts the initial idle
+window; the last connection closing starts a new one. Host-side access does not renew it.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1161,7 +1187,8 @@ it cannot be combined with <code class="docutils literal notranslate"><span clas
 <span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">since</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.open" title="Link to this definition">¶</a></dt>
 <dd><p>Register a connection; return the messages to bring it up to date — its tenant’s private models
 and its subscribed shared models. With <code class="docutils literal notranslate"><span class="pre">since={mid:</span> <span class="pre">last_rev}</span></code> a reconnecting client resumes its
-<strong>private</strong> models from the delta (shared models re-snapshot — a shared replay log is a follow-on).</p>
+<strong>private</strong> models from the delta until the first tenant retirement; afterwards private
+reconnects use snapshots to avoid reusing a retired Session’s revisions. Shared models re-snapshot.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1827,6 +1854,12 @@ The accepted-change notification shape is unchanged.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Hub.tenant">Hub.tenant()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.retire_tenant">Hub.retire_tenant()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Hub.prune_tenants">Hub.prune_tenants()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Hub.share">Hub.share()</a>

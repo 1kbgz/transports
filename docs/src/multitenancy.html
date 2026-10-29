@@ -157,6 +157,9 @@
     <a href="#host-private-tenant-models">Host private tenant models</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
+    <a href="#retire-inactive-tenants">Retire inactive tenants</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
     <a href="#share-a-model-read-only">Share a model read-only</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
@@ -208,6 +211,51 @@ has an isolated store.</p>
 </div>
 <p>A connection for <code class="docutils literal notranslate"><span class="pre">alice</span></code> receives only Alice’s private snapshots. A private edit is echoed only to
 other Alice connections.</p>
+</section>
+<section id="retire-inactive-tenants">
+<h2>Retire inactive tenants<a class="headerlink" href="#retire-inactive-tenants" title="Link to this heading">¶</a></h2>
+<p>Closing a connection removes its awareness and connection state. By default, the Hub retains its
+private Session and shared-model subscriptions for future reconnects.</p>
+<p>For temporary sessions, set <code class="docutils literal notranslate"><span class="pre">tenant_idle_timeout</span></code> to a finite positive number of seconds:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span>
+    <span class="n">key</span><span class="o">=</span><span class="k">lambda</span> <span class="n">ws</span><span class="p">:</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">"tenant"</span><span class="p">],</span>
+    <span class="n">tenant_idle_timeout</span><span class="o">=</span><span class="mi">60</span><span class="p">,</span>
+<span class="p">)</span>
+</pre></div>
+</div>
+<p>The idle window starts when the tenant is created and restarts when its last connection closes.
+An open connection prevents expiration; reconnecting within the window preserves the Session.
+Host-side reads and writes do not extend the window. <code class="docutils literal notranslate"><span class="pre">flush()</span></code> and <code class="docutils literal notranslate"><span class="pre">autosync(hub)</span></code> sweep expired
+tenants, and <code class="docutils literal notranslate"><span class="pre">tenant(key)</span></code> checks expiration before returning a Session. Without periodic flushing,
+call <code class="docutils literal notranslate"><span class="pre">hub.prune_tenants()</span></code> from your own maintenance loop; it returns the retired keys.</p>
+<p>For immediate application-controlled cleanup after disconnect, call:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">removed</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">retire_tenant</span><span class="p">(</span><span class="s2">"alice"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>It returns <code class="docutils literal notranslate"><span class="pre">False</span></code> for a missing tenant and raises <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> if any connection remains. It removes
+the private Session and subscriptions, leaving shared models and other tenants intact. External
+references to a Session still belong to the application; retiring it only releases the Hub’s ownership.
+Model watchers do not keep an otherwise unreferenced Session alive.</p>
+<p>Reusing a retired key creates an empty Session. Initialize its private models and grant subscriptions
+again during connection setup. A key function can do that before <code class="docutils literal notranslate"><span class="pre">Hub.open()</span></code> sends snapshots:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">def</span><span class="w"> </span><span class="nf">tenant_key</span><span class="p">(</span><span class="n">ws</span><span class="p">):</span>
+    <span class="n">key</span> <span class="o">=</span> <span class="n">ws</span><span class="o">.</span><span class="n">path_params</span><span class="p">[</span><span class="s2">"tenant"</span><span class="p">]</span>
+    <span class="n">session</span> <span class="o">=</span> <span class="n">hub</span><span class="o">.</span><span class="n">tenant</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">session</span><span class="o">.</span><span class="n">ids</span><span class="p">():</span>
+        <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Document</span><span class="p">(</span><span class="n">title</span><span class="o">=</span><span class="sa">f</span><span class="s2">"</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> notes"</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">key</span>
+
+<span class="n">hub</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Hub</span><span class="p">(</span><span class="n">key</span><span class="o">=</span><span class="n">tenant_key</span><span class="p">,</span> <span class="n">tenant_idle_timeout</span><span class="o">=</span><span class="mi">60</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Retirement discards private state and replay history. After the first retirement, private reconnects
+on that Hub use snapshots instead of revision-only replay: model IDs and revisions may be reused by
+a fresh Session. This avoids retaining a record for every retired key. Clients retaining models that
+are no longer hosted should start a fresh Client; retirement does not send model-deletion frames.</p>
+<p>With <code class="docutils literal notranslate"><span class="pre">RelayBroadcaster</span></code>, configure the timeout on its Hub. Relay flushing performs the same sweep;
+retirement is local to that worker. Shared CRDT state and replica ownership are retained, so another
+tenant cannot claim a previously used replica ID. Their lifetime and compaction remain separate from
+private-session retirement.</p>
 </section>
 <section id="share-a-model-read-only">
 <h2>Share a model read-only<a class="headerlink" href="#share-a-model-read-only" title="Link to this heading">¶</a></h2>
@@ -372,6 +420,9 @@ model snapshots each tenant receives.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#host-private-tenant-models">Host private tenant models</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#retire-inactive-tenants">Retire inactive tenants</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#share-a-model-read-only">Share a model read-only</a>
