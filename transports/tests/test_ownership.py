@@ -92,27 +92,30 @@ def test_commands_queue_and_handover_preserves_order_and_fences_old_owner():
     assert [c["command"] for c in other] == ids[1:]
 
 
-@pytest.mark.asyncio
-async def test_status_coalesces_and_disconnect_cancels_timers():
-    session = Session()
-    mid = session.host(Clock())
-    server = Server(session)
-    client = open_client(server, "owner")
-    sent = []
-    await client.attach(sent.append)
-    for index in range(1000):
-        assert await client.propose_ops(mid, playing(index % 2 == 0))
-    assert sent == []
-    assert client.model(mid, Clock).playing is False
-    await asyncio.sleep(0.3)
-    assert len(sent) == 1
-    assert protocol.decode(sent[0])["patch"]["ops"] == playing(False)
-    assert client.pending_proposals() == []
-    await client.propose_ops(mid, playing(True))
-    client.detach(client._sender)
-    await asyncio.sleep(0.3)
-    assert len(sent) == 1
-    assert not client.owns(mid, "playing")
+def test_status_coalesces_and_disconnect_cancels_timers():
+    async def run():
+        session = Session()
+        mid = session.host(Clock())
+        server = Server(session)
+        client = open_client(server, "owner")
+        sent = []
+        await client.attach(sent.append)
+        for index in range(1000):
+            assert await client.propose_ops(mid, playing(index % 2 == 0))
+        assert sent == []
+        assert client.model(mid, Clock).playing is False
+        await asyncio.sleep(0.3)
+        assert len(sent) == 1
+        assert protocol.decode(sent[0])["patch"]["ops"] == playing(False)
+        assert client.pending_proposals() == []
+        await client.propose_ops(mid, playing(True))
+        client.detach(client._sender)
+        await asyncio.sleep(0.3)
+        assert len(sent) == 1
+        assert not client.owns(mid, "playing")
+        return sent
+
+    assert len(asyncio.run(run())) == 1
 
 
 def test_owner_metadata_and_explicit_model_ownership():
@@ -186,41 +189,43 @@ def test_rejected_server_edit_does_not_revert_local_owned_status():
     assert client.model(mid, Clock).bpm == 120
 
 
-@pytest.mark.asyncio
-async def test_failed_owner_send_hands_queued_command_to_next_connection():
-    from contextlib import suppress
+def test_failed_owner_send_hands_queued_command_to_next_connection():
+    async def run():
+        from contextlib import suppress
 
-    from transports import autosync
+        from transports import autosync
 
-    class Connection:
-        def __init__(self, fail=False):
-            self.fail = fail
-            self.messages = []
+        class Connection:
+            def __init__(self, fail=False):
+                self.fail = fail
+                self.messages = []
 
-        async def send_text(self, wire):
-            if self.fail:
-                raise OSError("disconnected")
-            self.messages.append(protocol.decode(wire))
+            async def send_text(self, wire):
+                if self.fail:
+                    raise OSError("disconnected")
+                self.messages.append(protocol.decode(wire))
 
-    session = Session()
-    mid = session.host(Clock())
-    server = Server(session)
-    first, second = Connection(fail=True), Connection()
-    server.open(first)
-    server.open(second)
-    session.command(mid, "playing", True)
-    task = asyncio.create_task(autosync(server, interval=0.001))
-    try:
-        for _ in range(100):
-            if any(message["t"] == "command" for message in second.messages):
-                break
-            await asyncio.sleep(0.01)
-        assert any(message["t"] == "ownership" and message["owned"] for message in second.messages)
-        assert any(message["t"] == "command" for message in second.messages)
-    finally:
-        task.cancel()
-        with suppress(asyncio.CancelledError):
-            await task
+        session = Session()
+        mid = session.host(Clock())
+        server = Server(session)
+        first, second = Connection(fail=True), Connection()
+        server.open(first)
+        server.open(second)
+        session.command(mid, "playing", True)
+        task = asyncio.create_task(autosync(server, interval=0.001))
+        try:
+            for _ in range(100):
+                if any(message["t"] == "command" for message in second.messages):
+                    break
+                await asyncio.sleep(0.01)
+            assert any(message["t"] == "ownership" and message["owned"] for message in second.messages)
+            assert any(message["t"] == "command" for message in second.messages)
+        finally:
+            task.cancel()
+            with suppress(asyncio.CancelledError):
+                await task
+
+    asyncio.run(run())
 
 
 def test_shared_models_reject_client_ownership():
@@ -307,22 +312,24 @@ def test_host_observers_receive_client_status_changes():
     assert model.playing is True
 
 
-@pytest.mark.asyncio
-async def test_immediate_edits_include_pending_status_without_replaying_old_values():
-    session = Session()
-    model = Clock()
-    mid = session.host(model)
-    server = Server(session)
-    client = open_client(server, "owner")
-    sent = []
-    await client.attach(sent.append)
-    await client.propose_ops(mid, playing(True))
-    immediate = client.edit_ops(mid, playing(False))
-    server.recv("owner", immediate)
-    await client.flush_owned()
-    assert sent == []
-    assert model.playing is False
-    client.detach(client._sender)
+def test_immediate_edits_include_pending_status_without_replaying_old_values():
+    async def run():
+        session = Session()
+        model = Clock()
+        mid = session.host(model)
+        server = Server(session)
+        client = open_client(server, "owner")
+        sent = []
+        await client.attach(sent.append)
+        await client.propose_ops(mid, playing(True))
+        immediate = client.edit_ops(mid, playing(False))
+        server.recv("owner", immediate)
+        await client.flush_owned()
+        assert sent == []
+        assert model.playing is False
+        client.detach(client._sender)
+
+    asyncio.run(run())
 
 
 @pytest.mark.parametrize("flush_callback", [False, True])
@@ -356,40 +363,44 @@ def test_owner_ack_stays_private_and_side_effects_follow_the_status_update(hub, 
     assert model.playing and model.bpm == 140
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize("hub", [False, True])
-async def test_reconnect_refreshes_unsent_owner_status_even_with_resume_revision(hub):
-    server = Hub(key=lambda _: "tenant") if hub else None
-    session = server.tenant("tenant") if server is not None else Session()
-    mid = session.host(Clock())
-    server = server or Server(session)
-    client = open_client(server, "owner")
-    sender = lambda frame: None
-    await client.attach(sender)
-    await client.propose_ops(mid, playing(True))
-    client.detach(sender)
-    server.close("owner")
-    wires = server.open("owner", since={mid: 0})
-    assert protocol.decode(wires[0])["t"] == "snapshot"
-    for wire in wires:
-        client.recv(wire)
-    assert client.model(mid, Clock).playing is False
-    assert client.owns(mid, "playing")
+def test_reconnect_refreshes_unsent_owner_status_even_with_resume_revision(hub):
+    async def run():
+        server = Hub(key=lambda _: "tenant") if hub else None
+        session = server.tenant("tenant") if server is not None else Session()
+        mid = session.host(Clock())
+        server = server or Server(session)
+        client = open_client(server, "owner")
+        sender = lambda frame: None
+        await client.attach(sender)
+        await client.propose_ops(mid, playing(True))
+        client.detach(sender)
+        server.close("owner")
+        wires = server.open("owner", since={mid: 0})
+        assert protocol.decode(wires[0])["t"] == "snapshot"
+        for wire in wires:
+            client.recv(wire)
+        assert client.model(mid, Clock).playing is False
+        assert client.owns(mid, "playing")
+
+    asyncio.run(run())
 
 
-@pytest.mark.asyncio
-async def test_managed_command_ack_flushes_status_before_acknowledging():
-    session = Session()
-    mid = session.host(Clock())
-    session.command(mid, "playing", True)
-    client = open_client(Server(session), "owner")
-    commands, sent = [], []
-    client.on_command(commands.append)
-    await client.attach(sent.append)
-    await client.propose_ops(mid, playing(True))
-    await client.ack_command(commands[0])
-    assert [protocol.decode(frame)["t"] for frame in sent] == ["owned", "command_ack"]
-    client.detach(client._sender)
+def test_managed_command_ack_flushes_status_before_acknowledging():
+    async def run():
+        session = Session()
+        mid = session.host(Clock())
+        session.command(mid, "playing", True)
+        client = open_client(Server(session), "owner")
+        commands, sent = [], []
+        client.on_command(commands.append)
+        await client.attach(sent.append)
+        await client.propose_ops(mid, playing(True))
+        await client.ack_command(commands[0])
+        assert [protocol.decode(frame)["t"] for frame in sent] == ["owned", "command_ack"]
+        client.detach(client._sender)
+
+    asyncio.run(run())
 
 
 def test_client_authority_reconciliation_excludes_owned_fields():
@@ -501,36 +512,38 @@ def test_owned_idle_flush_does_not_serialize(monkeypatch):
     assert session.flush() == []
 
 
-@pytest.mark.asyncio
-async def test_anywidget_lost_view_expires_and_redelivers_command():
-    class Widget:
-        def __init__(self):
-            self.sent = []
+def test_anywidget_lost_view_expires_and_redelivers_command():
+    async def run():
+        class Widget:
+            def __init__(self):
+                self.sent = []
 
-        def on_msg(self, callback):
-            self.callback = callback
+            def on_msg(self, callback):
+                self.callback = callback
 
-        def send(self, content, buffers=()):
-            self.sent.append(content)
+            def send(self, content, buffers=()):
+                self.sent.append(content)
 
-    session = Session()
-    mid = session.host(Clock())
-    session.command(mid, "playing", True)
-    server = Server(session)
-    widget = Widget()
-    serve_anywidget(server, widget, view_timeout=0.09)
-    widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "lost"})
-    await asyncio.sleep(0.06)
-    widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "live"})
-    await asyncio.sleep(0.06)
-    commands = [m for m in widget.sent if "wire" in m and json.loads(m["wire"])["t"] == "command"]
-    assert [m["view"] for m in commands] == ["lost", "live"]
-    assert {"expired": True, "view": "lost"} in widget.sent
-    widget.callback(widget, {"heartbeat": True, "view": "live"})
-    await asyncio.sleep(0.06)
-    assert {"expired": True, "view": "live"} not in widget.sent
-    widget.callback(widget, {"closed": True, "view": "live"})
-    assert not server._ownership.peers
+        session = Session()
+        mid = session.host(Clock())
+        session.command(mid, "playing", True)
+        server = Server(session)
+        widget = Widget()
+        serve_anywidget(server, widget, view_timeout=0.09)
+        widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "lost"})
+        await asyncio.sleep(0.06)
+        widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "live"})
+        await asyncio.sleep(0.06)
+        commands = [m for m in widget.sent if "wire" in m and json.loads(m["wire"])["t"] == "command"]
+        assert [m["view"] for m in commands] == ["lost", "live"]
+        assert {"expired": True, "view": "lost"} in widget.sent
+        widget.callback(widget, {"heartbeat": True, "view": "live"})
+        await asyncio.sleep(0.06)
+        assert {"expired": True, "view": "live"} not in widget.sent
+        widget.callback(widget, {"closed": True, "view": "live"})
+        assert not server._ownership.peers
+
+    asyncio.run(run())
 
 
 def test_owned_model_retains_server_model_configuration():
@@ -662,7 +675,7 @@ def test_synchronous_widget_heartbeat_handshake_still_opens():
     widget = Widget()
     serve_anywidget(server, widget)
     widget.callback(widget, {"ready": True, "view": "sync", "heartbeat": True, "ownership": True})
-    assert any(json.loads(m["wire"])["t"] == "snapshot" for m in widget.sent)
+    assert any(json.loads(m["wire"])["t"] == "snapshot" for m in widget.sent if "wire" in m)
     widget.callback(widget, {"closed": True, "view": "sync"})
     assert not server._ownership.peers
 
