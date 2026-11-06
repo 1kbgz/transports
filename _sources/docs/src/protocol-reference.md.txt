@@ -14,6 +14,7 @@ A model value is an externally tagged enum.
 | Int      | `{"Int": 1}`                | Signed integer.                                                                           |
 | Float    | `{"Float": 1.5}`            | Floating-point number.                                                                    |
 | Str      | `{"Str": "lamp"}`           | String.                                                                                   |
+| Bytes    | `{"Bytes": "AP8B"}`         | Standard padded base64 in JSON; native byte strings in MessagePack/CBOR.                  |
 | List     | `{"List": [Value, ...]}`    | Ordered values.                                                                           |
 | Map      | `{"Map": {"field": Value}}` | String-keyed map.                                                                         |
 | Submodel | `{"Submodel": 1}`           | Core model reference. Current Python and JavaScript bridges inline nested models as maps. |
@@ -23,6 +24,15 @@ Example:
 ```json
 {"Map": {"name": {"Str": "lamp"}, "on": {"Bool": true}}}
 ```
+
+The `Bytes` variant changes the wire representation of existing Python `bytes` fields. Older peers
+that only understand `Str` cannot decode it; upgrade both bindings together when using binary fields.
+Non-binary values retain their existing encoding.
+
+Bytes are atomic: a change emits one `Set`, never byte-index operations. The JSON form uses
+RFC 4648 standard base64 with padding; malformed encodings are rejected. For bytes `00 ff 01`,
+the golden model encodings are `81a54279746573c40300ff01` (MessagePack) and
+`a16542797465734300ff01` (CBOR).
 
 ## CRDT specification
 
@@ -380,11 +390,14 @@ session-local ids.
 | ---------------------------------------------------------------------- | --------------- | ------------- |
 | `json`, `application/json`, empty, `None`                              | `json`          | Text frame.   |
 | `msgpack`, `application/msgpack`, `x-msgpack`, `application/x-msgpack` | `msgpack`       | Binary frame. |
+| `cbor`, `application/cbor`                                             | `cbor`          | Binary frame. |
 
 A WebSocket connection selects a codec with the `codec` query parameter. `Server` and `Hub` encode
 each outbound message for the target connection's codec.
 
-SSE, Jupyter comm, and anywidget adapters use JSON text only.
+SSE uses JSON text and is receive-only. Comm and anywidget use JSON control frames with separate
+binary buffers; they accept the three built-in codecs. WebSocket capability `ownership=1` enables
+claiming client-owned fields. Receive-only connections never claim ownership.
 
 ## Custom codecs
 
@@ -397,3 +410,88 @@ A custom codec is registered under a content type and provides two functions:
 
 Built-in codec names cannot be overridden. Custom codecs are binding-local; register matching
 implementations in every Python or JavaScript process that uses the content type.
+
+## Binary attachments
+
+A binary comm/anywidget payload replaces the wire string with a control object:
+
+```json
+{
+  "message": {"t":"snapshot","id":1,"type":"Sample","rev":0,"value":{"Map":{"data":{"Bytes":{"buffer":0}}}}},
+  "buffer_paths": [["value", "Map", "data", "Bytes"]]
+}
+```
+
+`buffer_paths` addresses placeholders inside `message`; each placeholder contains an index into the
+separate `buffers` list. Paths must exist, placeholders must be unique, and every supplied buffer must
+be referenced. Multiple paths may reference the same buffer. The Rust attachment encoder deduplicates
+identical buffers by content. Lookalike objects outside listed paths remain ordinary data.
+Messages without binary attachments retain the existing wire-string form.
+
+Anywidget wraps this as `{"wire": control, "view": view_id}` and sends buffers through the widget
+API. Frontends announce `{"ready":true,"ownership":true,"view":view_id}`, accept only their addressed
+messages, and send `{"closed":true,"view":view_id}` on disposal. Legacy messages without a view id
+remain supported. Comm uses the control object as `content.data` and attachments as `buffers`.
+
+Byte-bearing CRDT operation frames set `tagged: true`. Their operation values and effect deltas use
+`Value` tags, including `Bytes`; frames without the flag retain their existing plain-value encoding.
+Bindings convert these values back to native bytes before invoking the public CRDT APIs. CRDT
+snapshots retain their existing state format, with byte values encoded natively by binary codecs.
+Binary CRDT rejection frames need only retain causal dots in `crdt_ops` for outbox settlement.
+
+## Replay memory
+
+`Session(log_cap=512, log_bytes=67108864, blob_threshold=65536)` bounds history per model by both entry
+count and retained payload bytes. Large byte strings are stored once by SHA-256 content reference;
+eviction releases references and removes unused blobs. Smaller attachments remain inline in an entry.
+`replay_stats(id)` reports `patches`, `blobs`, and retained payload `bytes`, excluding allocator and
+container overhead. Current model state and undrained outbound messages are outside this budget.
+
+Evicted history, including a single patch larger than the byte budget, causes resume to send a current
+snapshot. `Hub.share(replay=True, ...)` accepts the same limits. CRDT registers retain their current
+value and operation fingerprints, rather than keeping every previous binary payload; normal causal
+compaction still applies to tombstones and duplicate-suppression metadata.
+
+Replay also falls back to a snapshot when expanding deduplicated history would exceed `log_bytes`.
+
+## Field ownership and commands
+
+Schema fields default to `owner: "server"`; `owner: "client"` opts into single-connection ownership.
+One connection owns all client-owned fields of a model. The oldest eligible connected client wins;
+owner disconnect advances the epoch and grants ownership to the next eligible connection. This is
+local to one Server or Hub tenant session, not a distributed lease. `Hub.share()` rejects models
+with client-owned fields; shared merge policies and clustered ownership are not supported.
+
+| Frame         | Fields                                     | Meaning                                                       |
+| ------------- | ------------------------------------------ | ------------------------------------------------------------- |
+| `ownership`   | `id`, `fields`, `owned`, `epoch`           | Grant or observer metadata for one model.                     |
+| `owned`       | `id`, `epoch`, `sequence`, `patch`         | Owner's whole-field `Set` operations. No proposal id.         |
+| `owned_ack`   | `id`, `epoch`, `sequence`, `rev`           | Origin-only acknowledgement; no replacement state.            |
+| `command`     | `id`, `epoch`, `command`, `field`, `value` | One queued command, delivered to the owner.                   |
+| `command_ack` | `id`, `epoch`, `command`                   | Owner completed the command; next queued command may be sent. |
+
+The server verifies the owner, epoch, sequence, and field paths. Accepted owner edits bypass model
+validation, update the hosted object, invoke `Session.on_patch`, advance the server revision, and fan
+out to other connections. Duplicate sequences are acknowledged without applying them again. Ordinary
+server-owned proposals retain validation and canonicalization. Mixed-authority edits must be split.
+Python reconstructs annotated owner types without applying field constraints or model validators.
+If reconstruction fails, the server rejects the update, revokes the grant, sends an authoritative
+snapshot, and elects an owner again. Revocation clears pending invalid status before recovery;
+a normal rejection of a server-owned edit does not replace valid local owner status.
+
+Commands have monotonically increasing ids and are queued before connection. Only one command per
+model is in flight; unacknowledged commands are redelivered after handover. Delivery is **at least
+once**, not exactly once. Applications performing external effects must make them idempotent using
+the command id. `Session(command_cap=1024)` bounds the queue; overflow raises without discarding a
+command. Queues live in memory and do not survive a server restart.
+
+`propose_ops` / `proposeOps` update owner mirrors immediately and coalesce the latest value per field
+for `update_interval` / `updateInterval` seconds (default `0.25`). `flush_owned` / `flushOwned` flush
+explicitly. Low-level `edit_ops` / `editOps` return a frame immediately for caller-managed delivery.
+Disconnect invalidates grants and cancels unsent status updates; a new grant starts a new sequence.
+Models with client-owned fields reconnect using snapshots even when a resume revision is supplied,
+so unsent local status cannot silently survive a disconnected owner. Client-authority reconnects
+restore only server-owned fields; owned status starts from the snapshot.
+
+Immediate owner edits include any pending coalesced fields and supersede older values for those
+fields. Managed command acknowledgements flush pending status before acknowledging completion.

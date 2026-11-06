@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>How to connect live clients &#8212; transports v0.11.0</title>
+    <title>How to connect live clients &#8212; transports v0.12.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -13,16 +13,16 @@
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=8486d09b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=ead03eb6" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=f3b36f1a"></script>
+    <script src="../../_static/documentation_options.js?v=61ccb1f1"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=f281be69"></script>
-    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
+    <script type="module" src="../../_static/benched/benched.js?v=8a4d8cf8"></script>
     <script src="../../_static/design-tabs.js?v=f930bc37"></script>
     <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
     <script defer="defer" src="../../_static/fuma.js?v=9c325f6c"></script>
@@ -51,7 +51,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -66,7 +66,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -444,7 +444,8 @@ frames to that connection and can still serve JSON clients at the same time.</p>
 <span class="n">transports</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>The comm carries JSON wire strings in <code class="docutils literal notranslate"><span class="pre">data</span></code>, so <code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> rejects non-JSON codecs.</p>
+<p>The comm carries JSON control data and separate binary buffers. <code class="docutils literal notranslate"><span class="pre">serve_comm</span></code> supports JSON,
+MessagePack, and CBOR; receivers reattach buffers before decoding the protocol message.</p>
 </section>
 <section id="use-anywidget-custom-messages">
 <h2>Use anywidget custom messages<a class="headerlink" href="#use-anywidget-custom-messages" title="Link to this heading">¶</a></h2>
@@ -464,17 +465,33 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <span class="n">transports</span><span class="o">.</span><span class="n">sync</span><span class="p">(</span><span class="n">server</span><span class="p">)</span>
 </pre></div>
 </div>
+<p>The bundled frontend gives each browser model a distinct view id and sends heartbeats. A view that
+stops responding expires after 180 seconds, releasing ownership and redelivering pending commands to
+the next eligible view. <code class="docutils literal notranslate"><span class="pre">serve_anywidget(...,</span> <span class="pre">view_timeout=300)</span></code> changes that timeout. Lease timers
+need a running asyncio loop, as provided by Jupyter. In synchronous hosts without a running loop,
+the view still opens but has no automatic expiry; the frontend must close it explicitly. Explicit
+disposal closes the view immediately.</p>
+<p>Custom frontends can opt into this lifecycle with
+<code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:</span> <span class="pre">true,</span> <span class="pre">&quot;view&quot;:</span> <span class="pre">&quot;unique-id&quot;,</span> <span class="pre">&quot;ownership&quot;:</span> <span class="pre">true,</span> <span class="pre">&quot;heartbeat&quot;:</span> <span class="pre">true}</span></code>. The response
+<code class="docutils literal notranslate"><span class="pre">{&quot;view&quot;:</span> <span class="pre">&quot;unique-id&quot;,</span> <span class="pre">&quot;heartbeat&quot;:</span> <span class="pre">seconds}</span></code> gives the heartbeat interval. Send
+<code class="docutils literal notranslate"><span class="pre">{&quot;view&quot;:</span> <span class="pre">&quot;unique-id&quot;,</span> <span class="pre">&quot;heartbeat&quot;:</span> <span class="pre">true}</span></code> at that interval, even if a reply is lost. On
+<code class="docutils literal notranslate"><span class="pre">{&quot;view&quot;:</span> <span class="pre">&quot;unique-id&quot;,</span> <span class="pre">&quot;expired&quot;:</span> <span class="pre">true}</span></code>, detach the client, reattach, and send a new ready
+message to obtain a snapshot and ownership grant. Send <code class="docutils literal notranslate"><span class="pre">{&quot;view&quot;:</span> <span class="pre">&quot;unique-id&quot;,</span> <span class="pre">&quot;closed&quot;:</span> <span class="pre">true}</span></code>
+on disposal. Legacy frontends without heartbeats must close their connections explicitly.</p>
 <p>Frontend messages use the same client protocol:</p>
 <div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">();</span>
 
-<span class="nx">model</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">"msg:custom"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
-<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">)</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">);</span>
+<span class="nx">model</span><span class="p">.</span><span class="nx">on</span><span class="p">(</span><span class="s2">"msg:custom"</span><span class="p">,</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">,</span><span class="w"> </span><span class="nx">buffers</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="ow">typeof</span><span class="w"> </span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="w"> </span><span class="o">===</span><span class="w"> </span><span class="s2">"string"</span><span class="p">)</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recv</span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">);</span>
+<span class="w">  </span><span class="k">else</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">)</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">recvBuffers</span><span class="p">(</span><span class="nx">content</span><span class="p">.</span><span class="nx">wire</span><span class="p">,</span><span class="w"> </span><span class="nx">buffers</span><span class="w"> </span><span class="o">??</span><span class="w"> </span><span class="p">[]);</span>
 <span class="p">});</span>
 
 <span class="nx">model</span><span class="p">.</span><span class="nx">send</span><span class="p">({</span><span class="w"> </span><span class="nx">ready</span><span class="o">:</span><span class="w"> </span><span class="kt">true</span><span class="w"> </span><span class="p">});</span>
 </pre></div>
 </div>
-<p>Use <code class="docutils literal notranslate"><span class="pre">model.send({</span> <span class="pre">wire:</span> <span class="pre">client.edit(id,</span> <span class="pre">value)</span> <span class="pre">})</span></code> to send an edit from the frontend.</p>
+<p>For text-only custom frontends, use <code class="docutils literal notranslate"><span class="pre">model.send({</span> <span class="pre">wire:</span> <span class="pre">client.edit(id,</span> <span class="pre">value)</span> <span class="pre">})</span></code>. The bundled
+widget manages binary attachments, distinct frontend ids, managed sending, and ownership cleanup.
+Custom binary/ownership adapters must implement the <a class="reference internal" href="protocol-reference.html"><span class="std std-doc">attachment and view protocol</span></a>.</p>
 </section>
 <section id="serve-a-hub">
 <h2>Serve a Hub<a class="headerlink" href="#serve-a-hub" title="Link to this heading">¶</a></h2>
@@ -485,6 +502,10 @@ supply the <code class="docutils literal notranslate"><span class="pre">_esm</sp
 <span class="n">app</span> <span class="o">=</span> <span class="n">Starlette</span><span class="p">(</span><span class="n">routes</span><span class="o">=</span><span class="p">[</span><span class="n">WebSocketRoute</span><span class="p">(</span><span class="s2">"/ws/</span><span class="si">{tenant}</span><span class="s2">"</span><span class="p">,</span> <span class="n">transports</span><span class="o">.</span><span class="n">ws_endpoint</span><span class="p">(</span><span class="n">hub</span><span class="p">))])</span>
 </pre></div>
 </div>
+<p>Comm frontends opt into owning fields with <code class="docutils literal notranslate"><span class="pre">serve_comm(server,</span> <span class="pre">comm,</span> <span class="pre">ownership=True)</span></code>; the default
+leaves them as observers. Custom manual adapters can pass <code class="docutils literal notranslate"><span class="pre">ownership=False</span></code> to <code class="docutils literal notranslate"><span class="pre">Server.open</span></code> or
+<code class="docutils literal notranslate"><span class="pre">Hub.open</span></code>. A closed adapter must call <code class="docutils literal notranslate"><span class="pre">Client.detach</span></code> and the server’s <code class="docutils literal notranslate"><span class="pre">close</span></code> method so ownership
+can transfer; send every message returned by <code class="docutils literal notranslate"><span class="pre">close</span></code> to its destination.</p>
 </section>
 </section>
 

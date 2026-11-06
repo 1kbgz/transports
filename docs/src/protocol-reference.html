@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>Wire protocol reference &#8212; transports v0.11.0</title>
+    <title>Wire protocol reference &#8212; transports v0.12.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -13,16 +13,16 @@
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=8486d09b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=ead03eb6" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=f3b36f1a"></script>
+    <script src="../../_static/documentation_options.js?v=61ccb1f1"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=f281be69"></script>
-    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
+    <script type="module" src="../../_static/benched/benched.js?v=8a4d8cf8"></script>
     <script src="../../_static/design-tabs.js?v=f930bc37"></script>
     <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
     <script defer="defer" src="../../_static/fuma.js?v=9c325f6c"></script>
@@ -51,7 +51,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -66,7 +66,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -210,6 +210,15 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#custom-codecs">Custom codecs</a>
   </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#binary-attachments">Binary attachments</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#replay-memory">Replay memory</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#field-ownership-and-commands">Field ownership and commands</a>
+  </li>
 </ul>
 </div>
   </div>
@@ -252,15 +261,19 @@ binary frame.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">{&quot;Str&quot;:</span> <span class="pre">&quot;lamp&quot;}</span></code></p></td>
 <td><p>String.</p></td>
 </tr>
-<tr class="row-odd"><td><p>List</p></td>
+<tr class="row-odd"><td><p>Bytes</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">{&quot;Bytes&quot;:</span> <span class="pre">&quot;AP8B&quot;}</span></code></p></td>
+<td><p>Standard padded base64 in JSON; native byte strings in MessagePack/CBOR.</p></td>
+</tr>
+<tr class="row-even"><td><p>List</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">{&quot;List&quot;:</span> <span class="pre">[Value,</span> <span class="pre">...]}</span></code></p></td>
 <td><p>Ordered values.</p></td>
 </tr>
-<tr class="row-even"><td><p>Map</p></td>
+<tr class="row-odd"><td><p>Map</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">{&quot;Map&quot;:</span> <span class="pre">{&quot;field&quot;:</span> <span class="pre">Value}}</span></code></p></td>
 <td><p>String-keyed map.</p></td>
 </tr>
-<tr class="row-odd"><td><p>Submodel</p></td>
+<tr class="row-even"><td><p>Submodel</p></td>
 <td><p><code class="docutils literal notranslate"><span class="pre">{&quot;Submodel&quot;:</span> <span class="pre">1}</span></code></p></td>
 <td><p>Core model reference. Current Python and JavaScript bridges inline nested models as maps.</p></td>
 </tr>
@@ -270,6 +283,13 @@ binary frame.</p>
 <div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"Map"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"name"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Str"</span><span class="p">:</span><span class="w"> </span><span class="s2">"lamp"</span><span class="p">},</span><span class="w"> </span><span class="nt">"on"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"Bool"</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">}}}</span>
 </pre></div>
 </div>
+<p>The <code class="docutils literal notranslate"><span class="pre">Bytes</span></code> variant changes the wire representation of existing Python <code class="docutils literal notranslate"><span class="pre">bytes</span></code> fields. Older peers
+that only understand <code class="docutils literal notranslate"><span class="pre">Str</span></code> cannot decode it; upgrade both bindings together when using binary fields.
+Non-binary values retain their existing encoding.</p>
+<p>Bytes are atomic: a change emits one <code class="docutils literal notranslate"><span class="pre">Set</span></code>, never byte-index operations. The JSON form uses
+RFC 4648 standard base64 with padding; malformed encodings are rejected. For bytes <code class="docutils literal notranslate"><span class="pre">00</span> <span class="pre">ff</span> <span class="pre">01</span></code>,
+the golden model encodings are <code class="docutils literal notranslate"><span class="pre">81a54279746573c40300ff01</span></code> (MessagePack) and
+<code class="docutils literal notranslate"><span class="pre">a16542797465734300ff01</span></code> (CBOR).</p>
 </section>
 <section id="crdt-specification">
 <h2>CRDT specification<a class="headerlink" href="#crdt-specification" title="Link to this heading">¶</a></h2>
@@ -647,11 +667,17 @@ session-local ids.</p>
 <td><p><code class="docutils literal notranslate"><span class="pre">msgpack</span></code></p></td>
 <td><p>Binary frame.</p></td>
 </tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">cbor</span></code>, <code class="docutils literal notranslate"><span class="pre">application/cbor</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">cbor</span></code></p></td>
+<td><p>Binary frame.</p></td>
+</tr>
 </tbody>
 </table>
 <p>A WebSocket connection selects a codec with the <code class="docutils literal notranslate"><span class="pre">codec</span></code> query parameter. <code class="docutils literal notranslate"><span class="pre">Server</span></code> and <code class="docutils literal notranslate"><span class="pre">Hub</span></code> encode
 each outbound message for the target connection’s codec.</p>
-<p>SSE, Jupyter comm, and anywidget adapters use JSON text only.</p>
+<p>SSE uses JSON text and is receive-only. Comm and anywidget use JSON control frames with separate
+binary buffers; they accept the three built-in codecs. WebSocket capability <code class="docutils literal notranslate"><span class="pre">ownership=1</span></code> enables
+claiming client-owned fields. Receive-only connections never claim ownership.</p>
 </section>
 <section id="custom-codecs">
 <h2>Custom codecs<a class="headerlink" href="#custom-codecs" title="Link to this heading">¶</a></h2>
@@ -676,6 +702,103 @@ each outbound message for the target connection’s codec.</p>
 </table>
 <p>Built-in codec names cannot be overridden. Custom codecs are binding-local; register matching
 implementations in every Python or JavaScript process that uses the content type.</p>
+</section>
+<section id="binary-attachments">
+<h2>Binary attachments<a class="headerlink" href="#binary-attachments" title="Link to this heading">¶</a></h2>
+<p>A binary comm/anywidget payload replaces the wire string with a control object:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+<span class="w">  </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span><span class="nt">"t"</span><span class="p">:</span><span class="s2">"snapshot"</span><span class="p">,</span><span class="nt">"id"</span><span class="p">:</span><span class="mi">1</span><span class="p">,</span><span class="nt">"type"</span><span class="p">:</span><span class="s2">"Sample"</span><span class="p">,</span><span class="nt">"rev"</span><span class="p">:</span><span class="mi">0</span><span class="p">,</span><span class="nt">"value"</span><span class="p">:{</span><span class="nt">"Map"</span><span class="p">:{</span><span class="nt">"data"</span><span class="p">:{</span><span class="nt">"Bytes"</span><span class="p">:{</span><span class="nt">"buffer"</span><span class="p">:</span><span class="mi">0</span><span class="p">}}}}},</span>
+<span class="w">  </span><span class="nt">"buffer_paths"</span><span class="p">:</span><span class="w"> </span><span class="p">[[</span><span class="s2">"value"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Map"</span><span class="p">,</span><span class="w"> </span><span class="s2">"data"</span><span class="p">,</span><span class="w"> </span><span class="s2">"Bytes"</span><span class="p">]]</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">buffer_paths</span></code> addresses placeholders inside <code class="docutils literal notranslate"><span class="pre">message</span></code>; each placeholder contains an index into the
+separate <code class="docutils literal notranslate"><span class="pre">buffers</span></code> list. Paths must exist, placeholders must be unique, and every supplied buffer must
+be referenced. Multiple paths may reference the same buffer. The Rust attachment encoder deduplicates
+identical buffers by content. Lookalike objects outside listed paths remain ordinary data.
+Messages without binary attachments retain the existing wire-string form.</p>
+<p>Anywidget wraps this as <code class="docutils literal notranslate"><span class="pre">{&quot;wire&quot;:</span> <span class="pre">control,</span> <span class="pre">&quot;view&quot;:</span> <span class="pre">view_id}</span></code> and sends buffers through the widget
+API. Frontends announce <code class="docutils literal notranslate"><span class="pre">{&quot;ready&quot;:true,&quot;ownership&quot;:true,&quot;view&quot;:view_id}</span></code>, accept only their addressed
+messages, and send <code class="docutils literal notranslate"><span class="pre">{&quot;closed&quot;:true,&quot;view&quot;:view_id}</span></code> on disposal. Legacy messages without a view id
+remain supported. Comm uses the control object as <code class="docutils literal notranslate"><span class="pre">content.data</span></code> and attachments as <code class="docutils literal notranslate"><span class="pre">buffers</span></code>.</p>
+<p>Byte-bearing CRDT operation frames set <code class="docutils literal notranslate"><span class="pre">tagged:</span> <span class="pre">true</span></code>. Their operation values and effect deltas use
+<code class="docutils literal notranslate"><span class="pre">Value</span></code> tags, including <code class="docutils literal notranslate"><span class="pre">Bytes</span></code>; frames without the flag retain their existing plain-value encoding.
+Bindings convert these values back to native bytes before invoking the public CRDT APIs. CRDT
+snapshots retain their existing state format, with byte values encoded natively by binary codecs.
+Binary CRDT rejection frames need only retain causal dots in <code class="docutils literal notranslate"><span class="pre">crdt_ops</span></code> for outbox settlement.</p>
+</section>
+<section id="replay-memory">
+<h2>Replay memory<a class="headerlink" href="#replay-memory" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">Session(log_cap=512,</span> <span class="pre">log_bytes=67108864,</span> <span class="pre">blob_threshold=65536)</span></code> bounds history per model by both entry
+count and retained payload bytes. Large byte strings are stored once by SHA-256 content reference;
+eviction releases references and removes unused blobs. Smaller attachments remain inline in an entry.
+<code class="docutils literal notranslate"><span class="pre">replay_stats(id)</span></code> reports <code class="docutils literal notranslate"><span class="pre">patches</span></code>, <code class="docutils literal notranslate"><span class="pre">blobs</span></code>, and retained payload <code class="docutils literal notranslate"><span class="pre">bytes</span></code>, excluding allocator and
+container overhead. Current model state and undrained outbound messages are outside this budget.</p>
+<p>Evicted history, including a single patch larger than the byte budget, causes resume to send a current
+snapshot. <code class="docutils literal notranslate"><span class="pre">Hub.share(replay=True,</span> <span class="pre">...)</span></code> accepts the same limits. CRDT registers retain their current
+value and operation fingerprints, rather than keeping every previous binary payload; normal causal
+compaction still applies to tombstones and duplicate-suppression metadata.</p>
+<p>Replay also falls back to a snapshot when expanding deduplicated history would exceed <code class="docutils literal notranslate"><span class="pre">log_bytes</span></code>.</p>
+</section>
+<section id="field-ownership-and-commands">
+<h2>Field ownership and commands<a class="headerlink" href="#field-ownership-and-commands" title="Link to this heading">¶</a></h2>
+<p>Schema fields default to <code class="docutils literal notranslate"><span class="pre">owner:</span> <span class="pre">&quot;server&quot;</span></code>; <code class="docutils literal notranslate"><span class="pre">owner:</span> <span class="pre">&quot;client&quot;</span></code> opts into single-connection ownership.
+One connection owns all client-owned fields of a model. The oldest eligible connected client wins;
+owner disconnect advances the epoch and grants ownership to the next eligible connection. This is
+local to one Server or Hub tenant session, not a distributed lease. <code class="docutils literal notranslate"><span class="pre">Hub.share()</span></code> rejects models
+with client-owned fields; shared merge policies and clustered ownership are not supported.</p>
+<table class="docutils align-default">
+<thead>
+<tr class="row-odd"><th class="head"><p>Frame</p></th>
+<th class="head"><p>Fields</p></th>
+<th class="head"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">ownership</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">fields</span></code>, <code class="docutils literal notranslate"><span class="pre">owned</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch</span></code></p></td>
+<td><p>Grant or observer metadata for one model.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">owned</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch</span></code>, <code class="docutils literal notranslate"><span class="pre">sequence</span></code>, <code class="docutils literal notranslate"><span class="pre">patch</span></code></p></td>
+<td><p>Owner’s whole-field <code class="docutils literal notranslate"><span class="pre">Set</span></code> operations. No proposal id.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">owned_ack</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch</span></code>, <code class="docutils literal notranslate"><span class="pre">sequence</span></code>, <code class="docutils literal notranslate"><span class="pre">rev</span></code></p></td>
+<td><p>Origin-only acknowledgement; no replacement state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">command</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch</span></code>, <code class="docutils literal notranslate"><span class="pre">command</span></code>, <code class="docutils literal notranslate"><span class="pre">field</span></code>, <code class="docutils literal notranslate"><span class="pre">value</span></code></p></td>
+<td><p>One queued command, delivered to the owner.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">command_ack</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">id</span></code>, <code class="docutils literal notranslate"><span class="pre">epoch</span></code>, <code class="docutils literal notranslate"><span class="pre">command</span></code></p></td>
+<td><p>Owner completed the command; next queued command may be sent.</p></td>
+</tr>
+</tbody>
+</table>
+<p>The server verifies the owner, epoch, sequence, and field paths. Accepted owner edits bypass model
+validation, update the hosted object, invoke <code class="docutils literal notranslate"><span class="pre">Session.on_patch</span></code>, advance the server revision, and fan
+out to other connections. Duplicate sequences are acknowledged without applying them again. Ordinary
+server-owned proposals retain validation and canonicalization. Mixed-authority edits must be split.
+Python reconstructs annotated owner types without applying field constraints or model validators.
+If reconstruction fails, the server rejects the update, revokes the grant, sends an authoritative
+snapshot, and elects an owner again. Revocation clears pending invalid status before recovery;
+a normal rejection of a server-owned edit does not replace valid local owner status.</p>
+<p>Commands have monotonically increasing ids and are queued before connection. Only one command per
+model is in flight; unacknowledged commands are redelivered after handover. Delivery is <strong>at least
+once</strong>, not exactly once. Applications performing external effects must make them idempotent using
+the command id. <code class="docutils literal notranslate"><span class="pre">Session(command_cap=1024)</span></code> bounds the queue; overflow raises without discarding a
+command. Queues live in memory and do not survive a server restart.</p>
+<p><code class="docutils literal notranslate"><span class="pre">propose_ops</span></code> / <code class="docutils literal notranslate"><span class="pre">proposeOps</span></code> update owner mirrors immediately and coalesce the latest value per field
+for <code class="docutils literal notranslate"><span class="pre">update_interval</span></code> / <code class="docutils literal notranslate"><span class="pre">updateInterval</span></code> seconds (default <code class="docutils literal notranslate"><span class="pre">0.25</span></code>). <code class="docutils literal notranslate"><span class="pre">flush_owned</span></code> / <code class="docutils literal notranslate"><span class="pre">flushOwned</span></code> flush
+explicitly. Low-level <code class="docutils literal notranslate"><span class="pre">edit_ops</span></code> / <code class="docutils literal notranslate"><span class="pre">editOps</span></code> return a frame immediately for caller-managed delivery.
+Disconnect invalidates grants and cancels unsent status updates; a new grant starts a new sequence.
+Models with client-owned fields reconnect using snapshots even when a resume revision is supplied,
+so unsent local status cannot silently survive a disconnected owner. Client-authority reconnects
+restore only server-owned fields; owned status starts from the snapshot.</p>
+<p>Immediate owner edits include any pending coalesced fields and supersede older values for those
+fields. Managed command acknowledgements flush pending status before acknowledging completion.</p>
 </section>
 </section>
 
@@ -771,6 +894,15 @@ implementations in every Python or JavaScript process that uses the content type
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#custom-codecs">Custom codecs</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#binary-attachments">Binary attachments</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#replay-memory">Replay memory</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#field-ownership-and-commands">Field ownership and commands</a>
   </li>
 </ul>
 

@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Index &#8212; transports v0.11.0</title>
+    <title>Index &#8212; transports v0.12.0</title>
     <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="_static/fuma-code.css?v=a950e949" />
@@ -12,16 +12,16 @@
     <link rel="stylesheet" type="text/css" href="_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="_static/autodoc_pydantic.css" />
-    <link rel="stylesheet" type="text/css" href="_static/benched/benched.css?v=8486d09b" />
+    <link rel="stylesheet" type="text/css" href="_static/benched/benched.css?v=ead03eb6" />
     <link rel="stylesheet" type="text/css" href="_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="_static/styles/custom.css?v=88c24c6a" />
-    <script src="_static/documentation_options.js?v=f3b36f1a"></script>
+    <script src="_static/documentation_options.js?v=61ccb1f1"></script>
     <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="_static/copybutton.js?v=f281be69"></script>
-    <script type="module" src="_static/benched/benched.js?v=287d4e6a"></script>
+    <script type="module" src="_static/benched/benched.js?v=8a4d8cf8"></script>
     <script src="_static/design-tabs.js?v=f930bc37"></script>
     <script data-searchlite-index="searchlite-index.json" defer="defer" src="_static/searchlite.js?v=a5320898"></script>
     <script defer="defer" src="_static/fuma.js?v=9c325f6c"></script>
@@ -455,7 +455,7 @@ window.runMermaid = runMermaid;</script>
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    </button><a class="fd-brand" href="index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -470,7 +470,7 @@ window.runMermaid = runMermaid;</script>
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -583,6 +583,8 @@ window.runMermaid = runMermaid;</script>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="docs/src/api.html#transports.Client.abandon_proposal">abandon_proposal() (transports.Client method)</a>
 </li>
+      <li><a href="docs/src/api.html#transports.Client.ack_command">ack_command() (transports.Client method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.apply">apply() (in module transports)</a>
 
       <ul>
@@ -593,10 +595,10 @@ window.runMermaid = runMermaid;</script>
       </ul></li>
       <li><a href="docs/src/api.html#transports.Hub.apply_crdt_shared">apply_crdt_shared() (transports.Hub method)</a>
 </li>
-      <li><a href="docs/src/api.html#transports.Hub.apply_delta_shared">apply_delta_shared() (transports.Hub method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="docs/src/api.html#transports.Hub.apply_delta_shared">apply_delta_shared() (transports.Hub method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.Session.apply_patch">apply_patch() (transports.Session method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Hub.apply_shared">apply_shared() (transports.Hub method)</a>
@@ -623,16 +625,20 @@ window.runMermaid = runMermaid;</script>
         <li><a href="docs/src/api.html#transports.Server.close">(transports.Server method)</a>
 </li>
       </ul></li>
+      <li><a href="docs/src/api.html#transports.Session.command">command() (transports.Session method)</a>
+</li>
+      <li><a href="docs/src/api.html#transports.Client.command_ack">command_ack() (transports.Client method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.CrdtDocument.compact">compact() (transports.CrdtDocument method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Hub.compact_shared_crdt">compact_shared_crdt() (transports.Hub method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Client.connect">connect() (transports.Client method)</a>
 </li>
-      <li><a href="docs/src/api.html#transports.Client.connect_data_channel">connect_data_channel() (transports.Client method)</a>
-</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="docs/src/api.html#transports.Client.connect_data_channel">connect_data_channel() (transports.Client method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.Client.connect_sse">connect_sse() (transports.Client method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Client.connected">connected (transports.Client property)</a>
@@ -697,6 +703,8 @@ window.runMermaid = runMermaid;</script>
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="docs/src/api.html#transports.Store.field">field() (transports.Store method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.Hub.flush">flush() (transports.Hub method)</a>
 
       <ul>
@@ -707,6 +715,8 @@ window.runMermaid = runMermaid;</script>
       </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="docs/src/api.html#transports.Client.flush_owned">flush_owned() (transports.Client method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.CrdtSpec.from_dict">from_dict() (transports.CrdtSpec class method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.CrdtSpec.from_json">from_json() (transports.CrdtSpec class method)</a>
@@ -811,11 +821,15 @@ window.runMermaid = runMermaid;</script>
 </li>
       <li><a href="docs/src/api.html#transports.Client.on_change">on_change() (transports.Client method)</a>
 </li>
+      <li><a href="docs/src/api.html#transports.Client.on_command">on_command() (transports.Client method)</a>
+</li>
       <li><a href="docs/src/api.html#transports.Client.on_connect">on_connect() (transports.Client method)</a>
+</li>
+      <li><a href="docs/src/api.html#transports.Client.on_disconnect">on_disconnect() (transports.Client method)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="docs/src/api.html#transports.Client.on_disconnect">on_disconnect() (transports.Client method)</a>
+      <li><a href="docs/src/api.html#transports.Client.on_ownership">on_ownership() (transports.Client method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Session.on_patch">on_patch() (transports.Session method)</a>
 </li>
@@ -829,6 +843,8 @@ window.runMermaid = runMermaid;</script>
         <li><a href="docs/src/api.html#transports.Server.open">(transports.Server method)</a>
 </li>
       </ul></li>
+      <li><a href="docs/src/api.html#transports.Client.owns">owns() (transports.Client method)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -871,9 +887,11 @@ window.runMermaid = runMermaid;</script>
 </li>
       <li><a href="docs/src/api.html#transports.registered_codecs">registered_codecs() (in module transports)</a>
 </li>
+      <li><a href="docs/src/api.html#transports.Session.reject_reason">reject_reason (transports.Session attribute)</a>
+</li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="docs/src/api.html#transports.Session.reject_reason">reject_reason (transports.Session attribute)</a>
+      <li><a href="docs/src/api.html#transports.Session.replay_stats">replay_stats() (transports.Session method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.CrdtSpec.require_hash">require_hash() (transports.CrdtSpec method)</a>
 </li>
@@ -884,6 +902,8 @@ window.runMermaid = runMermaid;</script>
 </li>
       </ul></li>
       <li><a href="docs/src/api.html#transports.Hub.retire_tenant">retire_tenant() (transports.Hub method)</a>
+</li>
+      <li><a href="docs/src/api.html#transports.Store.revision">revision() (transports.Store method)</a>
 </li>
       <li><a href="docs/src/api.html#transports.Client.run">run() (transports.Client method)</a>
 </li>

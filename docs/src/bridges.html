@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <title>How to bridge models and objects &#8212; transports v0.11.0</title>
+    <title>How to bridge models and objects &#8212; transports v0.12.0</title>
     <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=03e43079" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma.css?v=ca04d621" />
     <link rel="stylesheet" type="text/css" href="../../_static/fuma-code.css?v=a950e949" />
@@ -13,16 +13,16 @@
     <link rel="stylesheet" type="text/css" href="../../_static/copybutton.css?v=76b2166b" />
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
-    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=8486d09b" />
+    <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=ead03eb6" />
     <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
-    <script src="../../_static/documentation_options.js?v=f3b36f1a"></script>
+    <script src="../../_static/documentation_options.js?v=61ccb1f1"></script>
     <script src="../../_static/doctools.js?v=9bcbadda"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=f281be69"></script>
-    <script type="module" src="../../_static/benched/benched.js?v=287d4e6a"></script>
+    <script type="module" src="../../_static/benched/benched.js?v=8a4d8cf8"></script>
     <script src="../../_static/design-tabs.js?v=f930bc37"></script>
     <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
     <script defer="defer" src="../../_static/fuma.js?v=9c325f6c"></script>
@@ -51,7 +51,7 @@
   <div class="fd-subnav-inner">
     <button type="button" class="fd-icon-button fd-sidebar-toggle" aria-controls="fd-sidebar" aria-expanded="false" aria-label="Toggle navigation" title="Toggle navigation">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg>
-    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    </button><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
 
     <div class="fd-nav-actions">
@@ -66,7 +66,7 @@
 
 <aside id="fd-sidebar" aria-label="Documentation">
   <div class="fd-sidebar-header">
-    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.11.0</span>
+    <div class="fd-sidebar-brand-row"><a class="fd-brand" href="../../index.html"><span class="fd-brand-name">transports v0.12.0</span>
 </a>
       <button type="button" class="fd-icon-button fd-sidebar-collapse" aria-label="Collapse sidebar" title="Collapse sidebar"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" class="fd-icon "><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M9 3v18"/></svg></button>
     </div>
@@ -167,6 +167,12 @@
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#bridge-plain-javascript-objects">Bridge plain JavaScript objects</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#transfer-binary-fields">Transfer binary fields</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#let-the-frontend-own-status">Let the frontend own status</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#current-bridge-limits">Current bridge limits</a>
@@ -291,6 +297,81 @@ mirrored value as a Python model.</p>
 </pre></div>
 </div>
 </section>
+<section id="transfer-binary-fields">
+<h2>Transfer binary fields<a class="headerlink" href="#transfer-binary-fields" title="Link to this heading">¶</a></h2>
+<p>Declare binary data as <code class="docutils literal notranslate"><span class="pre">bytes</span></code> on pydantic models, dataclasses, or msgspec structs:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">class</span><span class="w"> </span><span class="nc">Sample</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">data</span><span class="p">:</span> <span class="nb">bytes</span> <span class="o">=</span> <span class="sa">b</span><span class="s2">""</span>
+
+<span class="n">sample</span> <span class="o">=</span> <span class="n">Sample</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="nb">bytes</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">255</span><span class="p">,</span> <span class="mi">1</span><span class="p">]))</span>
+<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">sample</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">Client(codec=&quot;msgpack&quot;)</span></code> or <code class="docutils literal notranslate"><span class="pre">Client(codec=&quot;cbor&quot;)</span></code> for native binary WebSocket payloads.
+Comm and anywidget carry these bytes in separate message buffers automatically. JSON/SSE uses
+base64. The input bridge also accepts <code class="docutils literal notranslate"><span class="pre">bytearray</span></code> and <code class="docutils literal notranslate"><span class="pre">memoryview</span></code>.</p>
+<p>In JavaScript, pass a <code class="docutils literal notranslate"><span class="pre">Uint8Array</span></code> or another <code class="docutils literal notranslate"><span class="pre">ArrayBufferView</span></code> through <code class="docutils literal notranslate"><span class="pre">toValue</span></code>. <code class="docutils literal notranslate"><span class="pre">fromValue</span></code>
+returns a <code class="docutils literal notranslate"><span class="pre">Uint8Array</span></code>, preserving the underlying buffer when a native view is available.
+<code class="docutils literal notranslate"><span class="pre">Client</span></code> handles wire encoding. For a low-level JSON API, use <code class="docutils literal notranslate"><span class="pre">valueToJson(toValue(data))</span></code>;
+ordinary <code class="docutils literal notranslate"><span class="pre">JSON.stringify</span></code> does not encode typed arrays as the protocol’s base64 byte strings.</p>
+</section>
+<section id="let-the-frontend-own-status">
+<h2>Let the frontend own status<a class="headerlink" href="#let-the-frontend-own-status" title="Link to this heading">¶</a></h2>
+<p>Mark browser-derived status separately from server-controlled fields:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">Field</span>
+
+<span class="k">class</span><span class="w"> </span><span class="nc">Clock</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+    <span class="n">is_playing</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="n">json_schema_extra</span><span class="o">=</span><span class="p">{</span><span class="s2">"owner"</span><span class="p">:</span> <span class="s2">"client"</span><span class="p">})</span>
+    <span class="n">bpm</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">Field</span><span class="p">(</span><span class="mi">120</span><span class="p">,</span> <span class="n">ge</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">clock</span> <span class="o">=</span> <span class="n">Clock</span><span class="p">()</span>
+<span class="n">session</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Session</span><span class="p">()</span>
+<span class="n">mid</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">clock</span><span class="p">)</span>
+<span class="n">server</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Server</span><span class="p">(</span><span class="n">session</span><span class="p">)</span>
+<span class="n">session</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="s2">"is_playing"</span><span class="p">,</span> <span class="kc">True</span><span class="p">)</span>  <span class="c1"># retained until an owner connects and acknowledges</span>
+</pre></div>
+</div>
+<p>For dataclasses, use <code class="docutils literal notranslate"><span class="pre">field(metadata={&quot;owner&quot;:</span> <span class="pre">&quot;client&quot;})</span></code>. To make every field client-owned, pass
+<code class="docutils literal notranslate"><span class="pre">session.host(model,</span> <span class="pre">owner=&quot;client&quot;)</span></code>. Field metadata overrides that model default.</p>
+<p>Handle commands in the browser and report the resulting status:</p>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"msgpack"</span><span class="p">,</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">updateInterval</span><span class="o">:</span><span class="w"> </span><span class="kt">0.25</span><span class="w"> </span><span class="p">});</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">onCommand</span><span class="p">((</span><span class="nx">command</span><span class="p">)</span><span class="w"> </span><span class="p">=&gt;</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="kd">const</span><span class="w"> </span><span class="nx">playing</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">fromValue</span><span class="p">(</span><span class="nx">command</span><span class="p">.</span><span class="nx">value</span><span class="p">);</span>
+<span class="w">  </span><span class="c1">// Apply playing to the browser's clock here, then report its resulting state.</span>
+<span class="w">  </span><span class="nx">client</span><span class="p">.</span><span class="nx">proposeOps</span><span class="p">(</span><span class="nx">command</span><span class="p">.</span><span class="nx">id</span><span class="p">,</span><span class="w"> </span><span class="p">[{</span>
+<span class="w">    </span><span class="nb">Set</span><span class="o">:</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">path</span><span class="o">:</span><span class="w"> </span><span class="p">[{</span><span class="w"> </span><span class="nx">Key</span><span class="o">:</span><span class="w"> </span><span class="kt">command.field</span><span class="w"> </span><span class="p">}],</span><span class="w"> </span><span class="nx">value</span><span class="o">:</span><span class="w"> </span><span class="kt">toValue</span><span class="p">(</span><span class="nx">playing</span><span class="p">)</span><span class="w"> </span><span class="p">},</span>
+<span class="w">  </span><span class="p">}]);</span>
+<span class="w">  </span><span class="nx">client</span><span class="p">.</span><span class="nx">ackCommand</span><span class="p">(</span><span class="nx">command</span><span class="p">);</span>
+<span class="p">});</span>
+<span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="nx">url</span><span class="p">);</span>
+</pre></div>
+</div>
+<p>Use <code class="docutils literal notranslate"><span class="pre">client.owns(id,</span> <span class="pre">&quot;is_playing&quot;)</span></code> before driving local status, and <code class="docutils literal notranslate"><span class="pre">onOwnership</span></code> to start or stop
+that work as ownership changes. Stop local work on <code class="docutils literal notranslate"><span class="pre">onDisconnect</span></code> as well; disconnection revokes
+all grants. Python clients expose matching <code class="docutils literal notranslate"><span class="pre">on_command</span></code>, <code class="docutils literal notranslate"><span class="pre">on_ownership</span></code>,
+<code class="docutils literal notranslate"><span class="pre">propose_ops</span></code>, and <code class="docutils literal notranslate"><span class="pre">ack_command</span></code> methods; managed sends are awaited. Commands received before a
+listener is registered are retained. Acknowledge only after applying a command successfully. Managed <code class="docutils literal notranslate"><span class="pre">ack_command</span></code> / <code class="docutils literal notranslate"><span class="pre">ackCommand</span></code>
+flush pending owned status before sending the acknowledgement; manual <code class="docutils literal notranslate"><span class="pre">command_ack</span></code> / <code class="docutils literal notranslate"><span class="pre">commandAck</span></code>
+callers must send that status first.</p>
+<p>Assign <code class="docutils literal notranslate"><span class="pre">clock.bpm</span></code> normally. Assigning client-owned fields from Python raises; use <code class="docutils literal notranslate"><span class="pre">session.command</span></code>
+instead. For unobservable models such as msgspec structs, <code class="docutils literal notranslate"><span class="pre">Session.update</span></code> detects and restores a
+forbidden assignment before raising. Nested Python mutations are restored with a warning on flush;
+idle flushes do not serialize owned values. Client-owned status preserves annotated Python types but
+bypasses field constraints and model validators. Invalid type representations are rejected before
+changing the hosted state. Use ownership for values whose authority belongs to the frontend; keep
+security-sensitive validation on server-owned fields. Server edits still run model-level validators,
+including cross-field checks. Those checks must tolerate every valid owner state, or unrelated server
+edits can be rejected until the owner changes that state. Keep independent owner status in a separate
+model when a cross-field constraint cannot tolerate it.</p>
+<p>Ownership grants and client paths use serialized field names, including aliases. Python assignment
+and <code class="docutils literal notranslate"><span class="pre">Session.command</span></code> use attribute names. Changes spanning both ownership kinds must be sent as
+separate edits; <code class="docutils literal notranslate"><span class="pre">propose</span></code> does not split a whole-model replacement automatically.</p>
+<p>Owned nested msgspec structs with <code class="docutils literal notranslate"><span class="pre">__post_init__</span></code> need an existing instance to copy. Adding a new
+such instance through an owned update is unsupported, because constructing it would run that hook.</p>
+<p>Command delivery may repeat after handover. See the <a class="reference internal" href="protocol-reference.html"><span class="std std-doc">protocol reference</span></a>
+for delivery and memory limits. Set <code class="docutils literal notranslate"><span class="pre">Client(ownership=False)</span></code> in Python or
+<code class="docutils literal notranslate"><span class="pre">new</span> <span class="pre">Client(&quot;json&quot;,</span> <span class="pre">{</span> <span class="pre">ownership:</span> <span class="pre">false</span> <span class="pre">})</span></code> in JavaScript for a passive WebSocket observer.</p>
+</section>
 <section id="current-bridge-limits">
 <h2>Current bridge limits<a class="headerlink" href="#current-bridge-limits" title="Link to this heading">¶</a></h2>
 <p>Nested Python models are currently inlined as <code class="docutils literal notranslate"><span class="pre">Map</span></code> values. The Rust core has a <code class="docutils literal notranslate"><span class="pre">Submodel</span></code> value,
@@ -358,6 +439,12 @@ encode as <code class="docutils literal notranslate"><span class="pre">Float</sp
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#bridge-plain-javascript-objects">Bridge plain JavaScript objects</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#transfer-binary-fields">Transfer binary fields</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#let-the-frontend-own-status">Let the frontend own status</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#current-bridge-limits">Current bridge limits</a>
