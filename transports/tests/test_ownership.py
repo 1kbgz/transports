@@ -512,38 +512,52 @@ def test_owned_idle_flush_does_not_serialize(monkeypatch):
     assert session.flush() == []
 
 
-def test_anywidget_lost_view_expires_and_redelivers_command():
-    async def run():
-        class Widget:
-            def __init__(self):
-                self.sent = []
+@pytest.mark.parametrize("close", [False, True])
+def test_anywidget_lost_view_expires_and_redelivers_command(monkeypatch, close):
+    from unittest.mock import Mock
 
-            def on_msg(self, callback):
-                self.callback = callback
+    class Widget:
+        def __init__(self):
+            self.sent = []
 
-            def send(self, content, buffers=()):
-                self.sent.append(content)
+        def on_msg(self, callback):
+            self.callback = callback
 
-        session = Session()
-        mid = session.host(Clock())
-        session.command(mid, "playing", True)
-        server = Server(session)
-        widget = Widget()
-        serve_anywidget(server, widget, view_timeout=0.09)
-        widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "lost"})
-        await asyncio.sleep(0.06)
-        widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "live"})
-        await asyncio.sleep(0.06)
-        commands = [m for m in widget.sent if "wire" in m and json.loads(m["wire"])["t"] == "command"]
-        assert [m["view"] for m in commands] == ["lost", "live"]
-        assert {"expired": True, "view": "lost"} in widget.sent
-        widget.callback(widget, {"heartbeat": True, "view": "live"})
-        await asyncio.sleep(0.06)
-        assert {"expired": True, "view": "live"} not in widget.sent
+        def send(self, content, buffers=()):
+            self.sent.append(content)
+
+    loop = Mock()
+    lost_timer, live_timer, renewed_timer = Mock(), Mock(), Mock()
+    loop.call_later.side_effect = [lost_timer, live_timer, renewed_timer]
+    monkeypatch.setattr(asyncio, "get_running_loop", lambda: loop)
+    session = Session()
+    mid = session.host(Clock())
+    session.command(mid, "playing", True)
+    server = Server(session)
+    widget = Widget()
+    serve_anywidget(server, widget, view_timeout=0.09)
+    widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "lost"})
+    widget.callback(widget, {"ready": True, "ownership": True, "heartbeat": True, "view": "live"})
+    delay, expire, view = loop.call_later.call_args_list[0].args
+    assert delay == 0.09 and view == "lost"
+    expire(view)
+    lost_timer.cancel.assert_called_once()
+    live_timer.cancel.assert_not_called()
+    commands = [m for m in widget.sent if "wire" in m and json.loads(m["wire"])["t"] == "command"]
+    assert [m["view"] for m in commands] == ["lost", "live"]
+    assert {"expired": True, "view": "lost"} in widget.sent
+    widget.callback(widget, {"heartbeat": True, "view": "live"})
+    live_timer.cancel.assert_called_once()
+    delay, expire, view = loop.call_later.call_args_list[2].args
+    assert delay == 0.09 and view == "live"
+    assert {"expired": True, "view": "live"} not in widget.sent
+    if close:
         widget.callback(widget, {"closed": True, "view": "live"})
-        assert not server._ownership.peers
-
-    asyncio.run(run())
+    else:
+        expire(view)
+    renewed_timer.cancel.assert_called_once()
+    assert ({"expired": True, "view": "live"} in widget.sent) is not close
+    assert not server._ownership.peers
 
 
 def test_owned_model_retains_server_model_configuration():
