@@ -585,7 +585,7 @@ class Client:
         if isinstance(frame, str):
             ws.send(frame)
         else:
-            from pyodide.ffi import to_js  # ty: ignore[unresolved-import]
+            from pyodide.ffi import to_js  # ty: ignore[import-not-found]
 
             ws.send(to_js(frame))
 
@@ -597,9 +597,9 @@ class Client:
         testable with fake modules injected into ``sys.modules`` off-browser."""
         import asyncio
 
-        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
+        from pyodide.ffi import create_proxy  # ty: ignore[import-not-found]
 
-        from js import WebSocket  # ty: ignore[unresolved-import]  # browser global via the Pyodide FFI
+        from js import WebSocket  # ty: ignore[import-not-found]  # browser global via the Pyodide FFI
 
         ws = WebSocket.new(self._connect_url(url))
         ws.binaryType = "arraybuffer"
@@ -645,7 +645,7 @@ class Client:
         """
         import asyncio
 
-        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
+        from pyodide.ffi import create_proxy  # ty: ignore[import-not-found]
 
         channel.binaryType = "arraybuffer"
         closed: asyncio.Future = asyncio.get_running_loop().create_future()
@@ -754,9 +754,9 @@ class Client:
         """Mirror over the browser's native `EventSource` (the Pyodide path) until it errors/closes."""
         import asyncio
 
-        from pyodide.ffi import create_proxy  # ty: ignore[unresolved-import]
+        from pyodide.ffi import create_proxy  # ty: ignore[import-not-found]
 
-        from js import EventSource  # ty: ignore[unresolved-import]  # browser global via the Pyodide FFI
+        from js import EventSource  # ty: ignore[import-not-found]  # browser global via the Pyodide FFI
 
         source = EventSource.new(url)
         closed: asyncio.Future = asyncio.get_running_loop().create_future()
