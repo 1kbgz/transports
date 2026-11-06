@@ -17,7 +17,9 @@ Nested models are inlined as `Map`s; `Submodel`-by-id references are a later ref
 import base64
 import dataclasses
 import inspect
+import json
 import math
+from collections import defaultdict
 from copy import deepcopy
 from functools import lru_cache
 from types import UnionType
@@ -99,7 +101,18 @@ def _restore_bytes(native: Any, serialized: Any) -> Any:
             key if isinstance(key, str) else next(iter(to_jsonable_python({key: None}, bytes_mode="base64"))): value for key, value in native.items()
         }
         return {key: _restore_bytes(keys.get(key), value) for key, value in serialized.items()}
-    if isinstance(native, (list, tuple, set, frozenset)) and isinstance(serialized, list) and len(native) == len(serialized):
+    if isinstance(native, (set, frozenset)) and isinstance(serialized, list):
+        # Separate dumps can iterate a set differently; match values without relying on order.
+        candidates = defaultdict(list)
+        for raw in native:
+            key = json.dumps(to_jsonable_python(raw, bytes_mode="base64"), sort_keys=True)
+            candidates[key].append(raw)
+        restored = []
+        for value in serialized:
+            matches = candidates.get(json.dumps(value, sort_keys=True))
+            restored.append(_restore_bytes(matches.pop(), value) if matches else value)
+        return restored
+    if isinstance(native, (list, tuple)) and isinstance(serialized, list) and len(native) == len(serialized):
         return [_restore_bytes(raw, value) for raw, value in zip(native, serialized)]
     return serialized
 

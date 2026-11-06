@@ -225,7 +225,7 @@ def test_pydantic_binary_preserves_json_serializers_and_rich_values():
 
     value = to_value(Model())["Map"]
     assert value["url"] == {"Str": "https://example.com/path"}
-    assert value["path"] == {"Str": "/tmp/example"}
+    assert value["path"] == {"Str": str(Path("/tmp/example"))}
     assert value["count"] == {"Str": "count=2"}
     assert value["payload"] == {"Bytes": "/g=="}
     assert value["child"]["Map"]["payload"] == {"Bytes": "/wA="}
@@ -253,6 +253,23 @@ def test_binary_dictionary_keys_and_sets_preserve_bytes():
         values: set[bytes]
 
     model = Model(data={1: b"\xff"}, flags={True: b"\xfe"}, values={b"\xff", b"\xfe"})
+    assert from_value(to_value(model), Model) == model
+
+
+@pytest.mark.parametrize("container", [set, frozenset])
+@pytest.mark.parametrize("nested", [False, True])
+def test_binary_sets_restore_bytes_when_serialization_reorders_elements(container, nested):
+    from pydantic import field_serializer
+
+    class Model(BaseModel):
+        values: container[tuple[bytes, int] if nested else bytes]
+
+        @field_serializer("values", when_used="json")
+        def reversed_values(self, _value):
+            return list(reversed(list(self.model_dump(mode="python")["values"])))
+
+    values = [bytes([i]) for i in range(16)]
+    model = Model(values=container((value, i) if nested else value for i, value in enumerate(values)))
     assert from_value(to_value(model), Model) == model
 
 
