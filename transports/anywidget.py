@@ -20,22 +20,34 @@ transports.sync(server)                         # push host-side changes to ever
 ```
 """
 
+import asyncio
+import math
 from typing import Any
 
 from . import protocol
+from ._buffers import join_buffers, split_buffers
 from .server import Broadcaster
 
 
 class _WidgetConn:
     """An anywidget as a transports connection handle: a wire becomes ``widget.send({"wire": wire})``."""
 
-    __slots__ = ("widget",)
+    __slots__ = ("codec", "view", "widget")
 
-    def __init__(self, widget: Any) -> None:
+    def __init__(self, widget: Any, codec: str, view: str | None = None) -> None:
         self.widget = widget
+        self.codec = codec
+        self.view = view
 
     def send(self, wire: Any) -> None:
-        self.widget.send({"wire": wire})
+        data, buffers = split_buffers(wire, self.codec)
+        content = {"wire": data}
+        if self.view is not None:
+            content["view"] = self.view
+        if buffers:
+            self.widget.send(content, buffers=buffers)
+        else:
+            self.widget.send(content)
 
 
 def widget(server: Broadcaster) -> Any:
@@ -61,29 +73,70 @@ def widget(server: Broadcaster) -> Any:
     return instance
 
 
-def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json") -> _WidgetConn:
+def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json", *, view_timeout: float = 180) -> _WidgetConn:
     """Wire a widget to a `Server`/`Hub`. Returns the connection handle; call `sync(server)` to push.
 
     The widget's custom messages drive the protocol: ``{"ready": true}`` triggers the opening snapshots,
     and any ``{"wire": <wire>}`` is relayed to ``server.recv`` (a client's edits), with results sent back
     over the relevant widgets.
     """
-    if protocol.normalize_codec(codec) != protocol.JSON:
-        raise ValueError(f"the anywidget transport carries JSON-able data only; codec {codec!r} is not supported")
-    conn = _WidgetConn(widget)
-    opened = []
+    if not math.isfinite(view_timeout) or view_timeout <= 0:
+        raise ValueError("view_timeout must be positive and finite")
+    codec = protocol.normalize_codec(codec)
+    if codec not in (protocol.JSON, protocol.MSGPACK, protocol.CBOR):
+        raise ValueError("anywidget buffers require a built-in codec")
+    conn = _WidgetConn(widget, codec)
+    connections: dict[str | None, _WidgetConn] = {}
+    leases: dict[str, asyncio.TimerHandle] = {}
+
+    def close(view: str | None) -> None:
+        if view in leases:
+            leases.pop(view).cancel()
+        target_conn = connections.pop(view)
+        for target, messages in server.close(target_conn).items():
+            for message in messages:
+                target.send(message)
+
+    def expire(view: str) -> None:
+        close(view)
+        widget.send({"expired": True, "view": view})
+
+    def renew(view: str) -> None:
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        if view in leases:
+            leases[view].cancel()
+        leases[view] = loop.call_later(view_timeout, expire, view)
+        widget.send({"heartbeat": view_timeout / 3, "view": view})
 
     def _on_msg(_widget: Any, content: Any, _buffers: Any = None) -> None:
         if not isinstance(content, dict):
             return
-        if content.get("ready") and not opened:
-            opened.append(True)
-            for wire in server.open(conn, codec):
-                conn.send(wire)
-        elif "wire" in content:
-            for target, msgs in server.recv(conn, content["wire"]).items():
-                for msg in msgs:
-                    target.send(msg)
+        view = content.get("view")
+        if view is not None and (not isinstance(view, str) or not view):
+            return
+        target_conn = connections.get(view)
+        if content.get("ready") and target_conn is None:
+            target_conn = conn if view is None else _WidgetConn(widget, codec, view)
+            opening = server.open(target_conn, codec, ownership=bool(content.get("ownership")))
+            connections[view] = target_conn
+            if view is not None and content.get("heartbeat"):
+                renew(view)
+            for wire in opening:
+                target_conn.send(wire)
+        elif content.get("closed") and target_conn is not None:
+            close(view)
+        elif content.get("heartbeat") and view is not None:
+            if view in leases:
+                renew(view)
+            elif target_conn is None:
+                widget.send({"expired": True, "view": view})
+        elif "wire" in content and target_conn is not None:
+            for target, messages in server.recv(target_conn, join_buffers(content["wire"], _buffers, codec)).items():
+                for message in messages:
+                    target.send(message)
 
     widget.on_msg(_on_msg)
     return conn

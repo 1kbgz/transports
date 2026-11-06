@@ -1,6 +1,6 @@
 import * as wasm from "../../dist/pkg/transports";
 
-import { fromValue, toValue, type Value } from "./bridge";
+import { fromValue, toValue, stringify, type Value } from "./bridge";
 
 export * as wasm from "../../dist/pkg/transports";
 
@@ -154,7 +154,7 @@ export class CrdtSpec {
   }
 }
 
-const wireItem = (
+export const wireItem = (
   item: CrdtMutation | CrdtOp | CrdtDelta,
   encode: boolean,
 ): Record<string, unknown> => {
@@ -200,7 +200,7 @@ export class CrdtDocument {
     this.replica = replica;
     this.inner = new wasm.CrdtDocument(
       spec.toJson(),
-      JSON.stringify(toValue(value)),
+      stringify(toValue(value)),
       replica,
     );
   }
@@ -227,11 +227,7 @@ export class CrdtDocument {
     return CrdtDocument.wrap(
       spec,
       replica,
-      wasm.CrdtDocument.from_state(
-        spec.toJson(),
-        JSON.stringify(state),
-        replica,
-      ),
+      wasm.CrdtDocument.from_state(spec.toJson(), stringify(state), replica),
     );
   }
 
@@ -245,9 +241,7 @@ export class CrdtDocument {
 
   mutate(mutations: CrdtMutation[]): CrdtChange {
     const wire = mutations.map((mutation) => wireItem(mutation, true));
-    const change = JSON.parse(
-      this.inner.mutate(JSON.stringify(wire)),
-    ) as CrdtChange;
+    const change = JSON.parse(this.inner.mutate(stringify(wire))) as CrdtChange;
     return {
       ops: change.ops.map((op) => wireItem(op, false) as CrdtOp),
       effect: publicEffect(change.effect),
@@ -257,14 +251,14 @@ export class CrdtDocument {
   apply(ops: CrdtOp[]): CrdtEffect {
     const wire = ops.map((op) => wireItem(op, true));
     return publicEffect(
-      JSON.parse(this.inner.apply(JSON.stringify(wire))) as CrdtEffect,
+      JSON.parse(this.inner.apply(stringify(wire))) as CrdtEffect,
     );
   }
 
   memberKey(path: CrdtPath, value: unknown): string {
     return this.inner.member_key(
       JSON.stringify(path),
-      JSON.stringify(toValue(value)),
+      stringify(toValue(value)),
     );
   }
 
@@ -340,13 +334,15 @@ export const Store = wasm.Store;
 export const ClientState = wasm.ClientState;
 
 // Plain JS object <-> core `Value` bridge (the JS analog of the Python bridge).
-export { toValue, fromValue } from "./bridge";
+export { toValue, fromValue, stringify as valueToJson } from "./bridge";
 export type { Value } from "./bridge";
 
 // WebSocket client that mirrors a remote Session.
 export { Client } from "./client";
 export type {
   AckMsg,
+  CommandMsg,
+  OwnershipMsg,
   ModelPatch,
   PatchMsg,
   PatchOp,
@@ -358,3 +354,5 @@ export type {
 // Custom wire codec registry.
 export { registerCodec, unregisterCodec, codecFor } from "./codecs";
 export type { CodecEncode, CodecDecode } from "./codecs";
+
+export { splitBuffers, joinBuffers, type BufferHeader } from "./buffers";

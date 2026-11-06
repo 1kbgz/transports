@@ -32,7 +32,9 @@ import os
 from typing import Any
 
 from . import protocol
+from ._bridge import _contains_bytes
 from .backplane import Backplane
+from .crdt import _wire_item
 from .hub import Hub
 from .server import Wire
 from .transports import diff as _diff
@@ -109,6 +111,8 @@ class RelayBroadcaster:
                         else:
                             self.hub.apply_shared(m["sid"], m["patch"], m["origin"])
                     elif t == "c":
+                        if m.get("tagged"):
+                            m["ops"] = [_wire_item(op, encode=False) for op in m["ops"]]
                         if self._catching_up:
                             self._buffer.append(("c", m["sid"], m["ops"], m["origin"]))
                         else:
@@ -192,7 +196,11 @@ class RelayBroadcaster:
             self._caught.add(sid)
 
     # --- broadcaster contract: delegate to the hub; recv also publishes shared writes to the cluster ---
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
+    def open(
+        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+    ) -> list[Wire]:
+        if any(session._authorities for session in self.hub._tenants.values()):
+            raise ValueError("client-owned fields require a single Server or Hub; clustered ownership is not supported")
         return self.hub.open(conn, codec, since, batch=batch)
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
@@ -221,7 +229,7 @@ class RelayBroadcaster:
             self._buffer.append(("w", sid, msg["patch"], origin))
         if publish:
             if msg["t"] == "crdt":
-                payload = json.dumps({"t": "c", "sid": sid, "ops": msg["ops"], "origin": origin}).encode()
+                payload = _crdt_payload(sid, msg["ops"], origin)
             else:
                 payload = json.dumps({"t": "w", "sid": sid, "patch": msg["patch"], "origin": origin}).encode()
             asyncio.create_task(self.backplane.publish(payload))  # broadcast the raw write to the others
@@ -250,7 +258,7 @@ class RelayBroadcaster:
         if ops:
             if self._catching_up:
                 self._buffer.append(("c", sid, ops, "<host>"))
-            payload = json.dumps({"t": "c", "sid": sid, "ops": ops, "origin": "<host>"}).encode()
+            payload = _crdt_payload(sid, ops, "<host>")
             await self.backplane.publish(payload)
 
     async def compact_shared_crdt(self, sid: int, frontier: dict[str, int]) -> int:
@@ -274,3 +282,11 @@ class RelayBroadcaster:
 
     def close(self, conn: Any) -> dict[Any, list[Wire]]:
         return self.hub.close(conn)
+
+
+def _crdt_payload(sid: int, ops: list[dict], origin: Any) -> bytes:
+    tagged = _contains_bytes(ops)
+    message = {"t": "c", "sid": sid, "ops": [_wire_item(op, encode=True) for op in ops] if tagged else ops, "origin": origin}
+    if tagged:
+        message["tagged"] = True
+    return json.dumps(message).encode()

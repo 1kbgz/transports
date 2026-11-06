@@ -2,7 +2,7 @@
  *
  * anywidget loads this module (`_esm`); `initialize` opens the wire — a `Client` mirroring the
  * kernel's models over the widget's custom-message channel — and `render` shows a live view of every
- * mirrored model. The anywidget wire is JSON-only; it loads the same Rust client state as the main
+ * mirrored model. The anywidget wire uses JSON headers and separate binary buffers; it loads the same Rust client state as the main
  * browser package. Edits skip `diff` by sending a single-`Set` proposal from plain path segments.
  *
  * Consumers hook in through DOM events bubbled from the widget element — `transports-change`
@@ -11,27 +11,98 @@
  */
 import { fromValue, toValue } from "./bridge";
 import { Client } from "./client";
+import { type BufferHeader } from "./buffers";
+import { BufferFrame } from "../../dist/pkg/transports";
 import type { PathSeg, ReceiveChange, RejectMsg } from "./client";
 import init from "../../dist/pkg/transports";
 import wasm from "../../dist/pkg/transports_bg.wasm";
 
 type AnyModel = {
   on(event: string, callback: (...args: unknown[]) => void): void;
-  send(content: unknown): void;
+  off?(event: string, callback: (...args: unknown[]) => void): void;
+  send(
+    content: unknown,
+    callbacks?: unknown,
+    buffers?: ArrayBufferView[],
+  ): void;
 };
 
 const clients = new WeakMap<AnyModel, Client>();
+const disposers = new WeakMap<AnyModel, () => void>();
 
 function clientFor(model: AnyModel): Client {
   let client = clients.get(model);
   if (!client) {
     const created = new Client();
     clients.set(model, created);
-    model.on("msg:custom", (content: unknown) => {
-      const wire = (content as { wire?: string } | undefined)?.wire;
-      if (wire !== undefined) created.recv(wire);
+    const view = crypto.randomUUID();
+    const sender = (wire: string | Uint8Array) => {
+      const frame =
+        typeof wire === "string"
+          ? BufferFrame.from_json(wire)
+          : BufferFrame.decode(wire, "msgpack");
+      try {
+        const buffers = Array.from({ length: frame.count() }, (_, index) =>
+          frame.buffer(index),
+        );
+        if (buffers.length)
+          model.send(
+            { wire: JSON.parse(frame.header), view },
+            undefined,
+            buffers,
+          );
+        else
+          model.send({
+            wire: typeof wire === "string" ? wire : frame.to_json(),
+            view,
+          });
+      } finally {
+        frame.free();
+      }
+    };
+    let heartbeat: ReturnType<typeof setInterval> | undefined;
+    const ready = () =>
+      model.send({ ready: true, ownership: true, heartbeat: true, view });
+    const receive = (content: unknown, buffers: unknown) => {
+      const message = content as
+        | {
+            wire?: string | BufferHeader;
+            view?: string;
+            heartbeat?: number;
+            expired?: boolean;
+          }
+        | undefined;
+      if (message?.view && message.view !== view) return;
+      if (message?.expired) {
+        clearInterval(heartbeat);
+        created.detach(sender);
+        created.attach(sender);
+        ready();
+        return;
+      }
+      if (typeof message?.heartbeat === "number" && message.heartbeat > 0) {
+        clearInterval(heartbeat);
+        heartbeat = setInterval(
+          () => model.send({ heartbeat: true, view }),
+          message.heartbeat * 1000,
+        );
+      }
+      const wire = message?.wire;
+      if (typeof wire === "string") created.recv(wire);
+      else if (wire)
+        created.recvBuffers(wire, (buffers || []) as ArrayBufferView[]);
+    };
+    model.on("msg:custom", receive);
+    created.attach(sender);
+    disposers.set(model, () => {
+      clearInterval(heartbeat);
+      created.detach(sender);
+      model.send({ closed: true, view });
+      model.off?.("msg:custom", receive);
+      clients.delete(model);
+      disposers.delete(model);
     });
-    model.send({ ready: true }); // the kernel sends the opening snapshots once a frontend listens
+    ready();
     client = created;
   }
   return client;
@@ -47,17 +118,16 @@ function sendEdit(
   const segments: PathSeg[] = path.map((p) =>
     typeof p === "number" ? { Index: p } : { Key: p },
   );
-  const patch = {
-    rev: 0, // a proposal's rev is ignored; the server owns rev
-    ops: [{ Set: { path: segments, value: toValue(value) } }],
-  };
-  model.send({ wire: JSON.stringify({ t: "patch", id, patch }) });
+  clientFor(model).proposeOps(id, [
+    { Set: { path: segments, value: toValue(value) } },
+  ]);
 }
 
 export default {
   async initialize({ model }: { model: AnyModel }) {
     await init({ module_or_path: wasm });
     clientFor(model);
+    return disposers.get(model);
   },
 
   render({ model, el }: { model: AnyModel; el: HTMLElement }) {

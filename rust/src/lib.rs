@@ -14,12 +14,15 @@
 //! - [`bridge`] — the JSON string facade the bindings call.
 
 mod bridge;
+mod buffers;
 mod client;
 mod codec;
 mod crdt;
 mod diff;
 mod frame;
 mod message;
+mod ownership;
+mod replay;
 mod schema;
 mod store;
 mod value;
@@ -31,6 +34,7 @@ pub use bridge::{
     msgpack_to_json, normalize_crdt_spec_json, normalize_message_json, require_crdt_spec_hash_json,
     JsonCrdtDocument, JsonStore,
 };
+pub use buffers::BufferFrame;
 pub use client::{ClientEffect, ClientState};
 pub use codec::{codec_for, CborCodec, Codec, CodecError, JsonCodec, MsgpackCodec};
 pub use crdt::{
@@ -41,6 +45,8 @@ pub use crdt::{
 pub use diff::{apply, diff, diff_with_list_keys, ListKey, Op, Patch, Path, PathSeg};
 pub use frame::{Frame, FrameError, FrameKind};
 pub use message::Message;
-pub use schema::{Field, FieldType, Registry, Schema};
+pub use ownership::{FieldAuthority, OwnedFields, OwnershipMessage};
+pub use replay::ReplayLog;
+pub use schema::{Field, FieldType, Owner, Registry, Schema};
 pub use store::Store;
 pub use value::{ModelId, Value};

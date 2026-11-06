@@ -1,18 +1,50 @@
+import { OwnedFields } from "../../dist/pkg/transports";
 import { codecFor } from "./codecs";
 import {
   ClientState as WasmClientState,
   CrdtDocument,
   CrdtSpec,
-  decodeMessage,
   diff,
   encodeMessage,
+  decodeMessage,
   toValue,
+  wireItem,
   type CrdtEffect,
   type CrdtMutation,
   type CrdtOp,
   type Dot,
 } from "./index";
-import type { Value } from "./bridge";
+import { stringify, containsBytes, type Value } from "./bridge";
+import {
+  decodeBuffers,
+  encodeBuffers,
+  joinBuffers,
+  type BufferHeader,
+} from "./buffers";
+
+export type OwnershipMsg = {
+  t: "ownership";
+  id: number;
+  fields: string[];
+  owned: boolean;
+  epoch: number;
+};
+export type CommandMsg = {
+  t: "command";
+  id: number;
+  epoch: number;
+  command: number;
+  field: string;
+  value: Value;
+};
+type OwnedAckMsg = {
+  t: "owned_ack";
+  id: number;
+  epoch: number;
+  sequence: number;
+  rev: number;
+};
+type ControlMsg = OwnershipMsg | CommandMsg | OwnedAckMsg;
 
 type SnapshotMsg = {
   t: "snapshot";
@@ -40,12 +72,14 @@ export type PatchOp =
   | { Reorder: { path: PathSeg[]; order: number[] } };
 export type ModelPatch = { rev: number; ops: PatchOp[] };
 export type PatchMsg = {
+  local?: boolean;
   t: "patch";
   id: number;
   patch: ModelPatch;
   proposal?: string;
 };
 export type CrdtMsg = {
+  tagged?: boolean;
   t: "crdt";
   id: number;
   rev: number;
@@ -125,7 +159,19 @@ class SharedClientState implements ClientStateAdapter {
   private inner = new WasmClientState();
 
   prepare(message: object): ClientEffect {
-    return JSON.parse(this.inner.prepare(JSON.stringify(message)));
+    const {
+      value: _value,
+      ops: _ops,
+      effect: _effect,
+      state,
+      spec: _spec,
+      crdt_ops: _crdtOps,
+      patch,
+      ...metadata
+    } = message as Record<string, unknown>;
+    if (patch) metadata.patch = { rev: (patch as ModelPatch).rev };
+    if (metadata.t === "awareness") metadata.state = state;
+    return JSON.parse(this.inner.prepare(JSON.stringify(metadata)));
   }
 
   commit(effect: ClientEffect): void {
@@ -133,7 +179,7 @@ class SharedClientState implements ClientStateAdapter {
   }
 
   proposal(id: number, ops: PatchOp[], proposal?: string): string {
-    return this.inner.proposal(BigInt(id), JSON.stringify(ops), proposal);
+    return this.inner.proposal(BigInt(id), stringify(ops), proposal);
   }
 
   disconnect(): Extract<ClientEffect, { effect: "disconnect" }> {
@@ -343,11 +389,25 @@ export class Client {
   private connectListeners: Array<() => void> = [];
   private disconnectListeners: Array<() => void> = [];
   private awarenessListeners: Array<(update: AwarenessMsg) => void> = [];
+  private ownedState = new OwnedFields();
+  private ownedTimer: ReturnType<typeof setTimeout> | undefined;
+  private updateInterval: number;
+  private ownership: boolean;
+  private commands = new Map<string, CommandMsg>();
+  private commandListeners: Array<(command: CommandMsg) => void> = [];
+  private ownershipListeners: Array<(grant: OwnershipMsg) => void> = [];
   private state: ClientStateAdapter;
   // outbound channel of the active managed connection (set by attach(), cleared by detach())
   private sender: ((frame: string | Uint8Array) => void) | null = null;
 
-  constructor(private codec: string = "json") {
+  constructor(
+    private codec: string = "json",
+    options: { updateInterval?: number; ownership?: boolean } = {},
+  ) {
+    this.updateInterval = options.updateInterval ?? 0.25;
+    this.ownership = options.ownership ?? true;
+    if (!Number.isFinite(this.updateInterval) || this.updateInterval < 0)
+      throw new Error("updateInterval must be finite and non-negative");
     this.state = new SharedClientState();
     const random =
       globalThis.crypto?.randomUUID?.() ?? Math.random().toString(16).slice(2);
@@ -377,11 +437,26 @@ export class Client {
    * the mirror updates when the authoritative patch echoes back (or `onReject` fires). Returns
    * `false` (dropped) when not connected. */
   propose(id: number, value: unknown, proposal?: string): boolean {
-    return this.sendProposal(this.edit(id, value, proposal));
+    const patch = JSON.parse(
+      diff(stringify(this.values.get(id)), stringify(value)),
+    );
+    return this.proposeOps(id, patch.ops, proposal);
   }
 
   /** Propose explicit patch operations over the active connection. */
   proposeOps(id: number, ops: PatchOp[], proposal?: string): boolean {
+    if (this.ownedState.classify(BigInt(id), stringify(ops))) {
+      if (proposal !== undefined)
+        throw new Error("client-owned edits do not use proposals");
+      if (!this.connected) return false;
+      this.applyOwnedEdit(id, ops, true);
+      if (this.ownedTimer === undefined)
+        this.ownedTimer = setTimeout(
+          () => this.flushOwned(),
+          this.updateInterval * 1000,
+        );
+      return true;
+    }
     return this.sendProposal(this.editOps(id, ops, proposal));
   }
 
@@ -533,13 +608,25 @@ export class Client {
   }
 
   private encode(message: object): string | Uint8Array {
+    if ((message as CrdtMsg).t === "crdt" && containsBytes(message)) {
+      const crdt = message as CrdtMsg;
+      message = {
+        ...crdt,
+        ops: crdt.ops.map((op) => wireItem(op, true)),
+        tagged: true,
+      };
+    }
     const custom = codecFor(this.codec);
     if (custom) return custom.encode(message);
-    const json = JSON.stringify(message);
-    return this.codec === "json" ? json : encodeMessage(json, this.codec);
+    const json = stringify(message);
+    return this.codec === "json" ? json : encodeBuffers(message, this.codec);
   }
 
   private disconnected(): void {
+    this.ownedState.disconnect();
+    this.commands.clear();
+    if (this.ownedTimer !== undefined) clearTimeout(this.ownedTimer);
+    this.ownedTimer = undefined;
     const { proposals } = this.state.disconnect();
     if (proposals.length)
       for (const listener of [...this.abandonListeners]) listener(proposals);
@@ -595,7 +682,8 @@ export class Client {
       | AckMsg
       | RejectMsg
       | AwarenessMsg
-      | BatchMsg;
+      | BatchMsg
+      | ControlMsg;
     if (custom) {
       msg = custom.decode(data) as
         | SnapshotMsg
@@ -609,8 +697,33 @@ export class Client {
       msg = JSON.parse(data);
     } else {
       // binary frame: disambiguate by the connection's codec (msgpack vs cbor)
-      msg = JSON.parse(decodeMessage(data, this.codec));
+      msg = decodeBuffers(data, this.codec) as typeof msg;
     }
+    return this.receiveMessage(msg);
+  }
+
+  /** Receive a JSON control frame with native comm/anywidget attachments. */
+  recvBuffers(
+    header: BufferHeader,
+    buffers: ArrayBufferView[],
+  ): ReceiveChange | ReceiveChange[] | undefined {
+    return this.receiveMessage(
+      joinBuffers(header, buffers) as Parameters<Client["receiveMessage"]>[0],
+    );
+  }
+
+  private receiveMessage(
+    msg:
+      | SnapshotMsg
+      | CrdtSnapshotMsg
+      | PatchMsg
+      | CrdtMsg
+      | AckMsg
+      | RejectMsg
+      | AwarenessMsg
+      | BatchMsg
+      | ControlMsg,
+  ): ReceiveChange | ReceiveChange[] | undefined {
     if (msg.t === "batch") {
       // a negotiated batch frame (the connection asked with ?batch=1): apply each message in
       // order and return the accepted changes as an array
@@ -630,8 +743,36 @@ export class Client {
       | CrdtMsg
       | AckMsg
       | RejectMsg
-      | AwarenessMsg,
+      | AwarenessMsg
+      | ControlMsg,
   ): ReceiveChange | undefined {
+    if (msg.t === "ownership" || msg.t === "command" || msg.t === "owned_ack") {
+      if (!this.ownedState.receive(stringify(msg))) return undefined;
+      if (msg.t === "ownership") {
+        for (const [key, command] of this.commands)
+          if (
+            command.id === msg.id &&
+            (!msg.owned || command.epoch !== msg.epoch)
+          )
+            this.commands.delete(key);
+        for (const listener of [...this.ownershipListeners]) listener(msg);
+      } else if (msg.t === "command") {
+        const key = `${msg.id}:${msg.command}`;
+        if (!this.commands.has(key)) {
+          this.commands.set(key, msg);
+          for (const listener of [...this.commandListeners]) listener(msg);
+        }
+      } else {
+        this.state.commit(
+          this.state.prepare({
+            t: "patch",
+            id: msg.id,
+            patch: { rev: msg.rev, ops: [] },
+          }),
+        );
+      }
+      return undefined;
+    }
     const effect = this.state.prepare(msg);
     if (effect.effect === "snapshot") {
       const snapshot = msg as SnapshotMsg;
@@ -639,7 +780,20 @@ export class Client {
       this.crdtOutbox = this.crdtOutbox.filter(
         (pending) => pending.id !== snapshot.id,
       );
-      this.values.set(snapshot.id, snapshot.value);
+      let value = snapshot.value as Value;
+      const current = this.values.get(snapshot.id) as Value | undefined;
+      if (
+        current &&
+        typeof current === "object" &&
+        "Map" in current &&
+        typeof value === "object" &&
+        "Map" in value
+      ) {
+        value = { Map: { ...value.Map } };
+        for (const [key, item] of Object.entries(current.Map))
+          if (this.owns(snapshot.id, key)) value.Map[key] = item;
+      }
+      this.values.set(snapshot.id, value);
       this.state.commit(effect);
       return this.accepted({
         t: "snapshot",
@@ -676,6 +830,14 @@ export class Client {
       return accepted;
     } else if (effect.effect === "crdt") {
       const change = msg as CrdtMsg;
+      if (change.tagged) {
+        change.ops = change.ops.map((op) => wireItem(op, false) as CrdtOp);
+        if (change.effect)
+          change.effect.deltas = change.effect.deltas.map(
+            (delta) => wireItem(delta, false) as typeof delta,
+          );
+        delete change.tagged;
+      }
       const document = this.crdt.get(change.id);
       if (!document)
         throw new Error(
@@ -770,14 +932,92 @@ export class Client {
     return this.state.abandon(proposal);
   }
 
+  /** Whether this connection currently owns a field. */
+  owns(id: number, field: string): boolean {
+    return this.ownedState.owns(BigInt(id), field);
+  }
+
+  onOwnership(listener: (grant: OwnershipMsg) => void): () => void {
+    this.ownershipListeners.push(listener);
+    return () => {
+      this.ownershipListeners = this.ownershipListeners.filter(
+        (cb) => cb !== listener,
+      );
+    };
+  }
+
+  /** Commands remain available until acknowledged, including before listener registration. */
+  onCommand(listener: (command: CommandMsg) => void): () => void {
+    this.commandListeners.push(listener);
+    for (const command of [...this.commands.values()]) listener(command);
+    return () => {
+      this.commandListeners = this.commandListeners.filter(
+        (cb) => cb !== listener,
+      );
+    };
+  }
+
+  /** Build an acknowledgement after applying a command (manual transport API). */
+  commandAck(command: CommandMsg): string | Uint8Array {
+    const key = `${command.id}:${command.command}`;
+    const pending = this.commands.get(key);
+    if (
+      !pending ||
+      pending.epoch !== command.epoch ||
+      pending.field !== command.field ||
+      !this.ownedState.receive(stringify(command))
+    )
+      throw new Error("command is not pending for this owner");
+    const frame = this.encode({
+      t: "command_ack",
+      id: command.id,
+      epoch: command.epoch,
+      command: command.command,
+    });
+    this.commands.delete(key);
+    return frame;
+  }
+
+  /** Acknowledge a completed command over the managed connection. */
+  ackCommand(command: CommandMsg): boolean {
+    if (!this.connected) return false;
+    this.flushOwned();
+    return this.send(this.commandAck(command));
+  }
+
+  /** Flush coalesced status now; normally driven by updateInterval (seconds). */
+  flushOwned(): boolean {
+    if (this.ownedTimer !== undefined) clearTimeout(this.ownedTimer);
+    this.ownedTimer = undefined;
+    if (!this.connected) return false;
+    for (const message of JSON.parse(this.ownedState.drain()))
+      this.send(this.encode(message));
+    return true;
+  }
+
+  private applyOwnedEdit(id: number, ops: PatchOp[], queued = false): string {
+    const value = applyPatch(this.values.get(id) as Value, { rev: 0, ops });
+    const message = queued
+      ? this.ownedState.queue(BigInt(id), stringify(ops))
+      : this.ownedState.edit(BigInt(id), stringify(ops));
+    this.values.set(id, value);
+    this.accepted({
+      t: "patch",
+      id,
+      patch: { rev: this.state.revisions()[id], ops },
+      local: true,
+    });
+    return message;
+  }
+
   /** Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
    *
-   * Server-authoritative: the local mirror updates when the server echoes the authoritative patch
-   * back via `recv`, not optimistically.
+   * Server-owned fields update on the authoritative echo. Client-owned fields update locally
+   * immediately and receive an acknowledgement without replacement state.
    */
   edit(id: number, value: unknown, proposal?: string): string | Uint8Array {
     const patch = JSON.parse(
-      diff(JSON.stringify(this.values.get(id)), JSON.stringify(value)),
+      diff(stringify(this.values.get(id)), stringify(value)),
     );
     return this.editOps(id, patch.ops, proposal);
   }
@@ -785,6 +1025,11 @@ export class Client {
   /** Propose explicit patch operations. This can express a value equal to the current mirror while
    * an older optimistic proposal is pending. A client-local proposal id is assigned by default. */
   editOps(id: number, ops: PatchOp[], proposal?: string): string | Uint8Array {
+    if (this.ownedState.classify(BigInt(id), stringify(ops))) {
+      if (proposal !== undefined)
+        throw new Error("client-owned edits do not use proposals");
+      return this.encode(JSON.parse(this.applyOwnedEdit(id, ops)));
+    }
     const message = this.state.proposal(id, ops, proposal);
     const decoded = JSON.parse(message) as PatchMsg;
     try {
@@ -809,6 +1054,16 @@ export class Client {
     return this.encode({ t: "crdt", id, rev: 0, ops: change.ops });
   }
 
+  private reconcile(id: number, value: unknown): string | Uint8Array {
+    const ops = JSON.parse(
+      diff(stringify(this.values.get(id)), stringify(value)),
+    ).ops;
+    return this.editOps(
+      id,
+      JSON.parse(this.ownedState.server_ops(BigInt(id), stringify(ops))),
+    );
+  }
+
   /** Connect to a transports server and mirror it. Returns the `WebSocket`.
    *
    * On a reconnect (this client already mirrors models) it appends `?since=` with its last-seen rev per
@@ -816,7 +1071,7 @@ export class Client {
    */
   connect(url: string): WebSocket {
     const sep = url.includes("?") ? "&" : "?";
-    let params = `codec=${this.codec}`;
+    let params = `codec=${this.codec}&ownership=${this.ownership ? 1 : 0}`;
     const revisions = this.state.revisions();
     if (Object.keys(revisions).length) {
       const since = encodeURIComponent(JSON.stringify(revisions));
@@ -903,7 +1158,9 @@ export class Client {
               // cast, not copy: wasm-bindgen types its output Uint8Array<ArrayBufferLike>, but it
               // is always ArrayBuffer-backed, which is what WebSocket.send requires
               ws.send(
-                this.edit(id, pre.get(id)) as string | Uint8Array<ArrayBuffer>,
+                this.reconcile(id, pre.get(id)) as
+                  | string
+                  | Uint8Array<ArrayBuffer>,
               );
               pushed.add(id);
             }

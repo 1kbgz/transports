@@ -18,6 +18,7 @@ pub enum FieldType {
     Int,
     Float,
     Str,
+    Bytes,
     List,
     Map,
     Submodel(String),
@@ -25,11 +26,27 @@ pub enum FieldType {
     Any,
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Owner {
+    #[default]
+    Server,
+    Client,
+}
+
+impl Owner {
+    fn is_server(&self) -> bool {
+        matches!(self, Self::Server)
+    }
+}
+
 /// One field of a model.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Field {
     pub name: String,
     pub ty: FieldType,
+    #[serde(default, skip_serializing_if = "Owner::is_server")]
+    pub owner: Owner,
 }
 
 impl Field {
@@ -37,6 +54,7 @@ impl Field {
         Field {
             name: name.into(),
             ty,
+            owner: Owner::Server,
         }
     }
 }
@@ -69,6 +87,7 @@ impl Schema {
                     | (FieldType::Int, Value::Int(_))
                     | (FieldType::Float, Value::Float(_))
                     | (FieldType::Str, Value::Str(_))
+                    | (FieldType::Bytes, Value::Bytes(_))
                     | (FieldType::List, Value::List(_))
                     | (FieldType::Map, Value::Map(_))
                     | (FieldType::Submodel(_), Value::Submodel(_))

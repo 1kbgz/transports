@@ -29,10 +29,48 @@ pub enum Value {
     Int(i64),
     Float(f64),
     Str(String),
+    Bytes(#[serde(with = "bytes")] Vec<u8>),
     List(Vec<Value>),
     Map(BTreeMap<String, Value>),
     /// A reference to a nested model held elsewhere in the registry.
     Submodel(ModelId),
+}
+
+mod bytes {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    use serde::{de, Deserializer, Serializer};
+
+    pub fn serialize<S: Serializer>(value: &[u8], serializer: S) -> Result<S::Ok, S::Error> {
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&STANDARD.encode(value))
+        } else {
+            serializer.serialize_bytes(value)
+        }
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<Vec<u8>, D::Error> {
+        struct BytesVisitor;
+        impl<'de> de::Visitor<'de> for BytesVisitor {
+            type Value = Vec<u8>;
+
+            fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+                formatter.write_str("a byte string or padded standard base64")
+            }
+
+            fn visit_str<E: de::Error>(self, value: &str) -> Result<Self::Value, E> {
+                STANDARD.decode(value).map_err(E::custom)
+            }
+
+            fn visit_bytes<E: de::Error>(self, value: &[u8]) -> Result<Self::Value, E> {
+                Ok(value.to_vec())
+            }
+
+            fn visit_byte_buf<E: de::Error>(self, value: Vec<u8>) -> Result<Self::Value, E> {
+                Ok(value)
+            }
+        }
+        deserializer.deserialize_any(BytesVisitor)
+    }
 }
 
 impl Value {

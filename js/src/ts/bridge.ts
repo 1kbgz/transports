@@ -5,6 +5,7 @@ export type Value =
   | { Int: number }
   | { Float: number }
   | { Str: string }
+  | { Bytes: string | Uint8Array }
   | { List: Value[] }
   | { Map: { [k: string]: Value } }
   | { Submodel: number };
@@ -20,6 +21,9 @@ export function toValue(v: unknown): Value {
   if (typeof v === "number")
     return Number.isInteger(v) ? { Int: v } : { Float: v };
   if (typeof v === "string") return { Str: v };
+  if (ArrayBuffer.isView(v))
+    return { Bytes: new Uint8Array(v.buffer, v.byteOffset, v.byteLength) };
+  if (v instanceof ArrayBuffer) return { Bytes: new Uint8Array(v) };
   if (Array.isArray(v)) return { List: v.map(toValue) };
   if (typeof v === "object") {
     const m: { [k: string]: Value } = {};
@@ -40,6 +44,10 @@ export function fromValue(value: Value): unknown {
     case "Str":
     case "Submodel":
       return inner;
+    case "Bytes":
+      return typeof inner === "string"
+        ? Uint8Array.from(atob(inner), (c) => c.charCodeAt(0))
+        : inner;
     case "List":
       return (inner as Value[]).map(fromValue);
     case "Map": {
@@ -51,4 +59,27 @@ export function fromValue(value: Value): unknown {
     default:
       throw new Error(`unrecognized tagged value: ${JSON.stringify(value)}`);
   }
+}
+
+/** Canonical JSON encoding for tagged values containing native buffers. */
+export function stringify(value: unknown): string {
+  return JSON.stringify(value, (_key, inner) => {
+    if (!ArrayBuffer.isView(inner)) return inner;
+    const bytes = new Uint8Array(
+      inner.buffer,
+      inner.byteOffset,
+      inner.byteLength,
+    );
+    let binary = "";
+    for (let start = 0; start < bytes.length; start += 0x8000)
+      binary += String.fromCharCode(...bytes.subarray(start, start + 0x8000));
+    return btoa(binary);
+  });
+}
+
+export function containsBytes(value: unknown): boolean {
+  if (ArrayBuffer.isView(value) || value instanceof ArrayBuffer) return true;
+  if (value && typeof value === "object")
+    return Object.values(value).some(containsBytes);
+  return false;
 }

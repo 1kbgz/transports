@@ -27,11 +27,12 @@ from time import monotonic
 from typing import Any
 
 from . import protocol
-from ._bridge import _py_of, _value_of, to_value
+from ._bridge import _py_of, _value_of, schema_of, to_value
+from ._ownership import OwnershipServer
 from .crdt import CrdtDocument, CrdtSpec
 from .server import Wire
 from .session import Session
-from .transports import apply as _apply, diff as _diff
+from .transports import ReplayLog, apply as _apply, diff as _diff
 
 READ = "read"
 WRITE = "write"
@@ -170,6 +171,8 @@ class _Shared:
         replay: bool = False,
         rev: int = 0,
         log_cap: int = 512,
+        log_bytes: int = 64 * 1024 * 1024,
+        blob_threshold: int = 64 * 1024,
         crdt: CrdtDocument | None = None,
         list_keys: str | None = None,
     ) -> None:
@@ -181,7 +184,7 @@ class _Shared:
         self.list_keys = list_keys
         self.subs: dict[Any, str] = {}  # tenant key -> mode
         self.replay = replay
-        self.log: list[tuple] = []  # bounded [(rev, patch)] for delta catch-up when replay=True
+        self.log = ReplayLog(log_cap, log_bytes, blob_threshold)
         self.log_cap = log_cap
 
 
@@ -215,6 +218,7 @@ class Hub:
         self._key = key
         self.default_codec = protocol.normalize_codec(default_codec)
         self._tenants: dict[Any, Session] = {}
+        self._ownership: dict[Any, OwnershipServer] = {}
         self._shared: dict[int, _Shared] = {}
         self._replica = f"hub-{uuid.uuid4().hex}"
         self._crdt_replica_owners: dict[tuple[int, str], Any] = {}
@@ -226,6 +230,7 @@ class Hub:
         self._awareness: dict[int, dict[Any, Any]] = {}
         self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
         self._crdt_outbox: list[tuple[int, list[dict]]] = []
+        self._control_outbox: dict[Any, list[Wire]] = {}
         self._snapshot_outbox: set[int] = set()
         self._on_shared_write: Callable | None = None
         self._last_crdt_write: tuple[Any, int, str] | None = None
@@ -236,6 +241,7 @@ class Hub:
         sess = self._tenants.get(key)
         if sess is None:
             sess = self._tenants[key] = Session()
+            self._ownership[key] = OwnershipServer(sess)
             self._mark_idle(key)
         return sess
 
@@ -252,6 +258,7 @@ class Hub:
         if key not in self._tenants:
             return False
         del self._tenants[key]
+        self._ownership.pop(key, None)
         self._idle_since.pop(key, None)
         for shared in self._shared.values():
             shared.subs.pop(key, None)
@@ -286,6 +293,9 @@ class Hub:
         merge: Any = LastWriteWins,
         replay: bool = False,
         rev: int = 0,
+        log_cap: int = 512,
+        log_bytes: int = 64 * 1024 * 1024,
+        blob_threshold: int = 64 * 1024,
         merge_state: dict | None = None,
         crdt_spec: CrdtSpec | dict | None = None,
         crdt_state: dict | None = None,
@@ -306,6 +316,8 @@ class Hub:
         it cannot be combined with ``crdt_spec`` and must be configured again on host restore.
         """
         if type_name is None:
+            if any(field.get("owner") == "client" for field in schema_of(type(model_or_value))["fields"]):
+                raise ValueError("client-owned fields require a Server or Hub tenant model; Hub.share does not support ownership")
             type_name = type(model_or_value).__name__
             value = to_value(model_or_value)
         else:
@@ -333,7 +345,18 @@ class Hub:
             value = _value_of(crdt.value)
         elif merge_state is not None:
             strategy.restore(merge_state)
-        self._shared[sid] = _Shared(type_name, value, strategy, replay=replay, rev=rev, crdt=crdt, list_keys=policy)
+        self._shared[sid] = _Shared(
+            type_name,
+            value,
+            strategy,
+            replay=replay,
+            rev=rev,
+            crdt=crdt,
+            list_keys=policy,
+            log_cap=log_cap,
+            log_bytes=log_bytes,
+            blob_threshold=blob_threshold,
+        )
         return sid
 
     def subscribe(self, tenant_key: Any, sid: int, mode: str = READ) -> None:
@@ -368,7 +391,9 @@ class Hub:
                 out[conn] = encoded
         return out
 
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
+    def open(
+        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+    ) -> list[Wire]:
         # `batch` is accepted for endpoint parity but not yet applied: Hub.flush interleaves
         # per-tenant and shared fan-outs, so its batching lands with that restructure.
         """Register a connection; return the messages to bring it up to date — its tenant's private models
@@ -381,12 +406,8 @@ class Hub:
         if conn in self._conn_key:
             previous = self._conn_key[conn]
             if previous != key:
-                previous_conns = self._conns_by_key.get(previous)
-                if previous_conns is not None:
-                    previous_conns.discard(conn)
-                    if not previous_conns:
-                        self._conns_by_key.pop(previous)
-                        self._mark_idle(previous)
+                for target, messages in self.close(conn).items():
+                    self._control_outbox.setdefault(target, []).extend(messages)
         self._conn_key[conn] = key
         self._conns_by_key.setdefault(key, set()).add(conn)
         self._idle_since.pop(key, None)
@@ -396,13 +417,14 @@ class Hub:
             out: list[Wire] = []
             for mid in sess.ids():
                 client_rev = since.get(mid) if since else None
-                delta = sess.since(mid, client_rev) if client_rev is not None and self._private_resume else None
+                delta = sess.since(mid, client_rev) if client_rev is not None and self._private_resume and mid not in sess._authorities else None
                 if delta is not None:
                     for patch in delta:
                         out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
                 else:
                     snap = sess.snapshot(mid)
                     out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
+            out.extend(self._encode_for(conn, message) for message in self._ownership[key].open(conn, ownership))
             for sid, sh in self._shared.items():
                 if key in sh.subs:
                     if sh.crdt is None:
@@ -443,6 +465,18 @@ class Hub:
             msg = protocol.decode(data, codec)
         except (TypeError, ValueError):
             return {}
+        if msg.get("t") in ("owned", "command_ack"):
+            key = self._conn_key.get(conn)
+            controller = self._ownership.get(key)
+            if controller is None:
+                return {}
+            out = {target: [wire for _, wire in tagged] for target, tagged in self._flush_tenant_tagged(key).items()}
+            direct = controller.recv(conn, msg)
+            for target, messages in direct.items():
+                out.setdefault(target, []).extend(self._encode_for(target, message) for message in messages)
+            for target, tagged in self._flush_tenant_tagged(key).items():
+                out.setdefault(target, []).extend(wire for _, wire in tagged)
+            return out
         if msg.get("t") == "awareness":
             sid = msg["id"]
             key = self._conn_key.get(conn)
@@ -586,7 +620,10 @@ class Hub:
         `Server._flush_tagged`). Shared ids live above ``SHARED_ID_BASE``, so a connection's tenant
         and shared tags never collide."""
         self.prune_tenants()
-        out: dict[Any, list[tuple[int | None, Wire]]] = {}
+        out: dict[Any, list[tuple[int | None, Wire]]] = {
+            conn: [(None, wire) for wire in messages] for conn, messages in self._control_outbox.items() if conn in self._conn_key
+        }
+        self._control_outbox.clear()
         for key in list(self._tenants):
             for conn, tagged in self._flush_tenant_tagged(key).items():
                 out.setdefault(conn, []).extend(tagged)
@@ -596,6 +633,9 @@ class Hub:
             out.setdefault(conn, []).extend(tagged)
         for conn, tagged in self._flush_crdt_tagged().items():
             out.setdefault(conn, []).extend(tagged)
+        for controller in self._ownership.values():
+            for conn, messages in controller.flush().items():
+                out.setdefault(conn, []).extend((None, self._encode_for(conn, message)) for message in messages)
         return out
 
     def _flush_snapshots_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
@@ -764,9 +804,8 @@ class Hub:
             return None
         if since_rev >= sh.rev:
             return []
-        if not sh.log or sh.log[0][0] > since_rev + 1:
-            return None  # the needed delta has scrolled out of the bounded log
-        return [p for r, p in sh.log if r > since_rev]
+        replay = sh.log.since(since_rev, sh.rev)
+        return json.loads(replay) if replay is not None else None
 
     def apply_snapshot_shared(
         self,
@@ -830,6 +869,10 @@ class Hub:
                     self._mark_idle(key)
         self._codecs.pop(conn, None)
         out: dict[Any, list[Wire]] = {}
+        controller = self._ownership.get(key)
+        if controller is not None:
+            for target, messages in controller.close(conn).items():
+                out.setdefault(target, []).extend(self._encode_for(target, message) for message in messages)
         if peer is not None:
             for sid in removed:
                 shared = self._shared.get(sid)
@@ -851,9 +894,7 @@ class Hub:
         sh.rev += 1
         fan["rev"] = sh.rev
         if sh.replay:
-            sh.log.append((sh.rev, fan))
-            if len(sh.log) > sh.log_cap:
-                del sh.log[: len(sh.log) - sh.log_cap]
+            sh.log.append(json.dumps(fan))
         if self._on_shared_write is not None:
             # durability seam: the user persists this so the model survives a full-cluster restart.
             self._on_shared_write(sid, sh.type_name, sh.value, sh.rev, fan, sh.merge.state())

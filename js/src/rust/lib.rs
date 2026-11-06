@@ -253,6 +253,14 @@ impl Store {
         self.inner.snapshot(id)
     }
 
+    pub fn revision(&self, id: u64) -> Option<u64> {
+        self.inner.revision(id)
+    }
+
+    pub fn field(&self, id: u64, name: &str) -> Option<String> {
+        self.inner.field(id, name)
+    }
+
     /// Replace a hosted model from JSON; returns the JSON patch (or `undefined` if id unknown).
     pub fn mutate(&mut self, id: u64, value_json: &str) -> Result<Option<String>, JsError> {
         self.inner
@@ -271,5 +279,209 @@ impl Store {
 impl Default for Store {
     fn default() -> Store {
         Store::new()
+    }
+}
+
+/// A JSON control frame with native binary attachments.
+#[wasm_bindgen]
+pub struct BufferFrame {
+    inner: transports::BufferFrame,
+}
+
+#[wasm_bindgen]
+impl BufferFrame {
+    #[wasm_bindgen(constructor)]
+    pub fn new(header: String) -> Self {
+        Self {
+            inner: transports::BufferFrame {
+                header,
+                buffers: Vec::new(),
+            },
+        }
+    }
+
+    pub fn from_json(json: &str) -> Result<Self, JsError> {
+        let message = transports::Message::from_json(json).map_err(|e| JsError::new(&e))?;
+        Ok(Self {
+            inner: transports::BufferFrame::from_message(&message).map_err(|e| JsError::new(&e))?,
+        })
+    }
+
+    pub fn decode(data: &[u8], codec: &str) -> Result<Self, JsError> {
+        let message = transports::Message::decode(data, codec).map_err(|e| JsError::new(&e))?;
+        Ok(Self {
+            inner: transports::BufferFrame::from_message(&message).map_err(|e| JsError::new(&e))?,
+        })
+    }
+
+    #[wasm_bindgen(getter)]
+    pub fn header(&self) -> String {
+        self.inner.header.clone()
+    }
+
+    pub fn count(&self) -> usize {
+        self.inner.buffers.len()
+    }
+
+    pub fn buffer(&self, index: usize) -> Result<Vec<u8>, JsError> {
+        self.inner
+            .buffers
+            .get(index)
+            .cloned()
+            .ok_or_else(|| JsError::new("buffer index out of bounds"))
+    }
+
+    pub fn push(&mut self, buffer: Vec<u8>) {
+        self.inner.buffers.push(buffer);
+    }
+
+    pub fn encode(&self, codec: &str) -> Result<Vec<u8>, JsError> {
+        self.inner
+            .message()
+            .and_then(|m| m.encode(codec))
+            .map_err(|e| JsError::new(&e))
+    }
+
+    pub fn to_json(&self) -> Result<String, JsError> {
+        self.inner
+            .message()
+            .and_then(|m| m.to_json())
+            .map_err(|e| JsError::new(&e))
+    }
+}
+
+/// Bounded per-model replay with shared binary attachments.
+#[wasm_bindgen]
+pub struct ReplayLog {
+    inner: transports::ReplayLog,
+}
+
+#[wasm_bindgen]
+impl ReplayLog {
+    #[wasm_bindgen(constructor)]
+    pub fn new(cap: usize, max_bytes: usize, blob_threshold: usize) -> Self {
+        Self {
+            inner: transports::ReplayLog::new(cap, max_bytes, blob_threshold),
+        }
+    }
+    pub fn append(&mut self, patch: &str) -> Result<(), JsError> {
+        self.inner.append_json(patch).map_err(|e| JsError::new(&e))
+    }
+    pub fn since(&self, rev: u64, current: u64) -> Result<Option<String>, JsError> {
+        self.inner
+            .since_json(rev, current)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn bytes(&self) -> usize {
+        self.inner.bytes()
+    }
+    pub fn count(&self) -> usize {
+        self.inner.len()
+    }
+    pub fn blobs(&self) -> usize {
+        self.inner.blobs()
+    }
+}
+
+/// Single-server authority for one model's client-owned fields.
+#[wasm_bindgen]
+pub struct FieldAuthority {
+    inner: transports::FieldAuthority,
+}
+#[wasm_bindgen]
+impl FieldAuthority {
+    #[wasm_bindgen(constructor)]
+    pub fn new(id: u64, fields: &str, command_cap: usize) -> Result<Self, JsError> {
+        Ok(Self {
+            inner: transports::FieldAuthority::from_json(id, fields, command_cap)
+                .map_err(|e| JsError::new(&e))?,
+        })
+    }
+    pub fn open(&mut self, connection: &str) -> Result<String, JsError> {
+        self.inner
+            .open_json(connection)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn grant(&self, connection: &str) -> Result<String, JsError> {
+        self.inner
+            .grant_json(connection)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn command(&mut self, field: &str, value: &str) -> Result<u64, JsError> {
+        self.inner
+            .command_json(field, value)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn next_command(&mut self) -> Result<Option<String>, JsError> {
+        self.inner.next_json().map_err(|e| JsError::new(&e))
+    }
+    pub fn validate(&self, connection: &str, message: &str) -> Result<bool, JsError> {
+        self.inner
+            .validate_json(connection, message)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn acknowledge(
+        &mut self,
+        connection: &str,
+        epoch: u64,
+        command: u64,
+    ) -> Result<(), JsError> {
+        self.inner
+            .acknowledge(connection, epoch, command)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn close(&mut self, connection: &str) -> bool {
+        self.inner.close(connection)
+    }
+    pub fn owner(&self) -> Option<String> {
+        self.inner.owner().map(str::to_owned)
+    }
+    pub fn commit(&mut self, sequence: u64) {
+        self.inner.commit(sequence);
+    }
+}
+/// Client-side ownership classification and sequence generation.
+#[wasm_bindgen]
+#[derive(Default)]
+pub struct OwnedFields {
+    inner: transports::OwnedFields,
+}
+#[wasm_bindgen]
+impl OwnedFields {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Self {
+            inner: transports::OwnedFields::default(),
+        }
+    }
+    pub fn receive(&mut self, message: &str) -> Result<bool, JsError> {
+        self.inner
+            .receive_json(message)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn classify(&self, id: u64, ops: &str) -> Result<bool, JsError> {
+        self.inner
+            .classify_json(id, ops)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn edit(&mut self, id: u64, ops: &str) -> Result<String, JsError> {
+        self.inner.edit_json(id, ops).map_err(|e| JsError::new(&e))
+    }
+    pub fn queue(&mut self, id: u64, ops: &str) -> Result<String, JsError> {
+        self.inner.queue_json(id, ops).map_err(|e| JsError::new(&e))
+    }
+    pub fn drain(&mut self) -> Result<String, JsError> {
+        self.inner.drain_json().map_err(|e| JsError::new(&e))
+    }
+    pub fn server_ops(&self, id: u64, ops: &str) -> Result<String, JsError> {
+        self.inner
+            .server_ops_json(id, ops)
+            .map_err(|e| JsError::new(&e))
+    }
+    pub fn owns(&self, id: u64, field: &str) -> bool {
+        self.inner.owns(id, field)
+    }
+    pub fn disconnect(&mut self) {
+        self.inner.disconnect();
     }
 }

@@ -22,6 +22,10 @@ fn transports(_py: Python, m: &Bound<PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(api::encode_message, m)?)?;
     m.add_function(wrap_pyfunction!(api::decode_message, m)?)?;
     m.add_class::<api::ClientState>()?;
+    m.add_class::<api::BufferFrame>()?;
+    m.add_class::<api::ReplayLog>()?;
+    m.add_class::<api::FieldAuthority>()?;
+    m.add_class::<api::OwnedFields>()?;
     m.add_class::<api::CrdtDocument>()?;
     m.add_class::<api::Store>()?;
     Ok(())

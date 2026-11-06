@@ -18,6 +18,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from . import protocol
+from ._ownership import OwnershipServer
 from .session import Session
 
 Wire = str | bytes
@@ -43,7 +44,7 @@ class Broadcaster(Protocol):
     @property
     def _codecs(self) -> dict[Any, str]: ...
 
-    def open(self, conn: Any, codec: str = ..., since: dict[int, int] | None = ..., batch: bool = ...) -> list[Wire]: ...
+    def open(self, conn: Any, codec: str = ..., since: dict[int, int] | None = ..., batch: bool = ..., *, ownership: bool = ...) -> list[Wire]: ...
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]: ...
 
@@ -63,6 +64,7 @@ class Server:
 
     def __init__(self, session: Session, *, default_codec: str = protocol.JSON) -> None:
         self._session = session
+        self._ownership = OwnershipServer(session)
         self._codecs: dict[Any, str] = {}
         self._batched: set[Any] = set()
         self.default_codec = protocol.normalize_codec(default_codec)
@@ -88,7 +90,9 @@ class Server:
                 out[conn] = encoded
         return out
 
-    def open(self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False) -> list[Wire]:
+    def open(
+        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+    ) -> list[Wire]:
         """Register a connection; return the messages that bring it up to date.
 
         Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only
@@ -102,13 +106,14 @@ class Server:
             out: list[Wire] = []
             for mid in self._session.ids():
                 client_rev = since.get(mid) if since else None
-                delta = self._session.since(mid, client_rev) if client_rev is not None else None
+                delta = self._session.since(mid, client_rev) if client_rev is not None and mid not in self._session._authorities else None
                 if delta is not None:
                     for patch in delta:
                         out.append(self._encode_for(conn, protocol.patch_msg(mid, patch)))
                 else:
                     snap = self._session.snapshot(mid)
                     out.append(self._encode_for(conn, protocol.snapshot_msg(mid, snap["type_name"], snap["rev"], snap["value"])))
+            out.extend(self._encode_for(conn, message) for message in self._ownership.open(conn, ownership))
             return out
         except Exception:
             self.close(conn)
@@ -126,6 +131,14 @@ class Server:
         if codec is None:
             return {}
         msg = protocol.decode(data, codec)
+        if msg.get("t") in ("owned", "command_ack"):
+            out = {target: list(wires) for target, wires in self.flush().items()}
+            direct = self._ownership.recv(conn, msg)
+            for target, messages in direct.items():
+                out.setdefault(target, []).extend(self._encode_for(target, message) for message in messages)
+            for target, wires in self.flush().items():
+                out.setdefault(target, []).extend(wires)
+            return out
         if msg.get("t") == "patch":
             proposal = msg.get("proposal")
             authoritative = self._session.submit(msg["id"], msg["patch"])
@@ -167,6 +180,12 @@ class Server:
         return {conn: stripped.setdefault(id(tagged), [wire for _, wire in tagged]) for conn, tagged in self._flush_tagged().items()}
 
     def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
+        out = self._flush_patches_tagged()
+        for conn, messages in self._ownership.flush().items():
+            out[conn] = [*out.get(conn, []), *((None, self._encode_for(conn, message)) for message in messages)]
+        return out
+
+    def _flush_patches_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
         """`flush`, with each message tagged by its model id (``None`` for a batch envelope) so
         `autosync` can compose a connection's undelivered state per model."""
         tagged = [(mid, protocol.patch_msg(mid, patch)) for mid, patch in self._session.drain()]
@@ -197,7 +216,7 @@ class Server:
     def close(self, conn: Any) -> dict[Any, list[Wire]]:
         self._codecs.pop(conn, None)
         self._batched.discard(conn)
-        return {}
+        return {target: [self._encode_for(target, message) for message in messages] for target, messages in self._ownership.close(conn).items()}
 
 
 async def _send(conn: Any, msg: Wire) -> None:
@@ -223,9 +242,9 @@ def ws_endpoint(server: Broadcaster):
         since = {int(k): int(v) for k, v in json.loads(since_param).items()} if since_param else None
         batch = websocket.query_params.get("batch") in ("1", "true")
         await websocket.accept()
-        for msg in server.open(websocket, codec, since, batch=batch):
-            await _send(websocket, msg)
         try:
+            for msg in server.open(websocket, codec, since, batch=batch, ownership=websocket.query_params.get("ownership") == "1"):
+                await _send(websocket, msg)
             while True:
                 frame = await websocket.receive()
                 if frame.get("type") == "websocket.disconnect":
@@ -312,7 +331,7 @@ async def autosync(
         return len(wire.encode()) if isinstance(wire, str) else len(wire)
 
     def drop(conn: Any) -> None:
-        server.close(conn)
+        replies = server.close(conn)
         undelivered = pending.pop(conn, None)
         if undelivered is not None:
             undelivered.clear()
@@ -321,6 +340,7 @@ async def autosync(
         shard = shard_of.pop(conn, None)
         if shard is not None:
             shard.conns.discard(conn)
+        enqueue_direct(replies)
 
     def enqueue(conn: Any, tagged: list[tuple[int | None, Wire]], *, coalesce: bool = True) -> None:
         undelivered = pending.get(conn)

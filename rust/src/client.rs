@@ -233,7 +233,7 @@ impl ClientState {
                 state: state.clone(),
             }),
             Message::Awareness { peer: None, .. } => Ok(ClientEffect::Ignore),
-            Message::Unknown(_) => Ok(ClientEffect::Ignore),
+            Message::Ownership(_) | Message::Unknown(_) => Ok(ClientEffect::Ignore),
             Message::Batch { .. } => Err("batch messages must be prepared in order".into()),
         }
     }
@@ -462,6 +462,7 @@ mod client_tests {
             id: 8,
             rev,
             ops: vec![],
+            tagged: false,
             effect: None,
             proposal: None,
         }
@@ -535,6 +536,7 @@ mod client_tests {
             id: 7,
             rev: 4,
             ops: vec![],
+            tagged: false,
             effect: None,
             proposal: None,
         };

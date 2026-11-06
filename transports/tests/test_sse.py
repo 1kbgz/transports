@@ -126,3 +126,30 @@ def test_browser_sse_path_mirrors_events():
                 sys.modules.pop(name, None)
             else:
                 sys.modules[name] = mod
+
+
+def test_sse_binary_snapshot_and_update():
+    class Recording(BaseModel):
+        data: bytes
+
+    async def run():
+        session = Session()
+        model = Recording(data=b"\x00\xff\x80")
+        mid = session.host(model)
+        server = Server(session)
+        conn = _SSEConn()
+        stream = sse_stream(server, conn)
+        client = Client()
+        try:
+            client.recv(await asyncio.wait_for(stream.__anext__(), 1))
+            assert client.model(mid, Recording).data == model.data
+            model.data = b"\xfe\x00"
+            for connection, messages in server.flush().items():
+                for message in messages:
+                    await connection.send_text(message)
+            client.recv(await asyncio.wait_for(stream.__anext__(), 1))
+            assert client.model(mid, Recording).data == model.data
+        finally:
+            await stream.aclose()
+
+    asyncio.run(run())

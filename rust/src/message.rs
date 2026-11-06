@@ -11,6 +11,7 @@ use crate::{Patch, Value};
 /// One live protocol message.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Message {
+    Ownership(crate::OwnershipMessage),
     Snapshot {
         id: u64,
         model_type: String,
@@ -34,6 +35,7 @@ pub enum Message {
         id: u64,
         rev: u64,
         ops: Vec<serde_json::Value>,
+        tagged: bool,
         effect: Option<serde_json::Value>,
         proposal: Option<String>,
     },
@@ -94,6 +96,8 @@ enum KnownMessage {
         id: u64,
         rev: u64,
         ops: Vec<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "is_false")]
+        tagged: bool,
         #[serde(skip_serializing_if = "Option::is_none")]
         effect: Option<serde_json::Value>,
         #[serde(skip_serializing_if = "Option::is_none")]
@@ -164,12 +168,14 @@ impl From<KnownMessage> for Message {
                 id,
                 rev,
                 ops,
+                tagged,
                 effect,
                 proposal,
             } => Message::Crdt {
                 id,
                 rev,
                 ops,
+                tagged,
                 effect,
                 proposal,
             },
@@ -235,12 +241,14 @@ impl From<&Message> for KnownMessage {
                 id,
                 rev,
                 ops,
+                tagged,
                 effect,
                 proposal,
             } => KnownMessage::Crdt {
                 id: *id,
                 rev: *rev,
                 ops: ops.clone(),
+                tagged: *tagged,
                 effect: effect.clone(),
                 proposal: proposal.clone(),
             },
@@ -268,7 +276,7 @@ impl From<&Message> for KnownMessage {
                 state: state.clone(),
             },
             Message::Batch { msgs } => KnownMessage::Batch { msgs: msgs.clone() },
-            Message::Unknown(_) => {
+            Message::Ownership(_) | Message::Unknown(_) => {
                 unreachable!("unknown messages serialize through their raw value")
             }
         }
@@ -282,6 +290,7 @@ impl Serialize for Message {
     {
         match self {
             Message::Unknown(value) => value.serialize(serializer),
+            Message::Ownership(value) => value.serialize(serializer),
             known => KnownMessage::from(known).serialize(serializer),
         }
     }
@@ -292,16 +301,31 @@ impl<'de> Deserialize<'de> for Message {
     where
         D: Deserializer<'de>,
     {
-        let value = serde_json::Value::deserialize(deserializer)?;
-        let kind = value.get("t").and_then(serde_json::Value::as_str);
+        let mut value = ciborium::Value::deserialize(deserializer)?;
+        normalize_embedded_bytes(&mut value);
+        let kind = value.as_map().and_then(|entries| {
+            entries.iter().find_map(|(key, value)| {
+                (key.as_text() == Some("t"))
+                    .then(|| value.as_text())
+                    .flatten()
+            })
+        });
         match kind {
+            Some("ownership" | "owned" | "owned_ack" | "command" | "command_ack") => value
+                .deserialized()
+                .map(Message::Ownership)
+                .map_err(serde::de::Error::custom),
             Some(
                 "snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "awareness"
                 | "batch",
-            ) => serde_json::from_value::<KnownMessage>(value)
+            ) => value
+                .deserialized::<KnownMessage>()
                 .map(Message::from)
                 .map_err(serde::de::Error::custom),
-            _ => Ok(Message::Unknown(value)),
+            _ => value
+                .deserialized()
+                .map(Message::Unknown)
+                .map_err(serde::de::Error::custom),
         }
     }
 }
@@ -322,16 +346,71 @@ impl Message {
         match normalize_codec(codec)? {
             BuiltinCodec::Json => serde_json::to_vec(self).map_err(|error| error.to_string()),
             BuiltinCodec::Msgpack => {
-                let value = serde_json::to_value(self).map_err(|error| error.to_string())?;
-                rmp_serde::to_vec_named(&value).map_err(|error| error.to_string())
+                let value = self.binary_value()?;
+                rmp_serde::to_vec_named(&Canonical(&value)).map_err(|error| error.to_string())
             }
             BuiltinCodec::Cbor => {
-                let value = serde_json::to_value(self).map_err(|error| error.to_string())?;
+                let value = self.binary_value()?;
                 let mut bytes = Vec::new();
-                ciborium::into_writer(&value, &mut bytes).map_err(|error| error.to_string())?;
+                ciborium::into_writer(&Canonical(&value), &mut bytes)
+                    .map_err(|error| error.to_string())?;
                 Ok(bytes)
             }
         }
+    }
+
+    pub(crate) fn binary_value(&self) -> Result<ciborium::Value, String> {
+        let mut value = ciborium::Value::serialized(self).map_err(|e| e.to_string())?;
+        if let ciborium::Value::Map(entries) = &mut value {
+            match self {
+                Message::Crdt {
+                    ops,
+                    effect,
+                    tagged: true,
+                    ..
+                } => {
+                    let ops: Vec<crate::CrdtOp> =
+                        serde_json::from_value(serde_json::Value::Array(ops.clone()))
+                            .map_err(|e| e.to_string())?;
+                    set_entry(
+                        entries,
+                        "ops",
+                        ciborium::Value::serialized(&ops).map_err(|e| e.to_string())?,
+                    );
+                    if let Some(effect) = effect {
+                        let effect: crate::CrdtEffect =
+                            serde_json::from_value(effect.clone()).map_err(|e| e.to_string())?;
+                        set_entry(
+                            entries,
+                            "effect",
+                            ciborium::Value::serialized(&effect).map_err(|e| e.to_string())?,
+                        );
+                    }
+                }
+                Message::CrdtSnapshot { state, .. } => {
+                    if let Ok(state) = serde_json::from_value::<crate::CrdtState>(state.clone()) {
+                        set_entry(
+                            entries,
+                            "state",
+                            ciborium::Value::serialized(&state).map_err(|e| e.to_string())?,
+                        );
+                    }
+                }
+                Message::Batch { msgs } => {
+                    set_entry(
+                        entries,
+                        "msgs",
+                        ciborium::Value::Array(
+                            msgs.iter()
+                                .map(Message::binary_value)
+                                .collect::<Result<_, _>>()?,
+                        ),
+                    );
+                }
+                _ => (),
+            }
+        }
+        Ok(value)
     }
 
     /// Decode one message produced by a built-in connection codec.
@@ -342,6 +421,84 @@ impl Message {
                 rmp_serde::from_slice(bytes).map_err(|error| error.to_string())
             }
             BuiltinCodec::Cbor => ciborium::from_reader(bytes).map_err(|error| error.to_string()),
+        }
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !value
+}
+
+fn set_entry(
+    entries: &mut [(ciborium::Value, ciborium::Value)],
+    key: &str,
+    value: ciborium::Value,
+) {
+    if let Some((_, target)) = entries.iter_mut().find(|(k, _)| k.as_text() == Some(key)) {
+        *target = value;
+    }
+}
+
+// Embedded reducer state/operations are JSON-shaped in the public Message API. Preserve their
+// tagged byte values when deserializing binary codecs, without interpreting application maps.
+fn normalize_embedded_bytes(value: &mut ciborium::Value) {
+    use base64::{engine::general_purpose::STANDARD, Engine};
+    fn normalize(value: &mut ciborium::Value) {
+        match value {
+            ciborium::Value::Bytes(bytes) => *value = ciborium::Value::Text(STANDARD.encode(bytes)),
+            ciborium::Value::Map(entries) => {
+                for (_, value) in entries {
+                    normalize(value);
+                }
+            }
+            ciborium::Value::Array(values) => {
+                for value in values {
+                    normalize(value);
+                }
+            }
+            _ => (),
+        }
+    }
+    if let ciborium::Value::Map(entries) = value {
+        let kind = entries
+            .iter()
+            .find_map(|(k, v)| (k.as_text() == Some("t")).then(|| v.as_text()).flatten())
+            .map(str::to_owned);
+        for (key, value) in entries {
+            if (kind.as_deref() == Some("crdt") && matches!(key.as_text(), Some("ops" | "effect")))
+                || (kind.as_deref() == Some("crdt_snapshot") && key.as_text() == Some("state"))
+            {
+                normalize(value);
+            }
+        }
+    }
+}
+
+// Keep the existing sorted map encoding while preserving native byte strings.
+struct Canonical<'a>(&'a ciborium::Value);
+
+impl Serialize for Canonical<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::{SerializeMap, SerializeSeq};
+        match self.0 {
+            ciborium::Value::Map(entries) => {
+                let mut entries: Vec<_> = entries.iter().collect();
+                entries.sort_by(|(a, _), (b, _)| a.as_text().cmp(&b.as_text()));
+                let mut map = serializer.serialize_map(Some(entries.len()))?;
+                for (key, value) in entries {
+                    map.serialize_entry(key, &Canonical(value))?;
+                }
+                map.end()
+            }
+            ciborium::Value::Array(values) => {
+                let mut seq = serializer.serialize_seq(Some(values.len()))?;
+                for value in values {
+                    seq.serialize_element(&Canonical(value))?;
+                }
+                seq.end()
+            }
+            ciborium::Value::Float(value) => serializer.serialize_f64(*value),
+            value => value.serialize(serializer),
         }
     }
 }
@@ -401,6 +558,7 @@ mod message_tests {
             Message::Crdt {
                 id: 8,
                 rev: 3,
+                tagged: false,
                 ops: vec![serde_json::json!({
                     "kind": "sequence_insert",
                     "path": [],

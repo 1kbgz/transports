@@ -30,6 +30,7 @@ import json
 from collections.abc import Callable
 from typing import Any, cast
 
+from ._bridge import _contains_bytes
 from .transports import (
     decode_as as _core_decode_as,
     decode_message as _decode_message,
@@ -124,7 +125,16 @@ def crdt_msg(
     effect: dict | None = None,
     proposal: str | None = None,
 ) -> str:
+    tagged = _contains_bytes(ops) or _contains_bytes(effect)
+    if tagged:
+        from .crdt import _wire_item
+
+        ops = [_wire_item(op, encode=True) for op in ops]
+        if effect is not None:
+            effect = {**effect, "deltas": [_wire_item(delta, encode=True) for delta in effect["deltas"]]}
     msg = {"t": "crdt", "id": model_id, "rev": rev, "ops": ops}
+    if tagged:
+        msg["tagged"] = True
     if effect is not None:
         msg["effect"] = effect
     if proposal is not None:
@@ -147,7 +157,7 @@ def reject_msg(
     if proposal is not None:
         msg["proposal"] = proposal
     if crdt_ops is not None:
-        msg["crdt_ops"] = crdt_ops
+        msg["crdt_ops"] = [{"dot": op["dot"]} for op in crdt_ops] if _contains_bytes(crdt_ops) else crdt_ops
     return json.dumps(msg)
 
 
@@ -184,6 +194,18 @@ def encode(msg_json: str, codec: str = JSON) -> str | bytes:
     return msg_json
 
 
+def _public_message(message: dict) -> dict:
+    if message.get("t") == "batch":
+        message["msgs"] = [_public_message(item) for item in message["msgs"]]
+    elif message.get("t") == "crdt" and message.pop("tagged", False):
+        from .crdt import _public_effect, _wire_item
+
+        message["ops"] = [_wire_item(op, encode=False) for op in message["ops"]]
+        if message.get("effect") is not None:
+            message["effect"] = _public_effect(message["effect"])
+    return message
+
+
 def decode(data: str | bytes, codec: str | None = None) -> dict:
     """Parse an inbound frame to a message dict.
 
@@ -193,15 +215,15 @@ def decode(data: str | bytes, codec: str | None = None) -> dict:
     if codec is not None:
         c = normalize_codec(codec)
         if c in _CODECS:
-            return _CODECS[c][1](data)
+            return _public_message(_CODECS[c][1](data))
         if c == JSON:
             raw = data.encode() if isinstance(data, str) else bytes(data)
-            return json.loads(_decode_message(raw, c))
+            return _public_message(json.loads(_decode_message(raw, c)))
         if c == CBOR:
-            return json.loads(_decode_message(bytes(cast(bytes, data)), c))
+            return _public_message(json.loads(_decode_message(bytes(cast(bytes, data)), c)))
     if isinstance(data, (bytes, bytearray)):
-        return json.loads(_decode_message(bytes(data), MSGPACK))
-    return json.loads(_normalize_message(data))
+        return _public_message(json.loads(_decode_message(bytes(data), MSGPACK)))
+    return _public_message(json.loads(_normalize_message(data)))
 
 
 def encode_as(value_json: str, content_type: str) -> bytes:

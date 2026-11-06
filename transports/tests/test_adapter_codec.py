@@ -22,11 +22,16 @@ class _FakeComm:
         pass
 
 
-def test_comm_and_anywidget_adapters_reject_non_json_codecs():
-    # these transports carry JSON-able data only; a binary codec would send raw bytes the frontend
-    # can't decode from comm/custom-message data, so the adapters reject it up front.
+@pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
+def test_comm_and_anywidget_adapters_accept_builtin_codecs(codec):
+    server = transports.Server(transports.Session())
+    transports.serve_anywidget(server, _FakeWidget(), codec=codec)
+    transports.serve_comm(server, _FakeComm(), codec=codec)
+
+
+def test_comm_and_anywidget_adapters_reject_unknown_codecs():
     server = transports.Server(transports.Session())
     with pytest.raises(ValueError):
-        transports.serve_anywidget(server, _FakeWidget(), codec="msgpack")
+        transports.serve_anywidget(server, _FakeWidget(), codec="unknown")
     with pytest.raises(ValueError):
-        transports.serve_comm(server, _FakeComm(), codec="msgpack")
+        transports.serve_comm(server, _FakeComm(), codec="unknown")

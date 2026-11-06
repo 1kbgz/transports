@@ -241,6 +241,21 @@ impl JsonStore {
             })
     }
 
+    /// Read a revision without serializing the model's payload.
+    pub fn revision(&self, id: u64) -> Option<u64> {
+        self.inner.snapshot(ModelId(id)).map(|(_, _, rev)| rev)
+    }
+
+    /// Read one top-level field without serializing unrelated fields.
+    pub fn field(&self, id: u64, name: &str) -> Option<String> {
+        let (_, Value::Map(fields), _) = self.inner.snapshot(ModelId(id))? else {
+            return None;
+        };
+        fields
+            .get(name)
+            .map(|value| serde_json::to_string(value).expect("valid value"))
+    }
+
     /// Replace a hosted model from JSON; returns the JSON patch, or `None` if the id is unknown.
     pub fn mutate(&mut self, id: u64, value_json: &str) -> Result<Option<String>, String> {
         let value: Value = serde_json::from_str(value_json).map_err(|e| e.to_string())?;

@@ -16,7 +16,7 @@ def _bump(session, mid, value):
 
 
 def test_session_since_returns_delta_up_to_date_or_gap():
-    s = Session()
+    s = Session(log_cap=2)
     mid = s.host(Doc())
     for v in (1, 2, 3):
         _bump(s, mid, v)
@@ -25,7 +25,7 @@ def test_session_since_returns_delta_up_to_date_or_gap():
     assert replay is not None
     assert [p["rev"] for p in replay] == [2, 3]  # the patches after rev 1
     assert s.since(mid, 3) == []  # already current
-    s._log[mid] = s._log[mid][-1:]  # evict all but rev 3 — rev 2 is gone
+    _bump(s, mid, 4)  # rev 2 is evicted by log_cap
     assert s.since(mid, 1) is None  # gap: can't bridge from rev 1, caller must re-snapshot
 
 
@@ -53,7 +53,7 @@ def test_server_resume_falls_back_to_snapshot_on_gap():
     mid = s.host(Doc())
     server = Server(s)
     _bump(s, mid, 5)
-    s._log[mid] = []  # log evicted → gap
+    s._log.clear()  # log evicted → gap
     msgs = server.open("c", since={mid: 0})
     assert json.loads(msgs[0])["t"] == "snapshot"  # falls back to a fresh snapshot
 

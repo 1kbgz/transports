@@ -254,6 +254,14 @@ impl Store {
         self.inner.snapshot(id)
     }
 
+    fn revision(&self, id: u64) -> Option<u64> {
+        self.inner.revision(id)
+    }
+
+    fn field(&self, id: u64, name: &str) -> Option<String> {
+        self.inner.field(id, name)
+    }
+
     /// Replace a hosted model from JSON; returns the JSON patch (or `None` if id unknown).
     fn mutate(&mut self, id: u64, value_json: &str) -> PyResult<Option<String>> {
         self.inner
@@ -266,5 +274,212 @@ impl Store {
         self.inner
             .apply(id, patch_json)
             .map_err(PyValueError::new_err)
+    }
+}
+
+/// A JSON control frame with native binary attachments.
+#[pyclass]
+pub struct BufferFrame {
+    inner: transports::BufferFrame,
+}
+
+#[pymethods]
+impl BufferFrame {
+    #[new]
+    fn new(header: String) -> Self {
+        Self {
+            inner: transports::BufferFrame {
+                header,
+                buffers: Vec::new(),
+            },
+        }
+    }
+
+    #[staticmethod]
+    fn from_json(json: &str) -> PyResult<Self> {
+        let message = transports::Message::from_json(json).map_err(PyValueError::new_err)?;
+        Ok(Self {
+            inner: transports::BufferFrame::from_message(&message)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+
+    #[staticmethod]
+    fn decode(data: &[u8], codec: &str) -> PyResult<Self> {
+        let message = transports::Message::decode(data, codec).map_err(PyValueError::new_err)?;
+        Ok(Self {
+            inner: transports::BufferFrame::from_message(&message)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+
+    #[getter]
+    fn header(&self) -> &str {
+        &self.inner.header
+    }
+
+    fn count(&self) -> usize {
+        self.inner.buffers.len()
+    }
+
+    fn buffer<'py>(&self, py: Python<'py>, index: usize) -> PyResult<Bound<'py, PyBytes>> {
+        let buffer = self
+            .inner
+            .buffers
+            .get(index)
+            .ok_or_else(|| PyValueError::new_err("buffer index out of bounds"))?;
+        Ok(PyBytes::new(py, buffer))
+    }
+
+    fn push(&mut self, buffer: Vec<u8>) {
+        self.inner.buffers.push(buffer);
+    }
+
+    fn encode<'py>(&self, py: Python<'py>, codec: &str) -> PyResult<Bound<'py, PyBytes>> {
+        let bytes = self
+            .inner
+            .message()
+            .and_then(|m| m.encode(codec))
+            .map_err(PyValueError::new_err)?;
+        Ok(PyBytes::new(py, &bytes))
+    }
+
+    fn to_json(&self) -> PyResult<String> {
+        self.inner
+            .message()
+            .and_then(|m| m.to_json())
+            .map_err(PyValueError::new_err)
+    }
+}
+
+/// Bounded per-model replay with shared binary attachments.
+#[pyclass]
+pub struct ReplayLog {
+    inner: transports::ReplayLog,
+}
+
+#[pymethods]
+impl ReplayLog {
+    #[new]
+    fn new(cap: usize, max_bytes: usize, blob_threshold: usize) -> Self {
+        Self {
+            inner: transports::ReplayLog::new(cap, max_bytes, blob_threshold),
+        }
+    }
+    fn append(&mut self, patch: &str) -> PyResult<()> {
+        self.inner.append_json(patch).map_err(PyValueError::new_err)
+    }
+    fn since(&self, rev: u64, current: u64) -> PyResult<Option<String>> {
+        self.inner
+            .since_json(rev, current)
+            .map_err(PyValueError::new_err)
+    }
+    fn bytes(&self) -> usize {
+        self.inner.bytes()
+    }
+    fn count(&self) -> usize {
+        self.inner.len()
+    }
+    fn blobs(&self) -> usize {
+        self.inner.blobs()
+    }
+}
+
+/// Single-server authority for one model's client-owned fields.
+#[pyclass]
+pub struct FieldAuthority {
+    inner: transports::FieldAuthority,
+}
+#[pymethods]
+impl FieldAuthority {
+    #[new]
+    fn new(id: u64, fields: &str, command_cap: usize) -> Result<Self, PyErr> {
+        Ok(Self {
+            inner: transports::FieldAuthority::from_json(id, fields, command_cap)
+                .map_err(PyValueError::new_err)?,
+        })
+    }
+    fn open(&mut self, connection: &str) -> Result<String, PyErr> {
+        self.inner
+            .open_json(connection)
+            .map_err(PyValueError::new_err)
+    }
+    fn grant(&self, connection: &str) -> Result<String, PyErr> {
+        self.inner
+            .grant_json(connection)
+            .map_err(PyValueError::new_err)
+    }
+    fn command(&mut self, field: &str, value: &str) -> Result<u64, PyErr> {
+        self.inner
+            .command_json(field, value)
+            .map_err(PyValueError::new_err)
+    }
+    fn next_command(&mut self) -> Result<Option<String>, PyErr> {
+        self.inner.next_json().map_err(PyValueError::new_err)
+    }
+    fn validate(&self, connection: &str, message: &str) -> Result<bool, PyErr> {
+        self.inner
+            .validate_json(connection, message)
+            .map_err(PyValueError::new_err)
+    }
+    fn acknowledge(&mut self, connection: &str, epoch: u64, command: u64) -> Result<(), PyErr> {
+        self.inner
+            .acknowledge(connection, epoch, command)
+            .map_err(PyValueError::new_err)
+    }
+    fn close(&mut self, connection: &str) -> bool {
+        self.inner.close(connection)
+    }
+    fn owner(&self) -> Option<String> {
+        self.inner.owner().map(str::to_owned)
+    }
+    fn commit(&mut self, sequence: u64) {
+        self.inner.commit(sequence);
+    }
+}
+/// Client-side ownership classification and sequence generation.
+#[pyclass]
+pub struct OwnedFields {
+    inner: transports::OwnedFields,
+}
+#[pymethods]
+impl OwnedFields {
+    #[new]
+    fn new() -> Self {
+        Self {
+            inner: transports::OwnedFields::default(),
+        }
+    }
+    fn receive(&mut self, message: &str) -> Result<bool, PyErr> {
+        self.inner
+            .receive_json(message)
+            .map_err(PyValueError::new_err)
+    }
+    fn classify(&self, id: u64, ops: &str) -> Result<bool, PyErr> {
+        self.inner
+            .classify_json(id, ops)
+            .map_err(PyValueError::new_err)
+    }
+    fn edit(&mut self, id: u64, ops: &str) -> Result<String, PyErr> {
+        self.inner.edit_json(id, ops).map_err(PyValueError::new_err)
+    }
+    fn queue(&mut self, id: u64, ops: &str) -> Result<String, PyErr> {
+        self.inner
+            .queue_json(id, ops)
+            .map_err(PyValueError::new_err)
+    }
+    fn drain(&mut self) -> Result<String, PyErr> {
+        self.inner.drain_json().map_err(PyValueError::new_err)
+    }
+    fn server_ops(&self, id: u64, ops: &str) -> Result<String, PyErr> {
+        self.inner
+            .server_ops_json(id, ops)
+            .map_err(PyValueError::new_err)
+    }
+    fn owns(&self, id: u64, field: &str) -> bool {
+        self.inner.owns(id, field)
+    }
+    fn disconnect(&mut self) {
+        self.inner.disconnect();
     }
 }

@@ -45,7 +45,7 @@ async def sse_stream(server: Broadcaster, conn: _SSEConn):
     Patches arrive on the connection's queue via `autosync` (which calls `send_text`). Closes the
     connection when the consumer stops iterating.
     """
-    for wire in server.open(conn, protocol.JSON):  # snapshots first
+    for wire in server.open(conn, protocol.JSON, ownership=False):  # snapshots first
         await conn.queue.put(wire)
     try:
         while True:

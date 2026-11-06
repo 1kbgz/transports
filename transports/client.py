@@ -7,9 +7,11 @@ WebRTC data channel under Pyodide. `attach(sender)` and `detach(sender)` manage 
 application-owned duplex channels while inbound frames continue through `recv`.
 """
 
+import asyncio
 import contextlib
 import inspect
 import json
+import math
 import sys
 import urllib.parse
 import uuid
@@ -19,7 +21,7 @@ from typing import Any
 from . import protocol
 from ._bridge import M, _value_of, from_value
 from .crdt import CrdtDocument, CrdtSpec
-from .transports import ClientState as _ClientState, apply as _apply, diff as _diff
+from .transports import ClientState as _ClientState, OwnedFields, apply as _apply, diff as _diff
 
 
 class Client:
@@ -30,7 +32,16 @@ class Client:
     directly with `recv(data)`. The `codec` (`"json"`, `"msgpack"`, or `"cbor"`) frames outbound
     edits and decodes inbound frames."""
 
-    def __init__(self, codec: str = protocol.JSON) -> None:
+    def __init__(self, codec: str = protocol.JSON, *, update_interval: float = 0.25, ownership: bool = True) -> None:
+        if not math.isfinite(update_interval) or update_interval < 0:
+            raise ValueError("update_interval must be finite and non-negative")
+        self._update_interval = update_interval
+        self._ownership = ownership
+        self._owned = OwnedFields()
+        self._owned_timer: asyncio.TimerHandle | None = None
+        self._commands: dict[tuple[int, int], dict] = {}
+        self._command_cbs: list[Callable[[dict], None]] = []
+        self._ownership_cbs: list[Callable[[dict], None]] = []
         self._values: dict[int, Any] = {}
         self._state = _ClientState()
         self._replica = f"client-{uuid.uuid4().hex}"
@@ -78,11 +89,21 @@ class Client:
 
         Server-authoritative — the mirror updates when the authoritative patch echoes back (or
         `on_reject` fires with why it was refused). Returns ``False`` (dropped) when not connected."""
-        frame = self.edit(mid, new_value, proposal)
-        return await self._send_proposal(frame)
+        patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
+        return await self.propose_ops(mid, patch["ops"], proposal)
 
     async def propose_ops(self, mid: int, ops: list[dict], proposal: str | None = None) -> bool:
         """Propose explicit patch operations over the active connection."""
+        if self._owned.classify(mid, json.dumps(ops)):
+            if proposal is not None:
+                raise ValueError("client-owned edits do not use proposals")
+            if not self.connected:
+                return False
+            self._apply_owned_edit(mid, ops, queued=True)
+            if self._owned_timer is None:
+                loop = asyncio.get_running_loop()
+                self._owned_timer = loop.call_later(self._update_interval, lambda: loop.create_task(self.flush_owned()))
+            return True
         frame = self.edit_ops(mid, ops, proposal)
         return await self._send_proposal(frame)
 
@@ -192,6 +213,11 @@ class Client:
         return True
 
     def _disconnected(self) -> None:
+        self._owned.disconnect()
+        self._commands.clear()
+        if self._owned_timer is not None:
+            self._owned_timer.cancel()
+            self._owned_timer = None
         abandoned = json.loads(self._state.disconnect())["proposals"]
         if abandoned:
             for callback in list(self._abandon_cbs):
@@ -260,14 +286,44 @@ class Client:
         return self._recv_msg(msg)
 
     def _recv_msg(self, msg: dict) -> dict | None:
-        effect_json = self._state.prepare(json.dumps(msg))
+        if msg.get("t") in ("ownership", "command", "owned_ack"):
+            if not self._owned.receive(json.dumps(msg)):
+                return None
+            if msg["t"] == "ownership":
+                self._commands = {
+                    key: command
+                    for key, command in self._commands.items()
+                    if key[0] != msg["id"] or command["epoch"] == msg["epoch"] and msg["owned"]
+                }
+                for callback in list(self._ownership_cbs):
+                    callback(msg)
+            elif msg["t"] == "command":
+                key = (msg["id"], msg["command"])
+                if key not in self._commands:
+                    self._commands[key] = msg
+                    for callback in list(self._command_cbs):
+                        callback(msg)
+            else:
+                effect = self._state.prepare(json.dumps({"t": "patch", "id": msg["id"], "patch": {"rev": msg["rev"], "ops": []}}))
+                self._state.commit(effect)
+            return None
+        metadata = {key: value for key, value in msg.items() if key not in ("value", "ops", "effect", "state", "spec", "crdt_ops", "patch")}
+        if "patch" in msg:
+            metadata["patch"] = {"rev": msg["patch"]["rev"]}
+        if msg.get("t") == "awareness":
+            metadata["state"] = msg["state"]
+        effect_json = self._state.prepare(json.dumps(metadata))
         effect = json.loads(effect_json)
         kind = effect["effect"]
         if kind == "snapshot":
             mid: int = msg["id"]
             self._crdt.pop(mid, None)
             self._crdt_outbox = [pending for pending in self._crdt_outbox if pending["id"] != mid]
-            self._values[mid] = msg["value"]
+            value = msg["value"]
+            current = self._values.get(mid)
+            if isinstance(current, dict) and "Map" in current and isinstance(value, dict) and "Map" in value:
+                value = {"Map": {**value["Map"], **{key: item for key, item in current["Map"].items() if self._owned.owns(mid, key)}}}
+            self._values[mid] = value
             self._state.commit(effect_json)
             return self._accepted({"t": "snapshot", "id": mid, "rev": msg["rev"]})
         elif kind == "crdt_snapshot":
@@ -369,12 +425,67 @@ class Client:
         """
         return self._state.abandon(proposal)
 
+    def owns(self, mid: int, field: str) -> bool:
+        """Whether this connection currently owns a field."""
+        return self._owned.owns(mid, field)
+
+    def on_ownership(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Observe grants and handover; a disconnected client owns no fields."""
+        self._ownership_cbs.append(callback)
+        return lambda: self._ownership_cbs.remove(callback) if callback in self._ownership_cbs else None
+
+    def on_command(self, callback: Callable[[dict], None]) -> Callable[[], None]:
+        """Receive ordered commands, including commands received before registering this listener.
+
+        Apply the command and report resulting state with propose_ops(), then acknowledge with
+        ack_command(). Values use the tagged wire representation. Delivery after handover may repeat.
+        """
+        self._command_cbs.append(callback)
+        for command in list(self._commands.values()):
+            callback(command)
+        return lambda: self._command_cbs.remove(callback) if callback in self._command_cbs else None
+
+    def command_ack(self, command: dict) -> str | bytes:
+        """Build an acknowledgement after applying a received command (manual transport API)."""
+        key = (command["id"], command["command"])
+        pending = self._commands.get(key)
+        if pending is None or any(pending[name] != command[name] for name in ("epoch", "field")) or not self._owned.receive(json.dumps(command)):
+            raise ValueError("command is not pending for this owner")
+        message = {"t": "command_ack", "id": command["id"], "epoch": command["epoch"], "command": command["command"]}
+        frame = protocol.encode(json.dumps(message), self._codec)
+        del self._commands[key]
+        return frame
+
+    async def ack_command(self, command: dict) -> bool:
+        """Acknowledge a completed command over the managed connection."""
+        if not self.connected:
+            return False
+        await self.flush_owned()
+        return await self.send(self.command_ack(command))
+
+    async def flush_owned(self) -> bool:
+        """Flush coalesced status now; normally driven by update_interval (seconds)."""
+        if self._owned_timer is not None:
+            self._owned_timer.cancel()
+            self._owned_timer = None
+        if not self.connected:
+            return False
+        for message in json.loads(self._owned.drain()):
+            await self.send(protocol.encode(json.dumps(message), self._codec))
+        return True
+
+    def _apply_owned_edit(self, mid: int, ops: list[dict], *, queued: bool = False) -> str:
+        value = json.loads(_apply(json.dumps(self._values[mid]), json.dumps({"rev": 0, "ops": ops})))
+        message = (self._owned.queue if queued else self._owned.edit)(mid, json.dumps(ops))
+        self._values[mid] = value
+        self._accepted({"t": "patch", "id": mid, "patch": {"rev": self._rev[mid], "ops": ops}, "local": True})
+        return message
+
     def edit(self, mid: int, new_value: Any, proposal: str | None = None) -> str | bytes:
         """Propose an edit to a mirrored model; returns the patch frame to send (encoded in this codec).
 
-        Models are server-authoritative: the edit is a proposal, and the local mirror updates only
-        when the server echoes the authoritative patch back (via `recv`), not optimistically. This
-        keeps `rev` owned by the server and avoids client/server `rev` divergence.
+        Server-owned fields update on the authoritative echo. Client-owned fields update locally
+        immediately; the server acknowledges their revision without replacing local state.
         """
         patch = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(new_value)))
         return self.edit_ops(mid, patch["ops"], proposal)
@@ -386,6 +497,10 @@ class Client:
         form when a new optimistic value equals the current mirror and a whole-value diff would be
         empty while an older proposal is still pending.
         """
+        if self._owned.classify(mid, json.dumps(ops)):
+            if proposal is not None:
+                raise ValueError("client-owned edits do not use proposals")
+            return protocol.encode(self._apply_owned_edit(mid, ops), self._codec)
         message = self._state.proposal(mid, json.dumps(ops), proposal)
         try:
             return protocol.encode(message, self._codec)
@@ -408,11 +523,15 @@ class Client:
             self._crdt_outbox.append({"id": mid, "ops": change["ops"]})
         return protocol.encode(protocol.crdt_msg(mid, change["ops"]), self._codec)
 
+    def _reconcile(self, mid: int, value: Any) -> str | bytes:
+        ops = json.loads(_diff(json.dumps(self._values[mid]), json.dumps(value)))["ops"]
+        return self.edit_ops(mid, json.loads(self._owned.server_ops(mid, json.dumps(ops))))
+
     def _connect_url(self, url: str) -> str:
         """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
         mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""
         sep = "&" if "?" in url else "?"
-        params = f"codec={self._codec}"
+        params = f"codec={self._codec}&ownership={int(self._ownership)}"
         revisions = self._state.revisions()
         if revisions != "{}":
             params += "&since=" + urllib.parse.quote(revisions)
@@ -452,7 +571,7 @@ class Client:
                     return
                 for mid in list(self._values):
                     if mid not in pushed and mid in pre and mid not in self._crdt:
-                        self._send_browser(ws, self.edit(mid, pre[mid]))
+                        self._send_browser(ws, self._reconcile(mid, pre[mid]))
                         pushed.add(mid)
 
             # construction/FFI errors fall through to the retry, like the native loop's dropped socket
@@ -606,7 +725,7 @@ class Client:
                             if pre:  # rectify: once the server has (re)snapshotted a model, push our copy back
                                 for mid in list(self._values):
                                     if mid not in pushed and mid in pre and mid not in self._crdt:
-                                        await ws.send(self.edit(mid, pre[mid]))
+                                        await ws.send(self._reconcile(mid, pre[mid]))
                                         pushed.add(mid)
                     finally:
                         self.detach(sender)

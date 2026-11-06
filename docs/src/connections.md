@@ -300,7 +300,8 @@ transports.serve_comm(server, comm)
 transports.sync(server)
 ```
 
-The comm carries JSON wire strings in `data`, so `serve_comm` rejects non-JSON codecs.
+The comm carries JSON control data and separate binary buffers. `serve_comm` supports JSON,
+MessagePack, and CBOR; receivers reattach buffers before decoding the protocol message.
 
 ## Use anywidget custom messages
 
@@ -324,19 +325,37 @@ conn = transports.serve_anywidget(server, widget)
 transports.sync(server)
 ```
 
+The bundled frontend gives each browser model a distinct view id and sends heartbeats. A view that
+stops responding expires after 180 seconds, releasing ownership and redelivering pending commands to
+the next eligible view. `serve_anywidget(..., view_timeout=300)` changes that timeout. Lease timers
+need a running asyncio loop, as provided by Jupyter. In synchronous hosts without a running loop,
+the view still opens but has no automatic expiry; the frontend must close it explicitly. Explicit
+disposal closes the view immediately.
+
+Custom frontends can opt into this lifecycle with
+`{"ready": true, "view": "unique-id", "ownership": true, "heartbeat": true}`. The response
+`{"view": "unique-id", "heartbeat": seconds}` gives the heartbeat interval. Send
+`{"view": "unique-id", "heartbeat": true}` at that interval, even if a reply is lost. On
+`{"view": "unique-id", "expired": true}`, detach the client, reattach, and send a new ready
+message to obtain a snapshot and ownership grant. Send `{"view": "unique-id", "closed": true}`
+on disposal. Legacy frontends without heartbeats must close their connections explicitly.
+
 Frontend messages use the same client protocol:
 
 ```ts
 const client = new Client();
 
-model.on("msg:custom", (content) => {
-  if (content.wire) client.recv(content.wire);
+model.on("msg:custom", (content, buffers) => {
+  if (typeof content.wire === "string") client.recv(content.wire);
+  else if (content.wire) client.recvBuffers(content.wire, buffers ?? []);
 });
 
 model.send({ ready: true });
 ```
 
-Use `model.send({ wire: client.edit(id, value) })` to send an edit from the frontend.
+For text-only custom frontends, use `model.send({ wire: client.edit(id, value) })`. The bundled
+widget manages binary attachments, distinct frontend ids, managed sending, and ownership cleanup.
+Custom binary/ownership adapters must implement the [attachment and view protocol](protocol-reference.md).
 
 ## Serve a Hub
 
@@ -348,3 +367,8 @@ A `Hub` satisfies the same connection contract as `Server`, so the same adapters
 hub = transports.Hub(key=lambda ws: ws.path_params["tenant"])
 app = Starlette(routes=[WebSocketRoute("/ws/{tenant}", transports.ws_endpoint(hub))])
 ```
+
+Comm frontends opt into owning fields with `serve_comm(server, comm, ownership=True)`; the default
+leaves them as observers. Custom manual adapters can pass `ownership=False` to `Server.open` or
+`Hub.open`. A closed adapter must call `Client.detach` and the server's `close` method so ownership
+can transfer; send every message returned by `close` to its destination.
