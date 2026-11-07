@@ -279,3 +279,38 @@ def test_buffer_channels_accept_plain_json_without_attachments(codec):
 
     wire = protocol.patch_msg(1, {"rev": 0, "ops": [{"Set": {"path": [{"Key": "value"}], "value": {"Int": 1}}}]})
     assert protocol.decode(join_buffers(wire, codec=codec), codec) == protocol.decode(wire)
+
+
+def test_binary_serializer_preserves_nested_serializers_and_model_configuration():
+    from pydantic import ConfigDict, Field, RootModel, model_serializer
+    from pydantic.dataclasses import dataclass as pydantic_dataclass
+
+    class Child(BaseModel):
+        model_config = ConfigDict(serialize_by_alias=True, populate_by_name=True)
+        data: bytes = Field(alias="payload")
+
+    class Wrapped(Child):
+        @model_serializer(mode="wrap")
+        def serialize(self, handler):
+            return {**handler(self), "label": "wrapped"}
+
+    @pydantic_dataclass
+    class Record:
+        data: bytes
+
+    class Model(BaseModel):
+        child: Child
+        wrapped: Wrapped
+        record: Record
+        root: RootModel[bytes]
+
+    child = Child(data=b"pcm")
+    model = Model(child=child, wrapped=Wrapped(data=b"\xff"), record=Record(b"\xfe"), root=b"\x00")
+    original = Child.__pydantic_serializer__
+    value = to_value(model)["Map"]
+    assert value["child"] == {"Map": {"payload": {"Bytes": "cGNt"}}}
+    assert value["wrapped"] == {"Map": {"payload": {"Bytes": "/w=="}, "label": {"Str": "wrapped"}}}
+    assert value["record"] == {"Map": {"data": {"Bytes": "/g=="}}}
+    assert value["root"] == {"Bytes": "AA=="}
+    assert Child.__pydantic_serializer__ is original
+    assert child.model_dump(mode="json") == {"payload": "pcm"}
