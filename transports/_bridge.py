@@ -129,6 +129,8 @@ def _serialize_any(value: Any, handler: Any) -> Any:
 
 @lru_cache(maxsize=128)
 def _binary_serializer(cls: type[BaseModel]) -> SchemaSerializer:
+    kwargs: dict[str, Any] = {"_use_prebuilt": False} if "_use_prebuilt" in inspect.signature(SchemaSerializer).parameters else {}
+
     def transform(node: Any) -> Any:
         if isinstance(node, list):
             return [transform(item) for item in node]
@@ -139,6 +141,10 @@ def _binary_serializer(cls: type[BaseModel]) -> SchemaSerializer:
             declared = result["cls"]
             result.setdefault("config", {})["ser_json_bytes"] = "base64"
             inner = dict(result)
+            if not kwargs and "serialization" not in inner:
+                # Older cores reuse the class's UTF-8 serializer for nested model schemas.
+                # An explicit serialization schema builds this copy without using that cache.
+                inner["serialization"] = dict(inner)
 
             def polymorphic(value: Any, handler: Any) -> Any:
                 return _json_bytes(value) if type(value) is not declared else handler(value)
@@ -148,11 +154,12 @@ def _binary_serializer(cls: type[BaseModel]) -> SchemaSerializer:
             )
         elif result.get("type") == "dataclass":
             result.setdefault("config", {})["ser_json_bytes"] = "base64"
+            if not kwargs and "serialization" not in result:
+                result["serialization"] = dict(result)
         elif result.get("type") == "any" and "serialization" not in result:
             result["serialization"] = core_schema.wrap_serializer_function_ser_schema(_serialize_any, when_used="json")
         return result
 
-    kwargs: dict[str, Any] = {"_use_prebuilt": False} if "_use_prebuilt" in inspect.signature(SchemaSerializer).parameters else {}
     return SchemaSerializer(transform(deepcopy(cls.__pydantic_core_schema__)), config={"ser_json_bytes": "base64"}, **kwargs)
 
 
@@ -167,7 +174,10 @@ def to_value(model: Any, *, include: set[str] | None = None) -> Any:
     """Convert model data to a core Value, preserving JSON serializers and native bytes."""
     if isinstance(model, BaseModel):
         if _contains_bytes({name: getattr(model, name) for name in include} if include is not None else model):
-            native = model.model_dump(**{**_DUMP_KWARGS, "mode": "python", "include": include})
+            native_kwargs = {**_DUMP_KWARGS, "mode": "python", "include": include}
+            if "polymorphic_serialization" not in native_kwargs:
+                native_kwargs["serialize_as_any"] = True
+            native = model.model_dump(**native_kwargs)
             plain = _restore_bytes(native, _json_bytes(model, include))
         else:
             plain = model.model_dump(**{**_DUMP_KWARGS, "include": include})
