@@ -1004,6 +1004,16 @@ window.runMermaid = runMermaid;</script>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_values</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span></div>
 
 
+<div class="viewcode-block" id="Client.crdt_diff">
+<a class="viewcode-back" href="../../docs/src/api.html#transports.Client.crdt_diff">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">crdt_diff</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">value</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span> <span class="n">path</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">list</span><span class="p">[</span><span class="nb">dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">"""Plan value edits against the current CRDT replica without sending or mutating."""</span>
+        <span class="n">document</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_crdt</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">document</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">KeyError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"model </span><span class="si">{</span><span class="n">mid</span><span class="si">}</span><span class="s2"> is not CRDT-backed"</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">document</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">value</span><span class="p">,</span> <span class="n">path</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="Client.crdt_spec">
 <a class="viewcode-back" href="../../docs/src/api.html#transports.Client.crdt_spec">[docs]</a>
     <span class="k">def</span><span class="w"> </span><span class="nf">crdt_spec</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">mid</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">CrdtSpec</span> <span class="o">|</span> <span class="kc">None</span><span class="p">:</span>

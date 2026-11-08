@@ -291,6 +291,9 @@
     <a href="#transports.Client.value">Client.value()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.crdt_diff">Client.crdt_diff()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.crdt_spec">Client.crdt_spec()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -502,6 +505,9 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.CrdtDocument.apply">CrdtDocument.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.diff">CrdtDocument.diff()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.CrdtDocument.member_key">CrdtDocument.member_key()</a>
@@ -946,6 +952,12 @@ may receive batch frames, which apply in order and return the accepted changes a
 <dt class="sig sig-object py" id="transports.Client.value">
 <span class="sig-name descname"><span class="pre">value</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Any</span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.value"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.value" title="Link to this definition">¶</a></dt>
 <dd><p>The current mirrored core <cite>Value</cite> of a model.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.crdt_diff">
+<span class="sig-name descname"><span class="pre">crdt_diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.crdt_diff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.crdt_diff" title="Link to this definition">¶</a></dt>
+<dd><p>Plan value edits against the current CRDT replica without sending or mutating.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -1508,6 +1520,12 @@ be transferred to a joining worker or persisted by the user. Stateless strategie
 </dd></dl>
 
 <dl class="py method">
+<dt class="sig sig-object py" id="transports.CrdtDocument.diff">
+<span class="sig-name descname"><span class="pre">diff</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.diff"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.diff" title="Link to this definition">¶</a></dt>
+<dd><p>Plan edits without mutating this replica. Path selects map keys; set order is ignored.</p>
+</dd></dl>
+
+<dl class="py method">
 <dt class="sig sig-object py" id="transports.CrdtDocument.member_key">
 <span class="sig-name descname"><span class="pre">member_key</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../../_modules/transports/crdt.html#CrdtDocument.member_key"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.CrdtDocument.member_key" title="Link to this definition">¶</a></dt>
 <dd><p>Return canonical identity for a value at a set path.</p>
@@ -1532,6 +1550,22 @@ stable-ID delete and insert operations used on the wire. Transfer <code class="d
 <code class="docutils literal notranslate"><span class="pre">from_state()</span></code> when a patch history is not available.</p>
 <p>After a CRDT snapshot, <code class="docutils literal notranslate"><span class="pre">Client.crdt_spec(id)</span></code> returns that model’s canonical specification. The
 JavaScript spelling is <code class="docutils literal notranslate"><span class="pre">client.crdtSpec(id)</span></code>. Plain and unknown models return <code class="docutils literal notranslate"><span class="pre">None</span></code> / <code class="docutils literal notranslate"><span class="pre">undefined</span></code>.</p>
+<p><code class="docutils literal notranslate"><span class="pre">CrdtDocument.diff(value,</span> <span class="pre">path=None)</span></code> returns mutation descriptors for replacing the materialized
+value at <code class="docutils literal notranslate"><span class="pre">path</span></code>. JavaScript uses <code class="docutils literal notranslate"><span class="pre">document.diff(value,</span> <span class="pre">path</span> <span class="pre">=</span> <span class="pre">[])</span></code>. The path contains map keys;
+it cannot traverse set members or sequence indexes. Missing map ancestors are created according
+to the specification. Planning does not change the replica, assign operation IDs, or send messages.</p>
+<p>Maps produce per-key additions, removals, and nested edits. Sets compare canonical member keys:
+retained members receive nested edits, missing members are removed, and new members are added.
+Changing an identity is a removal plus an addition. Set order has no effect; duplicate identities
+are rejected. Sequences produce one prefix/suffix splice, with string offsets in Unicode scalars.
+Register values are replaced. Invalid paths or values raise an error without changing state.</p>
+<p><code class="docutils literal notranslate"><span class="pre">Client.crdt_diff(id,</span> <span class="pre">value,</span> <span class="pre">path=None)</span></code> / <code class="docutils literal notranslate"><span class="pre">client.crdtDiff(id,</span> <span class="pre">value,</span> <span class="pre">path</span> <span class="pre">=</span> <span class="pre">[])</span></code> plans against the
+managed replica, including pending local operations. Unknown or non-CRDT model IDs raise an error.
+The result can be passed to <code class="docutils literal notranslate"><span class="pre">edit_crdt</span></code> / <code class="docutils literal notranslate"><span class="pre">editCrdt</span></code> or <code class="docutils literal notranslate"><span class="pre">propose_crdt</span></code> / <code class="docutils literal notranslate"><span class="pre">proposeCrdt</span></code> immediately.
+An unchanged value returns an empty list. Plans are relative to the observed state: applying one
+after intervening edits can overwrite newer intent. A stale replacement value can also remove
+observed keys or members absent from that value. Explicit mutations support intent that a final
+value cannot represent, such as precise editor ranges or an intentional remove-and-readd.</p>
 </section>
 <section id="protocol-helpers">
 <h2>Protocol helpers<a class="headerlink" href="#protocol-helpers" title="Link to this heading">¶</a></h2>
@@ -1875,6 +1909,9 @@ The accepted-change notification shape is unchanged.</p>
     <a href="#transports.Client.value">Client.value()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.crdt_diff">Client.crdt_diff()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.crdt_spec">Client.crdt_spec()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -2086,6 +2123,9 @@ The accepted-change notification shape is unchanged.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.CrdtDocument.apply">CrdtDocument.apply()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.CrdtDocument.diff">CrdtDocument.diff()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.CrdtDocument.member_key">CrdtDocument.member_key()</a>

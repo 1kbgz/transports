@@ -123,10 +123,12 @@ setup. The local 2026-10-15 development run recorded a median 7.5 ms for 1,000 t
 This is not comparable to the network fan-out latency or a stable CI timing threshold.
 
 ```{benched} ../../benchmarks/results
-:view: trend
-:metric: median
-:benchmark-filter: *test_private_patch_cost*
-:x-axis: time
+---
+view: trend
+metric: median
+benchmark-filter: '*test_private_patch_cost*'
+x-axis: time
+---
 ```
 
 A separate cProfile run spent 100 ms of 171 ms of cumulative Hub flush time in Session draining;
@@ -169,10 +171,12 @@ The report below is generated from committed benchmark records. It exposes the r
 benchmark parameters, timing distributions, and machine metadata.
 
 ```{benched} ../../benchmarks/results
-:view: trend
-:metric: median
-:benchmark-filter: test_fanout[[]*[]]
-:x-axis: time
+---
+view: trend
+metric: median
+benchmark-filter: test_fanout[[]*[]]
+x-axis: time
+---
 ```
 
 The [full interactive report](https://1kbgz.github.io/transports/benchmarks/) includes all committed

@@ -343,6 +343,15 @@ server snapshot and resends it when a managed WebSocket opens. The reducer’s c
 resend idempotent. <code class="docutils literal notranslate"><span class="pre">pending_crdt_ops()</span></code> / <code class="docutils literal notranslate"><span class="pre">pendingCrdtOps()</span></code> reports how many local operations still
 await an authoritative echo. The outbox has no automatic size limit; applications that allow long
 offline sessions should monitor that count and set their own editing or storage policy.</p>
+<p>To apply a control’s final value, plan against the current replica and submit the result immediately:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">mutations</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">crdt_diff</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="s2">"Updated title"</span><span class="p">,</span> <span class="n">path</span><span class="o">=</span><span class="p">[</span><span class="s2">"title"</span><span class="p">])</span>
+<span class="k">if</span> <span class="n">mutations</span><span class="p">:</span>
+    <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">propose_crdt</span><span class="p">(</span><span class="n">sid</span><span class="p">,</span> <span class="n">mutations</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>For map or keyed-set fields, pass the complete desired value at that path. Changes to retained
+keys and members become nested edits. Use explicit mutations when you already have precise editing
+intent, or when editing from a stale copy. See the <a class="reference internal" href="api.html#crdt-specifications"><span class="std std-ref">diff contract</span></a>.</p>
 <p>Host code uses <code class="docutils literal notranslate"><span class="pre">hub.mutate_shared_crdt(sid,</span> <span class="pre">mutations)</span></code>. With a <code class="docutils literal notranslate"><span class="pre">RelayBroadcaster</span></code>, use
 <code class="docutils literal notranslate"><span class="pre">await</span> <span class="pre">relay.mutate_shared_crdt(...)</span></code> so the operation also reaches other workers.</p>
 <p>To persist the model, store all arguments delivered to <code class="docutils literal notranslate"><span class="pre">Hub.on_shared_write</span></code>. Its <code class="docutils literal notranslate"><span class="pre">merge_state</span></code>
