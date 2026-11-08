@@ -208,6 +208,12 @@ impl CrdtDocument {
             .map_err(|error| JsError::new(&error))
     }
 
+    pub fn diff(&self, path_json: &str, value_json: &str) -> Result<String, JsError> {
+        self.inner
+            .diff(path_json, value_json)
+            .map_err(|e| JsError::new(&e))
+    }
+
     pub fn member_key(&self, path_json: &str, value_json: &str) -> Result<String, JsError> {
         self.inner
             .member_key(path_json, value_json)

@@ -208,6 +208,12 @@ impl CrdtDocument {
         self.inner.apply(ops_json).map_err(PyValueError::new_err)
     }
 
+    fn diff(&self, path_json: &str, value_json: &str) -> PyResult<String> {
+        self.inner
+            .diff(path_json, value_json)
+            .map_err(PyValueError::new_err)
+    }
+
     fn member_key(&self, path_json: &str, value_json: &str) -> PyResult<String> {
         self.inner
             .member_key(path_json, value_json)

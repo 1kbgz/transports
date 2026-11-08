@@ -116,6 +116,13 @@ impl JsonCrdtDocument {
         serde_json::to_string(&self.inner.apply(&ops)?).map_err(|error| error.to_string())
     }
 
+    pub fn diff(&self, path_json: &str, value_json: &str) -> Result<String, String> {
+        let path: Vec<String> =
+            serde_json::from_str(path_json).map_err(|error| error.to_string())?;
+        let value = serde_json::from_str(value_json).map_err(|error| error.to_string())?;
+        serde_json::to_string(&self.inner.diff(&path, &value)?).map_err(|error| error.to_string())
+    }
+
     pub fn member_key(&self, path_json: &str, value_json: &str) -> Result<String, String> {
         let path: CrdtPath = serde_json::from_str(path_json).map_err(|error| error.to_string())?;
         let value = serde_json::from_str(value_json).map_err(|error| error.to_string())?;

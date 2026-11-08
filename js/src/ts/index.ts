@@ -255,6 +255,16 @@ export class CrdtDocument {
     );
   }
 
+  /** Plan value edits without mutating this replica. Path selects map keys; set order is ignored. */
+  diff(value: unknown, path: string[] = []): CrdtMutation[] {
+    const wire = JSON.parse(
+      this.inner.diff(JSON.stringify(path), stringify(toValue(value))),
+    );
+    return wire.map(
+      (mutation: CrdtMutation) => wireItem(mutation, false) as CrdtMutation,
+    );
+  }
+
   memberKey(path: CrdtPath, value: unknown): string {
     return this.inner.member_key(
       JSON.stringify(path),

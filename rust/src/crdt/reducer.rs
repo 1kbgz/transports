@@ -588,6 +588,49 @@ impl CrdtDocument {
         Ok(change)
     }
 
+    /// Plan edits to a materialized value without assigning dots or changing this replica.
+    /// `path` selects map keys; sets are compared by canonical member identity, not list position.
+    pub fn diff(&self, path: &[String], value: &Value) -> Result<Vec<CrdtMutation>, String> {
+        let current = self.value()?;
+        let mut before = &current;
+        let mut policy = &self.spec.root;
+        let mut target = Vec::new();
+        for (index, key) in path.iter().enumerate() {
+            let (Value::Map(map), CrdtPolicy::Map { fields, values }) = (before, policy) else {
+                return Err("CRDT diff path must follow map keys".into());
+            };
+            policy = fields.get(key).unwrap_or(values);
+            if let Some(child) = map.get(key) {
+                before = child;
+                target.push(CrdtPathSegment::Key { key: key.clone() });
+            } else {
+                let mut child_policy = policy;
+                for key in &path[index + 1..] {
+                    let CrdtPolicy::Map { fields, values } = child_policy else {
+                        return Err("CRDT diff path must follow map keys".into());
+                    };
+                    child_policy = fields.get(key).unwrap_or(values);
+                }
+                let mut inserted = value.clone();
+                for key in path[index + 1..].iter().rev() {
+                    inserted = Value::Map(BTreeMap::from([(key.clone(), inserted)]));
+                }
+                node_from_value(policy, &inserted, &Dot::initial())?;
+                validate_diff_sets(policy, &inserted)?;
+                return Ok(vec![CrdtMutation::MapSet {
+                    path: target,
+                    key: key.clone(),
+                    value: inserted,
+                }]);
+            }
+        }
+        node_from_value(policy, value, &Dot::initial())?;
+        validate_diff_sets(policy, value)?;
+        let mut mutations = Vec::new();
+        diff_value(policy, before, value, &target, &mut mutations)?;
+        Ok(mutations)
+    }
+
     pub fn member_key(&self, path: &[CrdtPathSegment], value: &Value) -> Result<String, String> {
         let policy = policy_at_path(&self.spec.root, path)?;
         match policy {
@@ -1462,6 +1505,145 @@ fn set_member_active_adds(
             .into_iter()
             .collect()
     }))
+}
+
+fn validate_diff_sets(policy: &CrdtPolicy, value: &Value) -> Result<(), String> {
+    match (policy, value) {
+        (CrdtPolicy::Map { fields, values }, Value::Map(map)) => {
+            for (key, value) in map {
+                validate_diff_sets(fields.get(key).unwrap_or(values), value)?;
+            }
+        }
+        (CrdtPolicy::Set { keys, element }, Value::List(items)) => {
+            let mut seen = BTreeSet::new();
+            for item in items {
+                if !seen.insert(member_key(keys, item)?) {
+                    return Err("CRDT set value contains duplicate member identities".into());
+                }
+                validate_diff_sets(element, item)?;
+            }
+        }
+        (CrdtPolicy::Sequence { element, .. }, Value::List(items)) => {
+            for item in items {
+                validate_diff_sets(element, item)?;
+            }
+        }
+        _ => {}
+    }
+    Ok(())
+}
+
+fn diff_value(
+    policy: &CrdtPolicy,
+    before: &Value,
+    after: &Value,
+    path: &CrdtPath,
+    out: &mut Vec<CrdtMutation>,
+) -> Result<(), String> {
+    if before == after {
+        return Ok(());
+    }
+    match (policy, before, after) {
+        (CrdtPolicy::Register {}, _, _) => out.push(CrdtMutation::RegisterSet {
+            path: path.clone(),
+            value: after.clone(),
+        }),
+        (CrdtPolicy::Map { fields, values }, Value::Map(old), Value::Map(new)) => {
+            for key in old.keys().filter(|key| !new.contains_key(*key)) {
+                out.push(CrdtMutation::MapRemove {
+                    path: path.clone(),
+                    key: key.clone(),
+                });
+            }
+            for (key, value) in new {
+                if let Some(previous) = old.get(key) {
+                    let mut child = path.clone();
+                    child.push(CrdtPathSegment::Key { key: key.clone() });
+                    diff_value(
+                        fields.get(key).unwrap_or(values),
+                        previous,
+                        value,
+                        &child,
+                        out,
+                    )?;
+                } else {
+                    out.push(CrdtMutation::MapSet {
+                        path: path.clone(),
+                        key: key.clone(),
+                        value: value.clone(),
+                    });
+                }
+            }
+        }
+        (CrdtPolicy::Set { keys, element }, Value::List(old), Value::List(new)) => {
+            let index = |items: &[Value]| -> Result<BTreeMap<String, Value>, String> {
+                let mut result = BTreeMap::new();
+                for item in items {
+                    if result
+                        .insert(member_key(keys, item)?, item.clone())
+                        .is_some()
+                    {
+                        return Err("CRDT set value contains duplicate member identities".into());
+                    }
+                }
+                Ok(result)
+            };
+            let old = index(old)?;
+            let new = index(new)?;
+            for key in old.keys().filter(|key| !new.contains_key(*key)) {
+                out.push(CrdtMutation::SetRemove {
+                    path: path.clone(),
+                    key: key.clone(),
+                });
+            }
+            for (key, value) in new {
+                if let Some(previous) = old.get(&key) {
+                    let mut child = path.clone();
+                    child.push(CrdtPathSegment::Member { key });
+                    diff_value(element, previous, &value, &child, out)?;
+                } else {
+                    out.push(CrdtMutation::SetAdd {
+                        path: path.clone(),
+                        value,
+                    });
+                }
+            }
+        }
+        (
+            CrdtPolicy::Sequence {
+                materialization, ..
+            },
+            _,
+            _,
+        ) => {
+            let items = |value: &Value| -> Result<Vec<Value>, String> {
+                match (materialization, value) {
+                    (SequenceMaterialization::String, Value::Str(text)) => {
+                        Ok(text.chars().map(|ch| Value::Str(ch.to_string())).collect())
+                    }
+                    (SequenceMaterialization::List, Value::List(items)) => Ok(items.clone()),
+                    _ => Err("CRDT sequence value does not match materialization".into()),
+                }
+            };
+            let old = items(before)?;
+            let new = items(after)?;
+            let start = old.iter().zip(&new).take_while(|(a, b)| a == b).count();
+            let end = old[start..]
+                .iter()
+                .rev()
+                .zip(new[start..].iter().rev())
+                .take_while(|(a, b)| a == b)
+                .count();
+            out.push(CrdtMutation::SequenceSplice {
+                path: path.clone(),
+                index: start,
+                delete_count: old.len() - start - end,
+                values: new[start..new.len() - end].to_vec(),
+            });
+        }
+        _ => return Err("CRDT value does not match policy".into()),
+    }
+    Ok(())
 }
 
 fn value_at_key_path<'a>(mut value: &'a Value, path: &[String]) -> Result<&'a Value, String> {

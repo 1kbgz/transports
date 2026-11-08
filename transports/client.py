@@ -389,6 +389,13 @@ class Client:
         """The current mirrored core `Value` of a model."""
         return self._values[mid]
 
+    def crdt_diff(self, mid: int, value: Any, path: list[str] | None = None) -> list[dict]:
+        """Plan value edits against the current CRDT replica without sending or mutating."""
+        document = self._crdt.get(mid)
+        if document is None:
+            raise KeyError(f"model {mid} is not CRDT-backed")
+        return document.diff(value, path)
+
     def crdt_spec(self, mid: int) -> CrdtSpec | None:
         """The canonical merge specification for a CRDT-backed model, else ``None``."""
         document = self._crdt.get(mid)

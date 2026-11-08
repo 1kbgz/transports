@@ -842,3 +842,29 @@ def test_retiring_tenant_keeps_shared_crdt_data_and_replica_ownership():
     # The original owner can still resend an acknowledged CRDT operation after reauthorization.
     hub.recv(alice, message)
     assert hub.snapshot_shared(sid)["value"] == {"Str": "kept"}
+
+
+def test_client_structural_diff_is_read_only_and_replays_offline_edits():
+    from transports._bridge import _py_of
+
+    spec = CrdtSpec({"kind": "map", "fields": {"rows": {"kind": "set", "keys": [["id"]], "element": {"kind": "map"}}}})
+    hub = Hub(key=lambda conn: conn)
+    sid = hub.share({"Map": {"rows": {"List": []}}}, "Rows", crdt_spec=spec)
+    hub.subscribe("writer", sid, WRITE)
+    client = Client()
+    [snapshot] = hub.open("writer")
+    client.recv(snapshot)
+    plan = client.crdt_diff(sid, [{"id": "a", "label": "Added"}], ["rows"])
+    assert client.pending_crdt_ops(sid) == 0
+    assert _py_of(client.value(sid)) == {"rows": []}
+    frame = client.edit_crdt(sid, plan)
+    hub.close("writer")
+    [snapshot] = hub.open("writer")
+    client.recv(snapshot)
+    output = hub.recv("writer", frame)
+    for wire in output["writer"]:
+        client.recv(wire)
+    assert _py_of(client.value(sid)) == {"rows": [{"id": "a", "label": "Added"}]}
+    assert client.pending_crdt_ops(sid) == 0
+    with pytest.raises(KeyError, match="not CRDT-backed"):
+        client.crdt_diff(999, {})
