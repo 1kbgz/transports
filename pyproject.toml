@@ -69,7 +69,7 @@ develop = [
     "httpx-sse",
     "ipykernel",
     "mdformat",
-    "mdformat-frontmatter",
+    "mdformat-myst",
     "mdformat-tables>=1",
     "psutil",
     "pytest",
