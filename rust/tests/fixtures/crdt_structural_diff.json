@@ -1,0 +1,234 @@
+{
+  "spec": {
+    "root": {
+      "kind": "map",
+      "fields": {
+        "settings": {
+          "kind": "map",
+          "fields": {
+            "nested": {
+              "kind": "map"
+            }
+          }
+        },
+        "rows": {
+          "kind": "set",
+          "keys": [
+            [
+              "id"
+            ]
+          ],
+          "element": {
+            "kind": "map",
+            "fields": {
+              "notes": {
+                "kind": "sequence",
+                "materialization": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "initial": {
+    "Map": {
+      "settings": {
+        "Map": {
+          "theme": {
+            "Str": "dark"
+          },
+          "obsolete": {
+            "Bool": true
+          }
+        }
+      },
+      "rows": {
+        "List": [
+          {
+            "Map": {
+              "id": {
+                "Str": "a"
+              },
+              "label": {
+                "Str": "A"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": "a\ud83d\ude42b"
+              }
+            }
+          },
+          {
+            "Map": {
+              "id": {
+                "Str": "b"
+              },
+              "label": {
+                "Str": "B"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "left": {
+    "Map": {
+      "settings": {
+        "Map": {
+          "theme": {
+            "Str": "light"
+          }
+        }
+      },
+      "rows": {
+        "List": [
+          {
+            "Map": {
+              "id": {
+                "Str": "a"
+              },
+              "label": {
+                "Str": "Edited"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": "a\u03bbb"
+              }
+            }
+          },
+          {
+            "Map": {
+              "id": {
+                "Str": "c"
+              },
+              "label": {
+                "Str": "C"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "right": {
+    "Map": {
+      "settings": {
+        "Map": {
+          "theme": {
+            "Str": "dark"
+          },
+          "obsolete": {
+            "Bool": true
+          },
+          "added": {
+            "Int": 1
+          }
+        }
+      },
+      "rows": {
+        "List": [
+          {
+            "Map": {
+              "id": {
+                "Str": "a"
+              },
+              "label": {
+                "Str": "A"
+              },
+              "done": {
+                "Bool": true
+              },
+              "notes": {
+                "Str": "a\ud83d\ude42b"
+              }
+            }
+          },
+          {
+            "Map": {
+              "id": {
+                "Str": "b"
+              },
+              "label": {
+                "Str": "B"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  },
+  "merged": {
+    "Map": {
+      "settings": {
+        "Map": {
+          "theme": {
+            "Str": "light"
+          },
+          "added": {
+            "Int": 1
+          }
+        }
+      },
+      "rows": {
+        "List": [
+          {
+            "Map": {
+              "id": {
+                "Str": "a"
+              },
+              "label": {
+                "Str": "Edited"
+              },
+              "done": {
+                "Bool": true
+              },
+              "notes": {
+                "Str": "a\u03bbb"
+              }
+            }
+          },
+          {
+            "Map": {
+              "id": {
+                "Str": "c"
+              },
+              "label": {
+                "Str": "C"
+              },
+              "done": {
+                "Bool": false
+              },
+              "notes": {
+                "Str": ""
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

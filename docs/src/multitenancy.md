@@ -187,6 +187,18 @@ resend idempotent. `pending_crdt_ops()` / `pendingCrdtOps()` reports how many lo
 await an authoritative echo. The outbox has no automatic size limit; applications that allow long
 offline sessions should monitor that count and set their own editing or storage policy.
 
+To apply a control's final value, plan against the current replica and submit the result immediately:
+
+```python
+mutations = client.crdt_diff(sid, "Updated title", path=["title"])
+if mutations:
+    await client.propose_crdt(sid, mutations)
+```
+
+For map or keyed-set fields, pass the complete desired value at that path. Changes to retained
+keys and members become nested edits. Use explicit mutations when you already have precise editing
+intent, or when editing from a stale copy. See the [diff contract](api.md#crdt-specifications).
+
 Host code uses `hub.mutate_shared_crdt(sid, mutations)`. With a `RelayBroadcaster`, use
 `await relay.mutate_shared_crdt(...)` so the operation also reaches other workers.
 

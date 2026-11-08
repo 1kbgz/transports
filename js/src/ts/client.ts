@@ -889,6 +889,13 @@ export class Client {
     return this.values.get(id);
   }
 
+  /** Plan value edits against the current CRDT replica without sending or mutating. */
+  crdtDiff(id: number, value: unknown, path: string[] = []): CrdtMutation[] {
+    const document = this.crdt.get(id);
+    if (!document) throw new Error(`model ${id} is not CRDT-backed`);
+    return document.diff(value, path);
+  }
+
   /** The canonical merge specification for a CRDT-backed model, else undefined. */
   crdtSpec(id: number): CrdtSpec | undefined {
     return this.crdt.get(id)?.spec;

@@ -131,3 +131,48 @@ def test_python_crdt_binding_exposes_validation_identity_and_compaction():
     )
     compacted.mutate([{"kind": "map_remove", "path": [], "key": "old"}])
     assert compacted.compact({"map": 1}) == 1
+
+
+def test_structural_diff_matches_shared_fixture_and_preserves_concurrent_fields():
+    from transports._bridge import _py_of
+
+    fixture = json.loads((Path(__file__).parents[2] / "rust/tests/fixtures/crdt_structural_diff.json").read_text())
+    spec = CrdtSpec.from_dict(fixture["spec"])
+    left, right = (CrdtDocument(spec, _py_of(fixture["initial"]), replica) for replica in ("a", "b"))
+    before = left.state
+    planned = left.diff(_py_of(fixture["left"]))
+    assert left.state == before
+    a = left.mutate(planned)
+    b = right.mutate(right.diff(_py_of(fixture["right"])))
+    left.apply(b["ops"])
+    right.apply(a["ops"])
+    left.apply(b["ops"])
+    assert left.value == right.value == _py_of(fixture["merged"])
+    assert not left.diff(left.value)
+    assert not left.diff(list(reversed(left.value["rows"])), ["rows"])
+    with pytest.raises(ValueError, match="duplicate"):
+        left.diff([left.value["rows"][0]] * 2, ["rows"])
+    with pytest.raises(ValueError, match="map keys"):
+        left.diff("invalid", ["rows", "0", "label"])
+    left.mutate(left.diff(True, ["settings", "nested", "enabled"]))
+    assert left.value["settings"]["nested"] == {"enabled": True}
+
+
+def test_structural_diff_preserves_binary_registers_and_validates_missing_paths():
+    document = CrdtDocument(CrdtSpec({"kind": "map"}), {"sample": b"old"}, "a")
+    plan = document.diff(b"new", ["sample"])
+    assert plan == [{"kind": "register_set", "path": [{"kind": "key", "key": "sample"}], "value": b"new"}]
+    document.mutate(plan)
+    assert document.value == {"sample": b"new"}
+    with pytest.raises(ValueError, match="map keys"):
+        document.diff(True, ["missing", "nested"])
+    assert document.value == {"sample": b"new"}
+
+
+@pytest.mark.parametrize("path", [False, 0, "", {}, [0]])
+def test_structural_diff_rejects_invalid_paths_without_changing_state(path):
+    document = CrdtDocument(CrdtSpec({"kind": "map"}), {"sample": "old"}, "a")
+    state = document.state
+    with pytest.raises(ValueError):
+        document.diff({"sample": "new"}, path)
+    assert document.state == state

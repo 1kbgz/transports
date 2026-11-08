@@ -166,6 +166,11 @@ class CrdtDocument:
         effect = cast(dict[str, Any], json.loads(self._inner.apply(json.dumps(wire, allow_nan=False))))
         return _public_effect(effect)
 
+    def diff(self, value: Any, path: list[str] | None = None) -> list[CrdtMutation]:
+        """Plan edits without mutating this replica. Path selects map keys; set order is ignored."""
+        wire = json.loads(self._inner.diff(json.dumps([] if path is None else path, allow_nan=False), json.dumps(_value_of(value), allow_nan=False)))
+        return [_wire_item(mutation, encode=False) for mutation in wire]
+
     def member_key(self, path: list[CrdtPathSegment], value: Any) -> str:
         """Return canonical identity for a value at a set path."""
         return self._inner.member_key(json.dumps(path, allow_nan=False), json.dumps(_value_of(value), allow_nan=False))

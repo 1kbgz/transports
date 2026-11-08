@@ -126,6 +126,25 @@ stable-ID delete and insert operations used on the wire. Transfer `state` to ano
 After a CRDT snapshot, `Client.crdt_spec(id)` returns that model's canonical specification. The
 JavaScript spelling is `client.crdtSpec(id)`. Plain and unknown models return `None` / `undefined`.
 
+`CrdtDocument.diff(value, path=None)` returns mutation descriptors for replacing the materialized
+value at `path`. JavaScript uses `document.diff(value, path = [])`. The path contains map keys;
+it cannot traverse set members or sequence indexes. Missing map ancestors are created according
+to the specification. Planning does not change the replica, assign operation IDs, or send messages.
+
+Maps produce per-key additions, removals, and nested edits. Sets compare canonical member keys:
+retained members receive nested edits, missing members are removed, and new members are added.
+Changing an identity is a removal plus an addition. Set order has no effect; duplicate identities
+are rejected. Sequences produce one prefix/suffix splice, with string offsets in Unicode scalars.
+Register values are replaced. Invalid paths or values raise an error without changing state.
+
+`Client.crdt_diff(id, value, path=None)` / `client.crdtDiff(id, value, path = [])` plans against the
+managed replica, including pending local operations. Unknown or non-CRDT model IDs raise an error.
+The result can be passed to `edit_crdt` / `editCrdt` or `propose_crdt` / `proposeCrdt` immediately.
+An unchanged value returns an empty list. Plans are relative to the observed state: applying one
+after intervening edits can overwrite newer intent. A stale replacement value can also remove
+observed keys or members absent from that value. Explicit mutations support intent that a final
+value cannot represent, such as precise editor ranges or an intentional remove-and-readd.
+
 ## Protocol helpers
 
 ```{eval-rst}

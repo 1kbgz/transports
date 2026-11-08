@@ -1433,3 +1433,52 @@ test("model types are available during notifications and survive disconnect", ()
   expect(state.type_name(7n)).toBe("Orders");
   expect(state.type_name(8n)).toBeUndefined();
 });
+
+test("structural diff matches the shared fixture and preserves concurrent fields", () => {
+  const fixture = JSON.parse(
+    fs.readFileSync("../rust/tests/fixtures/crdt_structural_diff.json", "utf8"),
+  );
+  const spec = CrdtSpec.fromObject(fixture.spec);
+  const left = new CrdtDocument(spec, fromValue(fixture.initial), "a");
+  const right = new CrdtDocument(spec, fromValue(fixture.initial), "b");
+  const before = left.state;
+  const planned = left.diff(fromValue(fixture.left));
+  expect(left.state).toEqual(before);
+  const a = left.mutate(planned);
+  const b = right.mutate(right.diff(fromValue(fixture.right)));
+  left.apply(b.ops);
+  right.apply(a.ops);
+  left.apply(b.ops);
+  expect(left.value).toEqual(fromValue(fixture.merged));
+  expect(right.value).toEqual(left.value);
+  expect(left.diff(left.value)).toEqual([]);
+  expect(left.diff([...left.value.rows].reverse(), ["rows"])).toEqual([]);
+  expect(() =>
+    left.diff([left.value.rows[0], left.value.rows[0]], ["rows"]),
+  ).toThrow(/duplicate/);
+  expect(() => left.diff("invalid", ["rows", "0", "label"])).toThrow(
+    /map keys/,
+  );
+  left.mutate(left.diff(true, ["settings", "nested", "enabled"]));
+  expect(left.value.settings.nested).toEqual({ enabled: true });
+});
+
+test("structural diffs preserve binary registers and validate missing paths", () => {
+  const document = new CrdtDocument(
+    new CrdtSpec({ kind: "map" }),
+    { sample: new Uint8Array([1]) },
+    "a",
+  );
+  const plan = document.diff(new Uint8Array([2, 3]), ["sample"]);
+  expect(plan).toEqual([
+    {
+      kind: "register_set",
+      path: [{ kind: "key", key: "sample" }],
+      value: new Uint8Array([2, 3]),
+    },
+  ]);
+  document.mutate(plan);
+  expect(document.value).toEqual({ sample: new Uint8Array([2, 3]) });
+  expect(() => document.diff(true, ["missing", "nested"])).toThrow(/map keys/);
+  expect(() => new Client().crdtDiff(999, {})).toThrow(/not CRDT-backed/);
+});
