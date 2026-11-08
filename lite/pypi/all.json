@@ -1,24 +1,24 @@
 {
   "transports": {
     "releases": {
-      "0.12.1": [
+      "0.12.2": [
         {
           "comment_text": "",
           "digests": {
-            "md5": "82ae27b279ae2dc34a89044b981c6218",
-            "sha256": "0424022fe752e00bbe1eeebcd4d682e6e9f9daf8f7cbb543bf8629efc4c54a5f"
+            "md5": "e083d15f889fc2f0221d3aa9898d4359",
+            "sha256": "74a677b56e30b44cc00d087824dee2b8a1b0578624947be8d564a3c04fc361a0"
           },
           "downloads": -1,
-          "filename": "transports-0.12.1-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+          "filename": "transports-0.12.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
           "has_sig": false,
-          "md5_digest": "82ae27b279ae2dc34a89044b981c6218",
+          "md5_digest": "e083d15f889fc2f0221d3aa9898d4359",
           "packagetype": "bdist_wheel",
           "python_version": "py3",
           "requires_python": ">=3.10",
-          "size": 2427050,
-          "upload_time": "2026-11-08T17:17:52.532102Z",
-          "upload_time_iso_8601": "2026-11-08T17:17:52.532102Z",
-          "url": "./transports-0.12.1-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
+          "size": 2427046,
+          "upload_time": "2026-11-08T17:36:50.599865Z",
+          "upload_time_iso_8601": "2026-11-08T17:36:50.599865Z",
+          "url": "./transports-0.12.2-cp314-cp314-pyemscripten_2026_0_wasm32.whl",
           "yanked": false,
           "yanked_reason": null
         }
