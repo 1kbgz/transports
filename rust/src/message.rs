@@ -122,6 +122,14 @@ enum KnownMessage {
         peer: Option<String>,
         state: Option<serde_json::Value>,
     },
+    #[serde(rename = "scoped_awareness")]
+    ScopedAwareness {
+        id: u64,
+        scope: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        peer: Option<String>,
+        state: Option<serde_json::Value>,
+    },
     #[serde(rename = "batch")]
     Batch { msgs: Vec<Message> },
 }
@@ -194,6 +202,18 @@ impl From<KnownMessage> for Message {
                 crdt_ops,
             },
             KnownMessage::Awareness { id, peer, state } => Message::Awareness { id, peer, state },
+            KnownMessage::ScopedAwareness {
+                id,
+                scope,
+                peer,
+                state,
+            } => {
+                let mut value = serde_json::json!({"t": "scoped_awareness", "id": id, "scope": scope, "state": state});
+                if let Some(peer) = peer {
+                    value["peer"] = peer.into();
+                }
+                Message::Unknown(value)
+            }
             KnownMessage::Batch { msgs } => Message::Batch { msgs },
         }
     }
@@ -317,7 +337,7 @@ impl<'de> Deserialize<'de> for Message {
                 .map_err(serde::de::Error::custom),
             Some(
                 "snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "awareness"
-                | "batch",
+                | "scoped_awareness" | "batch",
             ) => value
                 .deserialized::<KnownMessage>()
                 .map(Message::from)
@@ -581,6 +601,9 @@ mod message_tests {
                 proposal: Some("editor-6".into()),
                 crdt_ops: None,
             },
+            Message::Unknown(serde_json::json!({
+                "t": "scoped_awareness", "id": 8, "scope": "editor", "peer": "peer-1", "state": {"selection": {"anchor": 2, "head": 4}}
+            })),
             Message::Awareness {
                 id: 8,
                 peer: Some("peer-1".into()),

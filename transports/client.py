@@ -49,8 +49,8 @@ class Client:
         self._crdt_outbox: list[dict] = []
         self._codec = protocol.normalize_codec(codec)
         self._change_cbs: list[Callable[[dict], None]] = []
-        self._awareness: dict[int, dict[str, Any]] = {}
-        self._local_awareness: dict[int, str | bytes] = {}
+        self._awareness: dict[tuple[int, str | None], dict[str, Any]] = {}
+        self._local_awareness: dict[tuple[int, str | None], str | bytes] = {}
         self._awareness_cbs: list[Callable[[dict], None]] = []
         self._ack_cbs: list[Callable[[dict], None]] = []
         self._reject_cbs: list[Callable[[dict], None]] = []
@@ -112,17 +112,18 @@ class Client:
         frame = self.edit_crdt(mid, mutations)
         return await self.send(frame)
 
-    async def set_awareness(self, mid: int, state: Any | None) -> bool:
+    async def set_awareness(self, mid: int, state: Any | None, *, scope: str | None = None) -> bool:
         """Publish ephemeral state for one model, or clear it with ``None``.
 
         The latest non-null state is retained locally and republished when a managed connection
-        opens. This keeps presence visible across reconnects without adding it to durable state.
+        opens. A named ``scope`` publishes independently of unscoped state and other scopes;
+        None withdraws only the selected scope. Awareness requires a shared Hub model.
         """
-        frame = protocol.encode(protocol.awareness_msg(mid, state), self._codec)
+        frame = protocol.encode(protocol.awareness_msg(mid, state, scope=scope), self._codec)
         if state is None:
-            self._local_awareness.pop(mid, None)
+            self._local_awareness.pop((mid, scope), None)
         else:
-            self._local_awareness[mid] = frame
+            self._local_awareness[mid, scope] = frame
         return await self.send(frame)
 
     async def _send_proposal(self, frame: str | bytes) -> bool:
@@ -151,10 +152,20 @@ class Client:
         self._reject_cbs.append(callback)
         return lambda: self._reject_cbs.remove(callback)
 
-    def on_awareness(self, callback: Callable[[dict], None]) -> Callable[[], None]:
-        """Register for remote awareness updates and removals (``state`` is ``None``)."""
-        self._awareness_cbs.append(callback)
-        return lambda: self._awareness_cbs.remove(callback)
+    def on_awareness(self, callback: Callable[[dict], None], *, scope: str | None = None) -> Callable[[], None]:
+        """Observe updates/removals for one scope (unscoped by default); unsubscribe does not withdraw state."""
+
+        def scoped(update: dict) -> None:
+            if update.get("scope") == scope:
+                callback(update)
+
+        self._awareness_cbs.append(scoped)
+
+        def stop() -> None:
+            if scoped in self._awareness_cbs:
+                self._awareness_cbs.remove(scoped)
+
+        return stop
 
     def on_ack(self, callback: Callable[[dict], None]) -> Callable[[], None]:
         """Register a callback fired when the server accepts a tagged proposal.
@@ -222,9 +233,9 @@ class Client:
         if abandoned:
             for callback in list(self._abandon_cbs):
                 callback(abandoned)
-        for mid, peers in list(self._awareness.items()):
+        for (mid, scope), peers in list(self._awareness.items()):
             for peer in list(peers):
-                update = {"t": "awareness", "id": mid, "peer": peer, "state": None}
+                update = json.loads(protocol.awareness_msg(mid, None, peer, scope=scope))
                 for callback in list(self._awareness_cbs):
                     callback(update)
         self._awareness.clear()
@@ -310,7 +321,7 @@ class Client:
         metadata = {key: value for key, value in msg.items() if key not in ("value", "ops", "effect", "state", "spec", "crdt_ops", "patch")}
         if "patch" in msg:
             metadata["patch"] = {"rev": msg["patch"]["rev"]}
-        if msg.get("t") == "awareness":
+        if msg.get("t") in ("awareness", "scoped_awareness"):
             metadata["state"] = msg["state"]
         effect_json = self._state.prepare(json.dumps(metadata))
         effect = json.loads(effect_json)
@@ -369,14 +380,20 @@ class Client:
                 callback(msg)
             return None
         elif kind == "awareness":
+            scope = msg["scope"] if msg["t"] == "scoped_awareness" else None
+            kind = "scoped_awareness" if scope is not None else "awareness"
+            msg = {"t": kind, "id": effect["id"], "peer": effect["peer"], "state": effect["state"]}
+            if kind == "scoped_awareness":
+                msg["scope"] = scope
             mid = msg["id"]
             peer = msg["peer"]
             state = msg.get("state")
-            peers = self._awareness.setdefault(mid, {})
+            awareness_key = (mid, msg.get("scope") if kind == "scoped_awareness" else None)
+            peers = self._awareness.setdefault(awareness_key, {})
             if state is None:
                 peers.pop(peer, None)
                 if not peers:
-                    self._awareness.pop(mid, None)
+                    self._awareness.pop(awareness_key, None)
             else:
                 peers[peer] = state
             for callback in list(self._awareness_cbs):
@@ -420,9 +437,9 @@ class Client:
         """Number of local CRDT operations awaiting an authoritative echo."""
         return sum(len(pending["ops"]) for pending in self._crdt_outbox if mid is None or pending["id"] == mid)
 
-    def awareness(self, mid: int) -> dict[str, Any]:
+    def awareness(self, mid: int, *, scope: str | None = None) -> dict[str, Any]:
         """Snapshot remote ephemeral state keyed by server-assigned peer id."""
-        return dict(self._awareness.get(mid, {}))
+        return dict(self._awareness.get((mid, scope), {}))
 
     def abandon_proposal(self, proposal: str) -> bool:
         """Stop tracking one proposal that the caller did not send.

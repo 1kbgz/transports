@@ -179,6 +179,30 @@ Hub also sends a removal when the connection closes. Read-only subscribers may p
 it does not grant model write access. Payload meaning, user identity, names, colors, and rendering
 remain application concerns.
 
+### Independent awareness scopes
+
+Use a named scope when multiple components publish state on one model and connection:
+
+```python
+await client.set_awareness(document_id, {"anchor": 12}, scope="editor")
+await client.set_awareness(document_id, {"row": "order-42"}, scope="table")
+client.on_awareness(handle_editor_selection, scope="editor")
+client.awareness(document_id, scope="table")
+await client.set_awareness(document_id, None, scope="editor")
+```
+
+JavaScript accepts `{scope: "editor"}` as the final argument to `setAwareness`, `onAwareness`,
+and `awareness`. Each call replaces only that scope's state; null withdraws only that scope.
+Repeated writes to the same scope use the last value. Scope names are application-defined strings.
+Subscriptions observe future updates; read `awareness` for current peers when subscribing late.
+Unsubscribing removes the callback without withdrawing state.
+
+Calls without a scope retain their existing full-payload behavior and receive only unscoped updates.
+Closing a connection removes all its scopes; reconnect republishes each retained scope's latest value.
+Scoped messages use `scoped_awareness`, which older clients ignore. Publishing scopes requires a Hub
+with scoped-awareness support. Neither scoped nor unscoped awareness currently crosses relay workers
+or expires independently of connection cleanup.
+
 ## Use an existing WebRTC data channel
 
 transports can manage an `RTCDataChannel` after your application negotiates it. Signaling and

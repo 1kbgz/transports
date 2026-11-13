@@ -349,6 +349,7 @@ export type { Value } from "./bridge";
 
 // WebSocket client that mirrors a remote Session.
 export { Client } from "./client";
+export type { AwarenessMsg, ScopedAwarenessMsg } from "./client";
 export type {
   AckMsg,
   CommandMsg,

@@ -227,7 +227,7 @@ class Hub:
         self._conns_by_key: dict[Any, set[Any]] = {}
         self._codecs: dict[Any, str] = {}
         self._peer_ids: dict[Any, str] = {}
-        self._awareness: dict[int, dict[Any, Any]] = {}
+        self._awareness: dict[tuple[int, str | None], dict[Any, Any]] = {}
         self._shared_outbox: list[tuple] = []  # (sid, fan_patch) from host-side writes
         self._crdt_outbox: list[tuple[int, list[dict]]] = []
         self._control_outbox: dict[Any, list[Wire]] = {}
@@ -439,10 +439,13 @@ class Hub:
                             sh.crdt.state,
                         )
                     out.append(self._encode_for(conn, message))
-                    for peer_conn, state in self._awareness.get(sid, {}).items():
-                        if peer_conn != conn and peer_conn in self._peer_ids:
-                            message = protocol.awareness_msg(sid, state, self._peer_ids[peer_conn])
-                            out.append(self._encode_for(conn, message))
+                    for (model, scope), peers in self._awareness.items():
+                        if model != sid:
+                            continue
+                        for peer_conn, state in peers.items():
+                            if peer_conn != conn and peer_conn in self._peer_ids:
+                                message = protocol.awareness_msg(sid, state, self._peer_ids[peer_conn], scope=scope)
+                                out.append(self._encode_for(conn, message))
             return out
         except Exception:
             self.close(conn)
@@ -477,21 +480,25 @@ class Hub:
             for target, tagged in self._flush_tenant_tagged(key).items():
                 out.setdefault(target, []).extend(wire for _, wire in tagged)
             return out
-        if msg.get("t") == "awareness":
+        if msg.get("t") in ("awareness", "scoped_awareness"):
             sid = msg["id"]
             key = self._conn_key.get(conn)
             shared = self._shared.get(sid)
             if shared is None or key not in shared.subs:
                 return {}
-            peers = self._awareness.setdefault(sid, {})
+            scope = msg["scope"] if msg["t"] == "scoped_awareness" else None
+            if scope is not None and not isinstance(scope, str):
+                raise TypeError("awareness scope must be a string")
+            awareness_key = (sid, scope)
+            peers = self._awareness.setdefault(awareness_key, {})
             state = msg.get("state")
             if state is None:
                 peers.pop(conn, None)
                 if not peers:
-                    self._awareness.pop(sid, None)
+                    self._awareness.pop(awareness_key, None)
             else:
                 peers[conn] = state
-            message = protocol.awareness_msg(sid, state, self._peer_ids[conn])
+            message = protocol.awareness_msg(sid, state, self._peer_ids[conn], scope=scope)
             targets = (target for tenant in shared.subs for target in self._conns_by_key.get(tenant, ()) if target != conn)
             return self._encode_many(targets, [message])
         if msg.get("t") not in ("patch", "crdt"):
@@ -874,12 +881,12 @@ class Hub:
             for target, messages in controller.close(conn).items():
                 out.setdefault(target, []).extend(self._encode_for(target, message) for message in messages)
         if peer is not None:
-            for sid in removed:
+            for sid, scope in removed:
                 shared = self._shared.get(sid)
                 if shared is None:
                     continue
                 targets = (target for tenant in shared.subs for target in self._conns_by_key.get(tenant, ()))
-                for target, messages in self._encode_many(targets, [protocol.awareness_msg(sid, None, peer)]).items():
+                for target, messages in self._encode_many(targets, [protocol.awareness_msg(sid, None, peer, scope=scope)]).items():
                     out.setdefault(target, []).extend(messages)
         return out
 

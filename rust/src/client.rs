@@ -131,6 +131,13 @@ enum ClientMessage {
         peer: String,
         state: Option<serde_json::Value>,
     },
+    #[serde(rename = "scoped_awareness")]
+    ScopedAwareness {
+        id: u64,
+        scope: String,
+        peer: String,
+        state: Option<serde_json::Value>,
+    },
     #[serde(rename = "batch")]
     Batch,
     #[serde(other)]
@@ -233,6 +240,14 @@ impl ClientState {
                 state: state.clone(),
             }),
             Message::Awareness { peer: None, .. } => Ok(ClientEffect::Ignore),
+            Message::Unknown(value)
+                if value.get("t").and_then(|t| t.as_str()) == Some("scoped_awareness") =>
+            {
+                if value.get("peer").is_none_or(serde_json::Value::is_null) {
+                    return Ok(ClientEffect::Ignore);
+                }
+                ClientEffect::from_json(&self.prepare_json(&value.to_string())?)
+            }
             Message::Ownership(_) | Message::Unknown(_) => Ok(ClientEffect::Ignore),
             Message::Batch { .. } => Err("batch messages must be prepared in order".into()),
         }
@@ -289,6 +304,15 @@ impl ClientState {
                 proposal,
             },
             ClientMessage::Awareness { id, peer, state } => {
+                ClientEffect::Awareness { id, peer, state }
+            }
+            ClientMessage::ScopedAwareness {
+                id,
+                scope,
+                peer,
+                state,
+            } => {
+                let _ = scope;
                 ClientEffect::Awareness { id, peer, state }
             }
             ClientMessage::Unknown => ClientEffect::Ignore,
@@ -466,6 +490,29 @@ mod client_tests {
             effect: None,
             proposal: None,
         }
+    }
+
+    #[test]
+    fn scoped_awareness_validates_metadata_without_changing_public_effects() {
+        let client = ClientState::new();
+        let json = r#"{"t":"scoped_awareness","id":8,"scope":"editor","peer":"alice","state":{"anchor":2}}"#;
+        let message = Message::from_json(json).unwrap();
+        let expected = ClientEffect::Awareness {
+            id: 8,
+            peer: "alice".into(),
+            state: Some(serde_json::json!({"anchor":2})),
+        };
+        assert_eq!(client.prepare(&message).unwrap(), expected);
+        assert_eq!(
+            ClientEffect::from_json(&client.prepare_json(json).unwrap()).unwrap(),
+            expected
+        );
+        assert!(client
+            .prepare_json(
+                r#"{"t":"scoped_awareness","id":8,"scope":false,"peer":"alice","state":null}"#
+            )
+            .is_err());
+        assert!(Message::from_json(r#"{"t":"scoped_awareness","id":8,"state":null}"#).is_err());
     }
 
     #[test]

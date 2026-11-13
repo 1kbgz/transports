@@ -161,9 +161,13 @@ def reject_msg(
     return json.dumps(msg)
 
 
-def awareness_msg(model_id: int, state: Any | None, peer: str | None = None) -> str:
+def awareness_msg(model_id: int, state: Any | None, peer: str | None = None, *, scope: str | None = None) -> str:
     """Build ephemeral per-model awareness. ``peer`` is assigned by the server on fan-out."""
     msg = {"t": "awareness", "id": model_id, "state": state}
+    if scope is not None:
+        if not isinstance(scope, str):
+            raise TypeError("awareness scope must be a string")
+        msg.update(t="scoped_awareness", scope=scope)
     if peer is not None:
         msg["peer"] = peer
     return json.dumps(msg)
