@@ -14,7 +14,7 @@
     <link rel="stylesheet" type="text/css" href="../../_static/graphviz.css?v=4ae1632d" />
     <link rel="stylesheet" type="text/css" href="../../_static/autodoc_pydantic.css" />
     <link rel="stylesheet" type="text/css" href="../../_static/benched/benched.css?v=ead03eb6" />
-    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=95c83b7e" />
+    <link rel="stylesheet" type="text/css" href="../../_static/sphinx-design.min.css?v=6a604523" />
     <link rel="stylesheet" type="text/css" href="../../_static/fonts/fuma-fonts.css?v=c2892c73" />
     <link rel="stylesheet" type="text/css" href="../../_static/styles/custom.css?v=88c24c6a" />
     <script src="../../_static/documentation_options.js?v=f24cbf82"></script>
@@ -23,7 +23,7 @@
     <script src="../../_static/clipboard.min.js?v=a7894cd8"></script>
     <script src="../../_static/copybutton.js?v=f281be69"></script>
     <script type="module" src="../../_static/benched/benched.js?v=8a4d8cf8"></script>
-    <script src="../../_static/design-tabs.js?v=f930bc37"></script>
+    <script data-sd-tabs-storage-prefix="sphinx-design-tab-id-" src="../../_static/design-tabs.js?v=fcb327ea"></script>
     <script data-searchlite-index="searchlite-index.json" defer="defer" src="../../_static/searchlite.js?v=a5320898"></script>
     <script defer="defer" src="../../_static/fuma.js?v=9c325f6c"></script>
     <script src="../../_static/js/custom.js?v=956e5d78"></script>
@@ -158,6 +158,9 @@
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#publish-ephemeral-awareness">Publish ephemeral awareness</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#independent-awareness-scopes">Independent awareness scopes</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#use-an-existing-webrtc-data-channel">Use an existing WebRTC data channel</a>
@@ -344,6 +347,27 @@ that produces no model frame. Pass <code class="docutils literal notranslate"><s
 Hub also sends a removal when the connection closes. Read-only subscribers may publish awareness;
 it does not grant model write access. Payload meaning, user identity, names, colors, and rendering
 remain application concerns.</p>
+<section id="independent-awareness-scopes">
+<h3>Independent awareness scopes<a class="headerlink" href="#independent-awareness-scopes" title="Link to this heading">¶</a></h3>
+<p>Use a named scope when multiple components publish state on one model and connection:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">set_awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">"anchor"</span><span class="p">:</span> <span class="mi">12</span><span class="p">},</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"editor"</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">set_awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="p">{</span><span class="s2">"row"</span><span class="p">:</span> <span class="s2">"order-42"</span><span class="p">},</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"table"</span><span class="p">)</span>
+<span class="n">client</span><span class="o">.</span><span class="n">on_awareness</span><span class="p">(</span><span class="n">handle_editor_selection</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"editor"</span><span class="p">)</span>
+<span class="n">client</span><span class="o">.</span><span class="n">awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"table"</span><span class="p">)</span>
+<span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">set_awareness</span><span class="p">(</span><span class="n">document_id</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="o">=</span><span class="s2">"editor"</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>JavaScript accepts <code class="docutils literal notranslate"><span class="pre">{scope:</span> <span class="pre">&quot;editor&quot;}</span></code> as the final argument to <code class="docutils literal notranslate"><span class="pre">setAwareness</span></code>, <code class="docutils literal notranslate"><span class="pre">onAwareness</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">awareness</span></code>. Each call replaces only that scope’s state; null withdraws only that scope.
+Repeated writes to the same scope use the last value. Scope names are application-defined strings.
+Subscriptions observe future updates; read <code class="docutils literal notranslate"><span class="pre">awareness</span></code> for current peers when subscribing late.
+Unsubscribing removes the callback without withdrawing state.</p>
+<p>Calls without a scope retain their existing full-payload behavior and receive only unscoped updates.
+Closing a connection removes all its scopes; reconnect republishes each retained scope’s latest value.
+Scoped messages use <code class="docutils literal notranslate"><span class="pre">scoped_awareness</span></code>, which older clients ignore. Publishing scopes requires a Hub
+with scoped-awareness support. Neither scoped nor unscoped awareness currently crosses relay workers
+or expires independently of connection cleanup.</p>
+</section>
 </section>
 <section id="use-an-existing-webrtc-data-channel">
 <h2>Use an existing WebRTC data channel<a class="headerlink" href="#use-an-existing-webrtc-data-channel" title="Link to this heading">¶</a></h2>
@@ -550,6 +574,9 @@ can transfer; send every message returned by <code class="docutils literal notra
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#publish-ephemeral-awareness">Publish ephemeral awareness</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#independent-awareness-scopes">Independent awareness scopes</a>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#use-an-existing-webrtc-data-channel">Use an existing WebRTC data channel</a>
