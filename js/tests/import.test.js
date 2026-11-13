@@ -1482,3 +1482,54 @@ test("structural diffs preserve binary registers and validate missing paths", ()
   expect(() => document.diff(true, ["missing", "nested"])).toThrow(/map keys/);
   expect(() => new Client().crdtDiff(999, {})).toThrow(/not CRDT-backed/);
 });
+
+for (const codec of ["json", "msgpack", "cbor"]) {
+  test(`awareness scopes stay independent over ${codec}`, () => {
+    const client = new Client(codec);
+    const remote = new Client(codec);
+    const changes = new Map(
+      [undefined, "editor", "table"].map((scope) => [scope, []]),
+    );
+    for (const [scope, updates] of changes)
+      remote.onAwareness((update) => updates.push(update), { scope });
+    const sent = [];
+    const sender = (frame) => {
+      const message = JSON.parse(
+        typeof frame === "string" ? frame : decodeMessage(frame, codec),
+      );
+      sent.push(message);
+      remote.recv(remote.encode({ ...message, peer: "session" }));
+    };
+    client.attach(sender);
+    for (const scope of changes.keys())
+      client.setAwareness(8, { scope: scope ?? "legacy" }, { scope });
+    for (const [scope, updates] of changes) {
+      expect(updates).toHaveLength(1);
+      expect(remote.awareness(8, { scope }).get("session")).toEqual({
+        scope: scope ?? "legacy",
+      });
+    }
+    client.setAwareness(8, null);
+    client.setAwareness(8, null, { scope: "editor" });
+    expect(remote.awareness(8).size).toBe(0);
+    expect(remote.awareness(8, { scope: "editor" }).size).toBe(0);
+    expect(remote.awareness(8, { scope: "table" }).size).toBe(1);
+    client.detach(sender);
+    sent.length = 0;
+    client.setAwareness(8, { row: "latest" }, { scope: "table" });
+    client.attach(sender);
+    expect(sent).toEqual([
+      {
+        t: "scoped_awareness",
+        id: 8,
+        scope: "table",
+        state: { row: "latest" },
+      },
+    ]);
+    const noop = () => {};
+    remote.attach(noop);
+    remote.detach(noop);
+    expect(remote.awareness(8, { scope: "table" }).size).toBe(0);
+    expect(changes.get("table").at(-1).state).toBeNull();
+  });
+}

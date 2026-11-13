@@ -14,6 +14,7 @@ can share one server. A wire message is a `str` (JSON text frame) or `bytes` (Me
 import asyncio
 import itertools
 import json
+from collections import deque
 from collections.abc import Callable
 from typing import Any, Protocol
 
@@ -234,6 +235,30 @@ def ws_endpoint(server: Broadcaster):
     `autosync(server)` as a background task to stream server-side model changes to clients.
     """
 
+    async def broadcast(replies: dict[Any, list[Wire]]) -> None:
+        from starlette.websockets import WebSocketDisconnect, WebSocketState
+
+        pending = deque(replies.items())
+        closed = set()
+        while pending:
+            conn, messages = pending.popleft()
+            if conn in closed:
+                continue
+            try:
+                for message in messages:
+                    await _send(conn, message)
+            except (WebSocketDisconnect, OSError):
+                pass
+            except RuntimeError:
+                if getattr(conn, "application_state", None) != WebSocketState.DISCONNECTED:
+                    raise
+            else:
+                continue
+            # A peer can close during fanout. Keep serving the origin and healthy peers,
+            # including withdrawals produced by removing the failed peer.
+            closed.add(conn)
+            pending.extend(server.close(conn).items())
+
     async def endpoint(websocket: Any) -> None:
         from starlette.websockets import WebSocketDisconnect
 
@@ -257,17 +282,13 @@ def ws_endpoint(server: Broadcaster):
                 replies = server.recv(websocket, data)
                 if _enqueue_if_autosync(server, replies):
                     continue
-                for conn, msgs in replies.items():
-                    for msg in msgs:
-                        await _send(conn, msg)
+                await broadcast(replies)
         except WebSocketDisconnect:
             pass
         finally:
             replies = server.close(websocket)
             if replies and not _enqueue_if_autosync(server, replies):
-                for conn, msgs in replies.items():
-                    for msg in msgs:
-                        await _send(conn, msg)
+                await broadcast(replies)
 
     return endpoint
 

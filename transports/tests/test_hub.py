@@ -2,6 +2,7 @@ import asyncio
 import itertools
 import json
 
+import pytest
 from pydantic import BaseModel
 
 from transports import READ, WRITE, Client, DeepLwwCrdt, Hub, LastWriteWins, LwwMapCrdt, protocol, register_codec, unregister_codec, ws_endpoint
@@ -709,3 +710,114 @@ def test_retiring_an_inactive_tenant_during_flush_does_not_interrupt_other_tenan
     active.x = 2
     assert set(h.flush()) == {conn}
     assert "inactive" not in h._tenants
+
+
+@pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
+def test_awareness_scopes_coexist_with_legacy_and_reconnect(codec):
+    h = hub()
+    sid = h.share(Doc())
+    h.subscribe("reader", sid, READ)
+    h.subscribe("writer", sid, WRITE)
+    reader, writer = ("reader", "a"), ("writer", "a")
+    h.open(reader, codec=codec)
+    remote = Client(codec=codec)
+    for frame in h.open(writer, codec=codec):
+        remote.recv(frame)
+    local = Client(codec=codec)
+    updates = {scope: [] for scope in (None, "editor", "table")}
+    for scope, events in updates.items():
+        remote.on_awareness(events.append, scope=scope)
+
+    def deliver(frame):
+        for outbound in h.recv(reader, frame).get(writer, []):
+            remote.recv(outbound)
+
+    asyncio.run(local.attach(deliver))
+    for scope in updates:
+        assert asyncio.run(local.set_awareness(sid, {"scope": scope}, scope=scope))
+    for scope, events in updates.items():
+        assert list(remote.awareness(sid, scope=scope).values()) == [{"scope": scope}]
+        assert len(events) == 1
+    assert len({events[0]["peer"] for events in updates.values()}) == 1
+
+    # A legacy clear cannot clear either named scope, and a scoped clear affects only that scope.
+    asyncio.run(local.set_awareness(sid, None))
+    asyncio.run(local.set_awareness(sid, None, scope="editor"))
+    assert remote.awareness(sid) == {}
+    assert remote.awareness(sid, scope="editor") == {}
+    assert list(remote.awareness(sid, scope="table").values()) == [{"scope": "table"}]
+    late = Client(codec=codec)
+    for frame in h.open(("writer", "b"), codec=codec):
+        late.recv(frame)
+    assert late.awareness(sid, scope="table") == remote.awareness(sid, scope="table")
+    assert late.awareness(sid) == {}
+
+    local.detach(deliver)
+    for frame in h.close(reader).get(writer, []):
+        remote.recv(frame)
+    assert remote.awareness(sid, scope="table") == {}
+    assert updates["table"][-1]["state"] is None
+    # Only the latest remaining scope is republished after reconnect.
+    asyncio.run(local.set_awareness(sid, {"row": "latest"}, scope="table"))
+    h.open(reader, codec=codec)
+    asyncio.run(local.attach(deliver))
+    assert list(remote.awareness(sid, scope="table").values()) == [{"row": "latest"}]
+    assert remote.awareness(sid, scope="editor") == {}
+    assert remote.awareness(sid) == {}
+
+
+@pytest.mark.parametrize("failure", ["disconnect", "closed", "io", "unexpected"])
+@pytest.mark.parametrize("when", ["recv", "close"])
+def test_starlette_closed_peer_does_not_interrupt_awareness_fanout(failure, when):
+    from starlette.websockets import WebSocketDisconnect, WebSocketState
+
+    class Connection:
+        def __init__(self, name):
+            self.query_params = {}
+            self.application_state = WebSocketState.CONNECTED
+            self.name = name
+            self.sent = []
+            self.incoming = iter(
+                [
+                    {"text": protocol.awareness_msg(sid, {"cursor": 2}, scope="editor")},
+                    {"text": protocol.awareness_msg(sid, {"cursor": 3}, scope="editor")},
+                    {"type": "websocket.disconnect"},
+                ]
+            )
+
+        async def accept(self):
+            pass
+
+        async def receive(self):
+            return next(self.incoming)
+
+        async def send_text(self, frame):
+            message = json.loads(frame)
+            if self.name == "closed" and message.get("t") == "scoped_awareness" and (when == "recv" or message["state"] is None):
+                if failure == "disconnect":
+                    raise WebSocketDisconnect()
+                if failure == "io":
+                    raise OSError("closed socket")
+                if failure == "closed":
+                    self.application_state = WebSocketState.DISCONNECTED
+                raise RuntimeError("send failed")
+            self.sent.append(message)
+
+    h = Hub(key=lambda conn: conn.name)
+    sid = h.share(Doc())
+    for name in ("origin", "closed", "healthy"):
+        h.subscribe(name, sid, READ)
+    origin, closed, healthy = (Connection(name) for name in ("origin", "closed", "healthy"))
+    h.open(closed)
+    h.open(healthy)
+    h.recv(closed, protocol.awareness_msg(sid, {"cursor": 1}, scope="editor"))
+    if failure == "unexpected":
+        with pytest.raises(RuntimeError, match="send failed"):
+            asyncio.run(ws_endpoint(h)(origin))
+        return
+    asyncio.run(ws_endpoint(h)(origin))
+    assert origin not in h._codecs
+    assert closed not in h._codecs
+    assert healthy in h._codecs
+    assert [message["state"] for message in healthy.sent if message["state"] is not None] == [{"cursor": 2}, {"cursor": 3}]
+    assert sum(message["state"] is None for message in healthy.sent) == 2

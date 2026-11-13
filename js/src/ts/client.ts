@@ -105,6 +105,11 @@ export type AwarenessMsg = {
   peer: string;
   state: unknown | null;
 };
+export type ScopedAwarenessMsg = Omit<AwarenessMsg, "t"> & {
+  t: "scoped_awareness";
+  scope: string;
+};
+type AwarenessUpdate = AwarenessMsg | ScopedAwarenessMsg;
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
   | { t: "snapshot"; id: number; rev: number }
@@ -140,7 +145,13 @@ type ClientEffect =
       error: string;
       proposal?: string;
     }
-  | { effect: "awareness"; id: number; peer: string; state: unknown | null }
+  | {
+      effect: "awareness";
+      id: number;
+      peer: string;
+      state: unknown | null;
+      scope?: string;
+    }
   | { effect: "ignore" }
   | { effect: "disconnect"; proposals: string[] };
 
@@ -170,7 +181,8 @@ class SharedClientState implements ClientStateAdapter {
       ...metadata
     } = message as Record<string, unknown>;
     if (patch) metadata.patch = { rev: (patch as ModelPatch).rev };
-    if (metadata.t === "awareness") metadata.state = state;
+    if (metadata.t === "awareness" || metadata.t === "scoped_awareness")
+      metadata.state = state;
     return JSON.parse(this.inner.prepare(JSON.stringify(metadata)));
   }
 
@@ -224,7 +236,7 @@ interface BatchMsg {
     | PatchMsg
     | CrdtMsg
     | RejectMsg
-    | AwarenessMsg
+    | AwarenessUpdate
   )[];
 }
 
@@ -379,8 +391,8 @@ export class Client {
   private values = new Map<number, unknown>();
   private crdt = new Map<number, CrdtDocument>();
   private crdtOutbox: Array<{ id: number; ops: CrdtOp[] }> = [];
-  private awarenessState = new Map<number, Map<string, unknown>>();
-  private localAwareness = new Map<number, string | Uint8Array>();
+  private awarenessState = new Map<string, Map<string, unknown>>();
+  private localAwareness = new Map<string, string | Uint8Array>();
   private replica: string;
   private changeListeners: Array<(change: ReceiveChange) => void> = [];
   private ackListeners: Array<(ack: PatchMsg | CrdtMsg | AckMsg) => void> = [];
@@ -388,7 +400,7 @@ export class Client {
   private abandonListeners: Array<(proposals: string[]) => void> = [];
   private connectListeners: Array<() => void> = [];
   private disconnectListeners: Array<() => void> = [];
-  private awarenessListeners: Array<(update: AwarenessMsg) => void> = [];
+  private awarenessListeners: Array<(update: AwarenessUpdate) => void> = [];
   private ownedState = new OwnedFields();
   private ownedTimer: ReturnType<typeof setTimeout> | undefined;
   private updateInterval: number;
@@ -470,11 +482,25 @@ export class Client {
   /** Publish ephemeral state for one model, or clear it with `null`.
    *
    * The latest non-null state is retained locally and republished when a managed connection opens.
+   * A named scope is independent of unscoped state and other scopes; null withdraws only that scope.
    */
-  setAwareness(id: number, state: unknown | null): boolean {
-    const frame = this.encode({ t: "awareness", id, state });
-    if (state === null) this.localAwareness.delete(id);
-    else this.localAwareness.set(id, frame);
+  setAwareness(
+    id: number,
+    state: unknown | null,
+    options: { scope?: string } = {},
+  ): boolean {
+    const scope = options.scope;
+    if (scope !== undefined && typeof scope !== "string")
+      throw new TypeError("awareness scope must be a string");
+    const key = JSON.stringify([id, scope ?? null]);
+    const frame = this.encode({
+      t: scope === undefined ? "awareness" : "scoped_awareness",
+      id,
+      state,
+      ...(scope === undefined ? {} : { scope }),
+    });
+    if (state === null) this.localAwareness.delete(key);
+    else this.localAwareness.set(key, frame);
     return this.send(frame);
   }
 
@@ -510,10 +536,25 @@ export class Client {
   }
 
   /** Register for remote awareness updates and removals (`state` is `null`). */
-  onAwareness(listener: (update: AwarenessMsg) => void): () => void {
-    this.awarenessListeners.push(listener);
+  onAwareness(listener: (update: AwarenessMsg) => void): () => void;
+  onAwareness(
+    listener: (update: ScopedAwarenessMsg) => void,
+    options: { scope: string },
+  ): () => void;
+  onAwareness(
+    listener: (update: any) => void,
+    options: { scope?: string } = {},
+  ): () => void {
+    const scope = options.scope;
+    const scoped = (update: AwarenessUpdate) => {
+      if (
+        (update.t === "scoped_awareness" ? update.scope : undefined) === scope
+      )
+        listener(update);
+    };
+    this.awarenessListeners.push(scoped);
     return () => {
-      const i = this.awarenessListeners.indexOf(listener);
+      const i = this.awarenessListeners.indexOf(scoped);
       if (i >= 0) this.awarenessListeners.splice(i, 1);
     };
   }
@@ -630,10 +671,16 @@ export class Client {
     const { proposals } = this.state.disconnect();
     if (proposals.length)
       for (const listener of [...this.abandonListeners]) listener(proposals);
-    for (const [id, peers] of this.awarenessState)
+    for (const [key, peers] of this.awarenessState) {
+      const [id, scope] = JSON.parse(key) as [number, string | null];
       for (const peer of peers.keys())
         for (const listener of [...this.awarenessListeners])
-          listener({ t: "awareness", id, peer, state: null });
+          listener(
+            scope === null
+              ? { t: "awareness", id, peer, state: null }
+              : { t: "scoped_awareness", id, peer, state: null, scope },
+          );
+    }
     this.awarenessState.clear();
     for (const listener of [...this.disconnectListeners]) listener();
   }
@@ -681,7 +728,7 @@ export class Client {
       | CrdtMsg
       | AckMsg
       | RejectMsg
-      | AwarenessMsg
+      | AwarenessUpdate
       | BatchMsg
       | ControlMsg;
     if (custom) {
@@ -692,7 +739,7 @@ export class Client {
         | CrdtMsg
         | AckMsg
         | RejectMsg
-        | AwarenessMsg;
+        | AwarenessUpdate;
     } else if (typeof data === "string") {
       msg = JSON.parse(data);
     } else {
@@ -720,7 +767,7 @@ export class Client {
       | CrdtMsg
       | AckMsg
       | RejectMsg
-      | AwarenessMsg
+      | AwarenessUpdate
       | BatchMsg
       | ControlMsg,
   ): ReceiveChange | ReceiveChange[] | undefined {
@@ -743,7 +790,7 @@ export class Client {
       | CrdtMsg
       | AckMsg
       | RejectMsg
-      | AwarenessMsg
+      | AwarenessUpdate
       | ControlMsg,
   ): ReceiveChange | undefined {
     if (msg.t === "ownership" || msg.t === "command" || msg.t === "owned_ack") {
@@ -866,15 +913,33 @@ export class Client {
       for (const listener of [...this.rejectListeners]) listener(rejection);
       return undefined;
     } else if (effect.effect === "awareness") {
-      const update = msg as AwarenessMsg;
-      let peers = this.awarenessState.get(update.id);
+      const update: AwarenessUpdate =
+        (msg as AwarenessUpdate).t === "awareness"
+          ? {
+              t: "awareness",
+              id: effect.id,
+              peer: effect.peer,
+              state: effect.state,
+            }
+          : {
+              t: "scoped_awareness",
+              id: effect.id,
+              scope: (msg as ScopedAwarenessMsg).scope,
+              peer: effect.peer,
+              state: effect.state,
+            };
+      const key = JSON.stringify([
+        update.id,
+        update.t === "scoped_awareness" ? update.scope : null,
+      ]);
+      let peers = this.awarenessState.get(key);
       if (update.state === null) {
         peers?.delete(update.peer);
-        if (peers?.size === 0) this.awarenessState.delete(update.id);
+        if (peers?.size === 0) this.awarenessState.delete(key);
       } else {
         if (!peers) {
           peers = new Map();
-          this.awarenessState.set(update.id, peers);
+          this.awarenessState.set(key, peers);
         }
         peers.set(update.peer, update.state);
       }
@@ -926,8 +991,13 @@ export class Client {
   }
 
   /** Snapshot remote ephemeral state keyed by server-assigned peer id. */
-  awareness(id: number): ReadonlyMap<string, unknown> {
-    return new Map(this.awarenessState.get(id));
+  awareness(
+    id: number,
+    options: { scope?: string } = {},
+  ): ReadonlyMap<string, unknown> {
+    return new Map(
+      this.awarenessState.get(JSON.stringify([id, options.scope ?? null])),
+    );
   }
 
   /** Stop tracking one proposal that the caller did not send.
