@@ -256,7 +256,6 @@ proposals for retired IDs. Python and JavaScript remove their associated payload
 `{t: "remove", id}` change per retired model. Repeated inventories produce no duplicate removals.
 No retirement history is retained on the server; reconnect detection uses the client's resume token.
 
-
 Connections carry one logical message per frame.
 
 ### Snapshot
