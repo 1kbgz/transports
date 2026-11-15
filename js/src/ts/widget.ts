@@ -62,7 +62,14 @@ function clientFor(model: AnyModel): Client {
     };
     let heartbeat: ReturnType<typeof setInterval> | undefined;
     const ready = () =>
-      model.send({ ready: true, ownership: true, heartbeat: true, view });
+      model.send({
+        ready: true,
+        ownership: true,
+        heartbeat: true,
+        view,
+        inventory: true,
+        since: created.revisions(),
+      });
     const receive = (content: unknown, buffers: unknown) => {
       const message = content as
         | {

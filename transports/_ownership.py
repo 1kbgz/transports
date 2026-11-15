@@ -12,9 +12,13 @@ class OwnershipServer:
     def __init__(self, session: Session) -> None:
         self.session = session
         self.peers: dict[Any, str] = {}
+        self._eligible: dict[Any, bool] = {}
+        self._known: dict[Any, tuple[int, set[int]]] = {}
 
     def open(self, conn: Any, eligible: bool = True) -> list[str]:
         peer = self.peers.setdefault(conn, uuid.uuid4().hex)
+        self._eligible[conn] = eligible
+        self._known[conn] = (self.session._generation, set(self.session._authorities))
         messages = [(authority.open(peer) if eligible else authority.grant(peer)) for authority in self.session._authorities.values()]
         for authority in self.session._authorities.values():
             if authority.owner() == peer and (message := authority.next_command()) is not None:
@@ -24,6 +28,15 @@ class OwnershipServer:
     def flush(self) -> dict[Any, list[str]]:
         connections = {peer: conn for conn, peer in self.peers.items()}
         messages: dict[Any, list[str]] = {}
+        for conn, peer in self.peers.items():
+            generation, known = self._known[conn]
+            if generation == self.session._generation:
+                continue
+            for mid, authority in self.session._authorities.items():
+                if mid not in known:
+                    grant = authority.open(peer) if self._eligible[conn] else authority.grant(peer)
+                    messages.setdefault(conn, []).append(grant)
+            self._known[conn] = (self.session._generation, set(self.session._authorities))
         for authority in self.session._authorities.values():
             owner = authority.owner()
             if owner in connections and (message := authority.next_command()) is not None:
@@ -31,6 +44,8 @@ class OwnershipServer:
         return messages
 
     def close(self, conn: Any) -> dict[Any, list[str]]:
+        self._known.pop(conn, None)
+        self._eligible.pop(conn, None)
         peer = self.peers.pop(conn, None)
         if peer is None:
             return {}

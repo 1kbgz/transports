@@ -340,7 +340,7 @@ def test_open_forwards_batch_negotiation_to_hub():
     with patch.object(hub, "open", wraps=hub.open) as open_hub:
         relay.open(conn, "json", {1: 2}, batch=True)
 
-    open_hub.assert_called_once_with(conn, "json", {1: 2}, batch=True)
+    open_hub.assert_called_once_with(conn, "json", {1: 2}, batch=True, ownership=True, inventory=False)
 
 
 def test_late_joiner_catches_up_and_inherits_the_clock():

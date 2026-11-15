@@ -32,6 +32,7 @@ class Session:
         self._blob_threshold = blob_threshold
         self._store = _CoreStore()
         self._models: dict[int, Any] = {}
+        self._generation = 0
         self._authorities: dict[int, FieldAuthority] = {}
         self._owned_fields: dict[int, set[str]] = {}
         self._owned_mirrors: dict[int, dict] = {}
@@ -68,7 +69,7 @@ class Session:
 
         def _watcher(obj: object, method: str, ref: object, call_args: tuple, call_kwargs: dict, _mid: int = mid) -> None:
             session = session_ref()
-            if session is not None and _mid not in session._suppress:
+            if session is not None and _mid in session._models and _mid not in session._suppress:
                 if call_args and isinstance(call_args[0], str) and call_args[0] in session._owned_names.get(_mid, {}).values():
                     hosted = session._models.get(_mid)
                     if obj is hosted or obj is getattr(hosted, "__dict__", None):
@@ -78,7 +79,28 @@ class Session:
         self._models[mid] = watch(model, _watcher, deepstate=True)
         if fields:
             self._owned_mirrors[mid] = to_value(model, include=set(self._owned_names[mid].values()))["Map"]
+        self._generation += 1
         return mid
+
+    def unhost(self, mid: int) -> bool:
+        """Retire a hosted model; connected mirrors remove it on the next server flush.
+
+        Releases state, replay history, ownership and queued commands. Further mutations of the
+        original object are ignored. Returns False for an unknown or already retired id.
+        """
+        if not self._store.unhost(mid):
+            return False
+        type_name = type(self._models.pop(mid)).__name__
+        if not any(type(model).__name__ == type_name for model in self._models.values()):
+            self._schemas.pop(type_name, None)
+        for mapping in (self._authorities, self._owned_fields, self._owned_mirrors, self._owned_names, self._list_keys, self._log):
+            mapping.pop(mid, None)
+        self._field_guard.remove(mid)
+        self._dirty.discard(mid)
+        self._suppress.discard(mid)
+        self.outbox[:] = [(model, patch) for model, patch in self.outbox if model != mid]
+        self._generation += 1
+        return True
 
     def ids(self) -> list[int]:
         """The ids of all hosted models."""
@@ -132,6 +154,8 @@ class Session:
         (``msgspec.Struct`` and other ``__slots__`` types) can't be watched, so mutate them and then
         call ``update(id)`` explicitly.
         """
+        if mid not in self._models:
+            raise KeyError(mid)
         self._dirty.add(mid)
         self._check_owned(mid, strict=True)
         return self.flush()

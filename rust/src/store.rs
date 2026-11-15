@@ -94,6 +94,11 @@ impl Store {
         }
     }
 
+    /// Retire a model and release its value. IDs are never reused by this store.
+    pub fn unhost(&mut self, id: ModelId) -> bool {
+        self.models.remove(&id).is_some()
+    }
+
     pub fn contains(&self, id: ModelId) -> bool {
         self.models.contains_key(&id)
     }

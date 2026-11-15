@@ -621,9 +621,10 @@ def test_batch_negotiated_connections_get_one_frame_per_flush():
     model.n = 3
     second.n = 1
     out = server.flush()
-    assert len(out[plain]) == 2
-    assert len(out[batched]) == 1
-    frame = json.loads(out[batched][0])
+    # The new model is announced before its first patch, including for batched connections.
+    assert [json.loads(wire)["t"] for wire in out[plain]] == ["models", "snapshot", "patch", "patch"]
+    assert [json.loads(wire)["t"] for wire in out[batched]] == ["models", "snapshot", "batch"]
+    frame = json.loads(out[batched][-1])
     assert frame["t"] == "batch"
     assert [m["t"] for m in frame["msgs"]] == ["patch", "patch"]
 

@@ -28,6 +28,7 @@ from typing import Any
 
 from . import protocol
 from ._bridge import _py_of, _value_of, schema_of, to_value
+from ._models import ModelAnnouncements
 from ._ownership import OwnershipServer
 from .crdt import CrdtDocument, CrdtSpec
 from .server import Wire
@@ -220,6 +221,7 @@ class Hub:
         self._tenants: dict[Any, Session] = {}
         self._ownership: dict[Any, OwnershipServer] = {}
         self._shared: dict[int, _Shared] = {}
+        self._models = ModelAnnouncements()
         self._replica = f"hub-{uuid.uuid4().hex}"
         self._crdt_replica_owners: dict[tuple[int, str], Any] = {}
         self._next_shared = 0
@@ -392,7 +394,14 @@ class Hub:
         return out
 
     def open(
-        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+        self,
+        conn: Any,
+        codec: str | None = None,
+        since: dict[int, int] | None = None,
+        batch: bool = False,
+        *,
+        ownership: bool = True,
+        inventory: bool = False,
     ) -> list[Wire]:
         # `batch` is accepted for endpoint parity but not yet applied: Hub.flush interleaves
         # per-tenant and shared fan-outs, so its batching lands with that restructure.
@@ -414,7 +423,11 @@ class Hub:
         self._codecs[conn] = codec
         self._peer_ids.setdefault(conn, uuid.uuid4().hex)
         try:
+            shared_ids = [sid for sid, shared in self._shared.items() if key in shared.subs]
+            models = self._models.open(conn, sess, shared_ids)
             out: list[Wire] = []
+            if inventory or since is not None and set(since) - set(sess.ids()) - set(shared_ids):
+                out.append(self._encode_for(conn, models))
             for mid in sess.ids():
                 client_rev = since.get(mid) if since else None
                 delta = sess.since(mid, client_rev) if client_rev is not None and self._private_resume and mid not in sess._authorities else None
@@ -667,7 +680,7 @@ class Hub:
             return {}
         drained = sess.drain()
         conns = self._conns_by_key.get(key)
-        if not drained or not conns:
+        if not conns:
             return {}
         msgs = [(mid, protocol.patch_msg(mid, patch)) for mid, patch in drained]
         groups: dict[str, list[Any]] = {}
@@ -684,7 +697,14 @@ class Hub:
                     self.close(conn)
                 continue
             for conn in codec_conns:
-                out[conn] = encoded
+                shared_ids = [sid for sid, shared in self._shared.items() if key in shared.subs]
+                try:
+                    announced = [(None, self._encode_for(conn, message)) for message in self._models.flush(conn, sess, shared_ids)]
+                except Exception:  # noqa: BLE001
+                    self.close(conn)
+                    continue
+                if announced or encoded:
+                    out[conn] = [*announced, *encoded] if announced else encoded
         return out
 
     def _flush_shared_tagged(self, only_sid: int | None = None) -> dict[Any, list[tuple[int | None, Wire]]]:
@@ -874,6 +894,7 @@ class Hub:
                 if not conns:
                     self._conns_by_key.pop(key)
                     self._mark_idle(key)
+        self._models.close(conn)
         self._codecs.pop(conn, None)
         out: dict[Any, list[Wire]] = {}
         controller = self._ownership.get(key)

@@ -396,3 +396,34 @@ Comm frontends opt into owning fields with `serve_comm(server, comm, ownership=T
 leaves them as observers. Custom manual adapters can pass `ownership=False` to `Server.open` or
 `Hub.open`. A closed adapter must call `Client.detach` and the server's `close` method so ownership
 can transfer; send every message returned by `close` to its destination.
+
+## Add and remove models after clients connect
+
+Use `Session.host()` while the server is running. The next `flush()`, `autosync`, or `sync()`
+announces the model and sends its snapshot before its first patch.
+
+```python
+model_id = session.host(Counter(tick=10))
+# Later, stop serving this model:
+session.unhost(model_id)
+```
+
+`unhost()` returns whether it removed a model. It releases replay history, ownership, and pending
+commands, and ignores subsequent changes to the original Python object. A later `host()` allocates
+a new ID. Use the same methods on `hub.tenant(key)` for private models. It does not remove
+models created with `Hub.share()`.
+
+Handle `{"t": "remove", "id": model_id}` in Python `on_change()` or JavaScript `onChange()` to
+clear application state or detach controls. The transports client removes its mirrored value,
+revision, CRDT outbox, ownership, commands, and awareness. Pending proposals for that model are
+reported through `on_abandon()` / `onAbandon()`.
+
+When writing a manual reconnect adapter, pass `client.revisions()` as `since` to `server.open()`
+or `hub.open()`. The server then announces any models removed while the client was disconnected.
+The managed WebSocket and anywidget adapters send this resume token. Set `inventory=True` on
+`open()` to request an inventory even without a resume token; managed WebSocket, SSE, and anywidget
+clients request it automatically. This also covers EventSource's automatic reconnect. A manual
+adapter calling `open()` without either option must initialize a fresh mirror.
+
+Older clients ignore model inventories. They receive late model snapshots, but need an upgrade to
+clear retired mirrors. The server rejects edits to a retired ID from either client generation.

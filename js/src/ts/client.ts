@@ -46,6 +46,8 @@ type OwnedAckMsg = {
 };
 type ControlMsg = OwnershipMsg | CommandMsg | OwnedAckMsg;
 
+type ModelsMsg = { t: "models"; ids: number[] };
+
 type SnapshotMsg = {
   t: "snapshot";
   id: number;
@@ -112,12 +114,14 @@ export type ScopedAwarenessMsg = Omit<AwarenessMsg, "t"> & {
 type AwarenessUpdate = AwarenessMsg | ScopedAwarenessMsg;
 /** Frame metadata returned after the mirror accepts a snapshot or patch. */
 export type ReceiveChange =
+  | { t: "remove"; id: number }
   | { t: "snapshot"; id: number; rev: number }
   | { t: "crdt_snapshot"; id: number; rev: number }
   | PatchMsg
   | CrdtMsg;
 
 type ClientEffect =
+  | { effect: "removed"; ids: number[]; proposals: string[] }
   | { effect: "snapshot"; id: number; rev: number; type?: string }
   | { effect: "crdt_snapshot"; id: number; rev: number; type?: string }
   | {
@@ -231,6 +235,7 @@ function mapValue(value: Value | undefined): Record<string, Value> {
 interface BatchMsg {
   t: "batch";
   msgs: (
+    | ModelsMsg
     | SnapshotMsg
     | CrdtSnapshotMsg
     | PatchMsg
@@ -685,7 +690,7 @@ export class Client {
     for (const listener of [...this.disconnectListeners]) listener();
   }
 
-  /** Register a listener fired after each accepted snapshot or patch — the same `ReceiveChange`
+  /** Register a listener fired after each accepted snapshot, patch, or removal — the same `ReceiveChange`
    * `recv` returns — so `connect`/`run`/`connectSSE` consumers get path-level changes without
    * managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
    * type). Returns an unsubscribe function. A listener exception propagates to the `recv` caller;
@@ -717,11 +722,12 @@ export class Client {
    * type — ignored, not an error, so a newer server can add message types without breaking older
    * clients. The returned change and values from `value()` share immutable branches with the
    * mirror; consumers must not mutate them. Invalid frames throw without changing the mirror or its
-   * accepted revision.
+   * accepted revision. Inventories return an array of `{t: "remove", id}` changes, or undefined.
    */
   recv(data: string | Uint8Array): ReceiveChange | ReceiveChange[] | undefined {
     const custom = codecFor(this.codec);
     let msg:
+      | ModelsMsg
       | SnapshotMsg
       | CrdtSnapshotMsg
       | PatchMsg
@@ -733,6 +739,7 @@ export class Client {
       | ControlMsg;
     if (custom) {
       msg = custom.decode(data) as
+        | ModelsMsg
         | SnapshotMsg
         | CrdtSnapshotMsg
         | PatchMsg
@@ -761,6 +768,7 @@ export class Client {
 
   private receiveMessage(
     msg:
+      | ModelsMsg
       | SnapshotMsg
       | CrdtSnapshotMsg
       | PatchMsg
@@ -775,7 +783,7 @@ export class Client {
       // a negotiated batch frame (the connection asked with ?batch=1): apply each message in
       // order and return the accepted changes as an array
       const accepted = msg.msgs
-        .map((m) => this.apply(m))
+        .flatMap((m) => this.apply(m))
         .filter((a): a is ReceiveChange => a !== undefined);
       return accepted.length ? accepted : undefined;
     }
@@ -784,6 +792,7 @@ export class Client {
 
   private apply(
     msg:
+      | ModelsMsg
       | SnapshotMsg
       | CrdtSnapshotMsg
       | PatchMsg
@@ -792,7 +801,7 @@ export class Client {
       | RejectMsg
       | AwarenessUpdate
       | ControlMsg,
-  ): ReceiveChange | undefined {
+  ): ReceiveChange | ReceiveChange[] | undefined {
     if (msg.t === "ownership" || msg.t === "command" || msg.t === "owned_ack") {
       if (!this.ownedState.receive(stringify(msg))) return undefined;
       if (msg.t === "ownership") {
@@ -821,7 +830,41 @@ export class Client {
       return undefined;
     }
     const effect = this.state.prepare(msg);
-    if (effect.effect === "snapshot") {
+    if (effect.effect === "removed") {
+      this.state.commit(effect);
+      for (const id of effect.ids) {
+        this.values.delete(id);
+        this.crdt.delete(id);
+        this.crdtOutbox = this.crdtOutbox.filter(
+          (pending) => pending.id !== id,
+        );
+        this.ownedState.remove(BigInt(id));
+        for (const [key, command] of this.commands)
+          if (command.id === id) this.commands.delete(key);
+        for (const key of this.localAwareness.keys())
+          if (JSON.parse(key)[0] === id) this.localAwareness.delete(key);
+        for (const [key, peers] of this.awarenessState) {
+          const [model, scope] = JSON.parse(key);
+          if (model !== id) continue;
+          this.awarenessState.delete(key);
+          for (const peer of peers.keys()) {
+            const update: AwarenessUpdate =
+              scope === null
+                ? { t: "awareness", id, peer, state: null }
+                : { t: "scoped_awareness", id, scope, peer, state: null };
+            for (const listener of [...this.awarenessListeners])
+              listener(update);
+          }
+        }
+      }
+      if (effect.proposals.length)
+        for (const listener of [...this.abandonListeners])
+          listener(effect.proposals);
+      const changes = effect.ids.map((id) =>
+        this.accepted({ t: "remove", id }),
+      );
+      return changes.length ? changes : undefined;
+    } else if (effect.effect === "snapshot") {
       const snapshot = msg as SnapshotMsg;
       this.crdt.delete(snapshot.id);
       this.crdtOutbox = this.crdtOutbox.filter(
@@ -949,6 +992,11 @@ export class Client {
     return undefined;
   }
 
+  /** Resume token for application-owned connection adapters. */
+  revisions(): Record<string, number> {
+    return this.state.revisions();
+  }
+
   /** The current mirrored core `Value` of a model. */
   value(id: number): unknown {
     return this.values.get(id);
@@ -1003,7 +1051,7 @@ export class Client {
   /** Stop tracking one proposal that the caller did not send.
    *
    * Returns whether the proposal was pending. This does not call `onAbandon`; those listeners report
-   * proposals abandoned by a managed connection closing.
+   * proposals abandoned by disconnect or model removal.
    */
   abandonProposal(proposal: string): boolean {
     return this.state.abandon(proposal);
@@ -1148,7 +1196,7 @@ export class Client {
    */
   connect(url: string): WebSocket {
     const sep = url.includes("?") ? "&" : "?";
-    let params = `codec=${this.codec}&ownership=${this.ownership ? 1 : 0}`;
+    let params = `codec=${this.codec}&ownership=${this.ownership ? 1 : 0}&inventory=1`;
     const revisions = this.state.revisions();
     if (Object.keys(revisions).length) {
       const since = encodeURIComponent(JSON.stringify(revisions));
@@ -1265,7 +1313,9 @@ export class Client {
 
   /** Mirror a server over Server-Sent Events (receive-only, JSON). Returns the `EventSource`. */
   connectSSE(url: string): EventSource {
-    const es = new EventSource(url);
+    const es = new EventSource(
+      `${url}${url.includes("?") ? "&" : "?"}inventory=1`,
+    );
     es.addEventListener("message", (e) =>
       this.recv((e as MessageEvent).data as string),
     );

@@ -256,6 +256,10 @@ impl Store {
     }
 
     /// `{"type_name":..,"rev":..,"value":..}` for a hosted model, or `None`.
+    fn unhost(&mut self, id: u64) -> bool {
+        self.inner.unhost(id)
+    }
+
     fn snapshot(&self, id: u64) -> Option<String> {
         self.inner.snapshot(id)
     }
@@ -485,6 +489,10 @@ impl OwnedFields {
     fn owns(&self, id: u64, field: &str) -> bool {
         self.inner.owns(id, field)
     }
+    fn remove(&mut self, id: u64) {
+        self.inner.remove(id);
+    }
+
     fn disconnect(&mut self) {
         self.inner.disconnect();
     }
