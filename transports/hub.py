@@ -606,6 +606,7 @@ class Hub:
         sess = self._tenants.get(key)
         if sess is None:
             return {}
+        pending = self._flush_tenant_tagged(key)
         authoritative = sess.submit(wire_id, msg["patch"])
         if authoritative is None:
             # Rejected (invalid edit / malformed patch): revert just the proposer to the authoritative
@@ -629,7 +630,10 @@ class Hub:
             else:
                 direct = self._encode_many((target for target in conns if target != conn), [relay])
                 direct.update(self._encode_many([conn], [protocol.patch_msg(wire_id, authoritative, proposal)]))
-        return finish(self._flush_tenant_tagged(key), direct)
+        out = finish(pending, direct)
+        for target, tagged in self._flush_tenant_tagged(key).items():
+            out.setdefault(target, []).extend(wire for _, wire in tagged)
+        return out
 
     def flush(self) -> dict[Any, list[Wire]]:
         """Drain every tenant session and any host-side shared writes; route the patches per tenant/subscription."""
