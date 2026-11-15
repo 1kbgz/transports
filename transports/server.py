@@ -157,6 +157,7 @@ class Server:
                 out.setdefault(target, []).extend(wires)
             return out
         if msg.get("t") == "patch":
+            out = {target: list(wires) for target, wires in self.flush().items()}
             proposal = msg.get("proposal")
             authoritative = self._session.submit(msg["id"], msg["patch"])
             if authoritative is None:
@@ -181,8 +182,9 @@ class Server:
                 else:
                     direct = self._encode_many((target for target in self._codecs if target != conn), [relay])
                     direct.update(self._encode_many([conn], [protocol.patch_msg(msg["id"], authoritative, proposal)]))
-            out = {target: [wire for _, wire in tagged] for target, tagged in self._flush_tagged().items()}
             for target, wires in direct.items():
+                out.setdefault(target, []).extend(wires)
+            for target, wires in self.flush().items():
                 out.setdefault(target, []).extend(wires)
             return out
         return {}

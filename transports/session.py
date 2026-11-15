@@ -183,6 +183,7 @@ class Session:
 
         Also refreshes the hosted Python object so the caller's own reference stays in sync — the
         update is made under observation suppression so it doesn't echo back as a new patch.
+        Additional writes by Python observers are emitted on the next flush.
         """
         return self._apply_authoritative(mid, patch)
 
@@ -379,7 +380,8 @@ class Session:
         if snapshot is None:
             return False
         try:
-            value = json.loads(_apply(json.dumps(json.loads(snapshot)["value"]), json.dumps(patch)))
+            previous = json.loads(snapshot)["value"]
+            value = json.loads(_apply(json.dumps(previous), json.dumps(patch)))
             fresh = self._validated_model(mid, value)
         except Exception:  # noqa: BLE001
             return False
@@ -388,13 +390,16 @@ class Session:
         obj = self._models[mid]
         self._suppress.add(mid)
         try:
-            for name in _annotations(type(obj)):
-                if name not in self._owned_names.get(mid, {}).values():
+            for wire, name in _field_names(type(obj)).items():
+                # Unchanged fields must not overwrite writes made by an earlier setter.
+                if wire not in self._owned_fields.get(mid, ()) and previous["Map"].get(wire) != value["Map"].get(wire):
                     setattr(obj, name, getattr(fresh, name))
             if mid in self._owned_fields:
                 self._refresh_owned(mid, {name: value["Map"][name] for name in self._owned_fields[mid]})
         finally:
             self._suppress.discard(mid)
+        if to_value(obj) != value:
+            self._dirty.add(mid)
         return True
 
     def schema(self, type_name: str) -> dict | None:

@@ -4,6 +4,13 @@ This reference lists the Python surface exposed by `transports`.
 
 ## Session
 
+`Session.submit()` and `Session.apply_patch()` refresh changed Python fields in model declaration
+order. Unchanged fields are left untouched. Synchronous observers can make additional writes;
+differences from the accepted patch are emitted at the next flush as a later revision. If a proposal
+changes several fields, a later field assignment can replace a value written by an earlier observer.
+`Server.recv()` and `Hub.recv()` send pending host patches, the proposal reply, and observer patches
+in that order.
+
 ```{eval-rst}
 .. autoclass:: transports.Session
    :members:
