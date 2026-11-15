@@ -685,10 +685,10 @@ def test_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_update
             return await self.incoming.get()
 
     class Stalled(FakeConn):
-        async def send_text(self, message):
+        async def send_text(self, msg):
             await asyncio.Event().wait()
 
-        async def send_bytes(self, message):
+        async def send_bytes(self, msg):
             await asyncio.Event().wait()
 
     async def run():
