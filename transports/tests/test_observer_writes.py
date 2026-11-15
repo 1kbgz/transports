@@ -1,5 +1,6 @@
+import msgspec
 import pytest
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, RootModel
 
 from transports import Client, Hub, Server, Session, protocol, to_value
 
@@ -30,6 +31,65 @@ def preset_model(trigger_first, alias=False):
 
 def set_op(field, value):
     return {"Set": {"path": [{"Key": field}], "value": value}}
+
+
+def test_authoritative_apply_replaces_pending_local_writes_without_echo():
+    class Model(BaseModel):
+        x: int = 0
+        y: int = 0
+
+    model = Model()
+    session = Session()
+    mid = session.host(model)
+    model.y = 9
+    assert session.apply_patch(mid, {"rev": 1, "ops": [set_op("x", {"Int": 2})]})
+    assert model == Model(x=2)
+    assert session.drain() == []
+    assert session.value(mid) == to_value(model)
+
+
+def test_authoritative_apply_does_not_echo_validation_coercion():
+    class Model(BaseModel):
+        x: int = 0
+
+    model = Model()
+    session = Session()
+    mid = session.host(model)
+    assert session.apply_patch(mid, {"rev": 1, "ops": [set_op("x", {"Str": "2"})]})
+    assert model.x == 2
+    assert session.drain() == []
+    assert session.snapshot(mid)["rev"] == 1
+
+
+@pytest.mark.parametrize("submit", [False, True])
+@pytest.mark.parametrize("shape", ["scalar", "root_map", "array"])
+def test_inbound_apply_preserves_non_field_map_models(shape, submit):
+    if shape == "scalar":
+        model = RootModel[int](0)
+        expected = RootModel[int](2)
+        path = []
+    elif shape == "root_map":
+        model = RootModel[dict[str, int]]({"root": 0, "x": 0})
+        expected = RootModel[dict[str, int]]({"root": 0, "x": 2})
+        path = [{"Key": "x"}]
+    else:
+
+        class Model(msgspec.Struct, array_like=True):
+            x: int = 0
+
+        model = Model()
+        expected = Model(x=2)
+        path = [{"Index": 0}]
+    session = Session()
+    mid = session.host(model)
+    patch = {"rev": 1, "ops": [{"Set": {"path": path, "value": {"Int": 2}}}]}
+    if submit:
+        assert session.submit(mid, patch) == patch
+    else:
+        assert session.apply_patch(mid, patch)
+    assert model == expected
+    assert session.drain() == []
+    assert session.value(mid) == to_value(model)
 
 
 @pytest.mark.parametrize("trigger_first", [False, True])

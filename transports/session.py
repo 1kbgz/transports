@@ -383,22 +383,37 @@ class Session:
             previous = json.loads(snapshot)["value"]
             value = json.loads(_apply(json.dumps(previous), json.dumps(patch)))
             fresh = self._validated_model(mid, value)
+            obj = self._models[mid]
+            before = to_value(obj)
+            expected = to_value(fresh)
+            changed = list(_annotations(type(obj)))
+            if (
+                isinstance(before, dict)
+                and "Map" in before
+                and isinstance(expected, dict)
+                and "Map" in expected
+                and not (isinstance(obj, BaseModel) and obj.__pydantic_root_model__)
+            ):
+                changed = [
+                    name
+                    for wire, name in _field_names(type(obj)).items()
+                    if wire not in before["Map"] or wire not in expected["Map"] or before["Map"][wire] != expected["Map"][wire]
+                ]
         except Exception:  # noqa: BLE001
             return False
         if not self._store.apply(mid, json.dumps(patch)):
             return False
-        obj = self._models[mid]
         self._suppress.add(mid)
         try:
-            for wire, name in _field_names(type(obj)).items():
-                # Unchanged fields must not overwrite writes made by an earlier setter.
-                if wire not in self._owned_fields.get(mid, ()) and previous["Map"].get(wire) != value["Map"].get(wire):
+            # Choose fields before setters run; unchanged fields must not overwrite observer writes.
+            for name in changed:
+                if name not in self._owned_names.get(mid, {}).values():
                     setattr(obj, name, getattr(fresh, name))
             if mid in self._owned_fields:
                 self._refresh_owned(mid, {name: value["Map"][name] for name in self._owned_fields[mid]})
         finally:
             self._suppress.discard(mid)
-        if to_value(obj) != value:
+        if to_value(obj) != expected:
             self._dirty.add(mid)
         return True
 
