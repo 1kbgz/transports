@@ -181,3 +181,23 @@ x-axis: time
 
 The [full interactive report](https://1kbgz.github.io/transports/benchmarks/) includes all committed
 timing runs and filters.
+
+## Scoped awareness
+
+`test_scoped_awareness_fanout` measures one participant updating one or three scopes with
+10, 100, or 1,000 connected peers, over JSON, MessagePack, and CBOR. Payloads contain a record ID,
+field, and normalized pointer coordinates. Repeated updates retain one state per peer/scope;
+closing the peers removes those states. The benchmark checks recipient counts and thread stability.
+
+```{benched} ../../benchmarks/results
+:view: trend
+:metric: median
+:benchmark-filter: *test_scoped_awareness_fanout*
+:x-axis: time
+```
+
+The measurement includes Hub reduction, encoding, and construction of the recipient map. It excludes
+WebSocket delivery, browser rendering, slow-consumer queues, and relay presence, which is not supported.
+`extra_info` records encoded bytes, delivered frames, and retained state counts. These checks bound
+retention for the fixed fixture; they do not impose a server-wide scope or payload limit. Calibrate
+latency limits on a stable runner before treating local timings as a release budget.

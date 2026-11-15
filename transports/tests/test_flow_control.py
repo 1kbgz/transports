@@ -668,3 +668,65 @@ def test_wedged_socket_is_cut_by_the_watchdog_and_its_shard_resumes():
             sync_task.cancel()
 
     asyncio.run(scenario())
+
+
+@pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
+@pytest.mark.parametrize("clock_resolution", [None, 1 / 64], ids=["default-clock", "coarse-clock"])
+def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_updates(codec, clock_resolution, monkeypatch):
+    class Source(FakeConn):
+        def __init__(self):
+            super().__init__()
+            self.query_params = {"codec": codec}
+            self.incoming = asyncio.Queue()
+
+        async def accept(self):
+            pass
+
+        async def receive(self):
+            return await self.incoming.get()
+
+    class Stalled(FakeConn):
+        async def send_text(self, msg):
+            await asyncio.Event().wait()
+
+        async def send_bytes(self, msg):
+            await asyncio.Event().wait()
+
+    async def wait_until(predicate):
+        while not predicate():
+            await asyncio.sleep(0.01)
+
+    async def run():
+        if clock_resolution is not None:
+            # Exercise early timer wakeups on platforms with coarse monotonic clocks.
+            monkeypatch.setattr(asyncio.get_running_loop(), "_clock_resolution", clock_resolution)
+        hub = transports.Hub(key=lambda connection: connection)
+        sid = hub.share(Counter())
+        source, healthy, stalled = Source(), FakeConn(), Stalled()
+        for connection in (source, healthy, stalled):
+            hub.subscribe(connection, sid)
+        for connection in (healthy, stalled):
+            hub.open(connection, codec=codec)
+        hub.recv(stalled, transports.protocol.encode(transports.protocol.awareness_msg(sid, {"row": "old"}, scope="table"), codec))
+        sync = asyncio.create_task(transports.autosync(hub, interval=0.001, max_queue=4, stall_timeout=0.05, shards=3))
+        endpoint = asyncio.create_task(transports.ws_endpoint(hub)(source))
+        try:
+            await asyncio.wait_for(wait_until(lambda: bool(source.sent)), timeout=5)
+            for value in range(20):
+                frame = transports.protocol.encode(transports.protocol.awareness_msg(sid, {"row": value}, scope="table"), codec)
+                await source.incoming.put({"text" if isinstance(frame, str) else "bytes": frame})
+            await asyncio.wait_for(wait_until(lambda: stalled not in hub._codecs and len(healthy.sent) >= 21), timeout=5)
+            assert healthy in hub._codecs
+            messages = [transports.protocol.decode(frame, codec) for frame in healthy.sent]
+            assert [message["state"]["row"] for message in messages if message.get("state") is not None] == list(range(20))
+            assert any(message.get("state") is None for message in messages)
+            assert all(stalled not in states for states in hub._awareness.values())
+            replay = [transports.protocol.decode(frame, codec) for frame in hub.open(stalled, codec=codec)]
+            assert [message["state"] for message in replay if message["t"] == "scoped_awareness"] == [{"row": 19}]
+        finally:
+            await source.incoming.put({"type": "websocket.disconnect"})
+            await endpoint
+            sync.cancel()
+            await asyncio.gather(sync, return_exceptions=True)
+
+    asyncio.run(run())

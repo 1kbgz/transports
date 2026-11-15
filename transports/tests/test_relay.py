@@ -481,3 +481,33 @@ def test_relay_flush_sweeps_local_inactive_tenants(monkeypatch):
     now[0] = 5
     assert relay._flush_tagged() == {}
     assert "idle" not in hub._tenants
+
+
+def test_relay_ignores_election_beacons_on_shared_backplane(caplog):
+    from transports import Election
+
+    async def go():
+        bus = _Bus()
+        hubs = [Hub(key=lambda conn: conn) for _ in range(2)]
+        ids = [hub.share({"Map": {"value": {"Int": 0}}}, "Shared") for hub in hubs]
+        relays = [RelayBroadcaster(hub, MemBackplane(bus)) for hub in hubs]
+        elections = [Election(relay.backplane, id=str(i), interval=0.01, timeout=0.1) for i, relay in enumerate(relays)]
+        try:
+            for relay, election in zip(relays, elections, strict=True):
+                await relay.start(catch_up_timeout=0.05)
+                await election.start()
+            await relays[0].set_shared(ids[0], {"Map": {"value": {"Int": 7}}})
+            for _ in range(100):
+                if hubs[1].snapshot_shared(ids[1])["value"] == {"Map": {"value": {"Int": 7}}} and not elections[1].is_leader:
+                    break
+                await asyncio.sleep(0.01)
+            assert hubs[1].snapshot_shared(ids[1])["value"] == {"Map": {"value": {"Int": 7}}}
+            assert elections[0].is_leader and not elections[1].is_leader
+            assert not [record for record in caplog.records if record.name == "transports.relay"]
+        finally:
+            for election in elections:
+                await election.stop()
+            for relay in relays:
+                await relay.stop()
+
+    asyncio.run(go())

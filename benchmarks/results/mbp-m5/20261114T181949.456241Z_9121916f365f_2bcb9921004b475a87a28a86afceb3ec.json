@@ -1,0 +1,1500 @@
+{
+  "schema_version": 1,
+  "run_id": "2bcb9921004b475a87a28a86afceb3ec",
+  "started_at": "2026-11-14T18:19:49.456241+00:00",
+  "ended_at": "2026-11-14T18:19:52.106268+00:00",
+  "status": "success",
+  "exit_code": 0,
+  "suite": {
+    "name": "transports",
+    "repository": "https://github.com/1kbgz/transports",
+    "version": "0.12.3",
+    "revision": "9121916f365fb8c41eb78bd7c099e4e7fbd481a0",
+    "branch": "add-shared-state-recipe",
+    "dirty": true,
+    "labels": {}
+  },
+  "subject": {
+    "name": "transports",
+    "repository": "https://github.com/1kbgz/transports",
+    "version": "0.12.3",
+    "revision": "9121916f365fb8c41eb78bd7c099e4e7fbd481a0",
+    "branch": "add-shared-state-recipe",
+    "dirty": true,
+    "labels": {}
+  },
+  "machine": {
+    "id": "mbp-m5",
+    "fingerprint": "4947e1f640c8e065b0bdc2b3f1c521f706461fb493daa642d995091105a41e96",
+    "metadata": {
+      "system": "Darwin",
+      "release": "25.6.0",
+      "architecture": "arm64",
+      "processor": "arm",
+      "cpu_count": 18,
+      "memory_gib": 64.0
+    },
+    "labels": {}
+  },
+  "environment": {
+    "fingerprint": "08a3e8e6b02c3b8e1bbdfca23dbe380db01a1fb4802f32e1154b169bf43bdabb",
+    "python_implementation": "CPython",
+    "python_version": "3.12.13",
+    "platform": "Darwin",
+    "architecture": "arm64",
+    "labels": {}
+  },
+  "tool": {
+    "benched": "0.5.1",
+    "pytest": "9.2.0",
+    "pytest_benchmark": "5.3.1"
+  },
+  "measurements": [
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=10&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-json]",
+      "name": "test_scoped_awareness_fanout[1-10-json]",
+      "group": null,
+      "parameter_id": "1-10-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 1,
+        "codec": "json",
+        "delivered_frames": 9,
+        "encoded_bytes": 1827,
+        "retained_states": 10,
+        "threads": 1
+      },
+      "stats": {
+        "min": 7.83335417509079e-06,
+        "max": 1.2292526662349701e-05,
+        "mean": 9.383447468280792e-06,
+        "stddev": 1.8170502735091185e-06,
+        "rounds": 5,
+        "median": 8.458271622657776e-06,
+        "iqr": 2.3657921701669693e-06,
+        "q1": 8.207745850086212e-06,
+        "q3": 1.0573538020253181e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 7.83335417509079e-06,
+        "hd15iqr": 1.2292526662349701e-05,
+        "ops": 106570.6397760883,
+        "total": 4.691723734140396e-05,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=10&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-json]",
+      "name": "test_scoped_awareness_fanout[1-10-json] peak memory",
+      "group": null,
+      "parameter_id": "1-10-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=10&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-10-msgpack]",
+      "group": null,
+      "parameter_id": "1-10-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 1,
+        "codec": "msgpack",
+        "delivered_frames": 9,
+        "encoded_bytes": 1431,
+        "retained_states": 10,
+        "threads": 1
+      },
+      "stats": {
+        "min": 8.74977558851242e-06,
+        "max": 1.0750256478786469e-05,
+        "mean": 9.249895811080933e-06,
+        "stddev": 8.607864460223056e-07,
+        "rounds": 5,
+        "median": 8.790753781795502e-06,
+        "iqr": 8.444767445325851e-07,
+        "q1": 8.74977558851242e-06,
+        "q3": 9.594252333045006e-06,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 8.74977558851242e-06,
+        "hd15iqr": 1.0750256478786469e-05,
+        "ops": 108109.32581554572,
+        "total": 4.624947905540466e-05,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=10&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-10-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "1-10-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=10&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-cbor]",
+      "name": "test_scoped_awareness_fanout[1-10-cbor]",
+      "group": null,
+      "parameter_id": "1-10-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 1,
+        "codec": "cbor",
+        "delivered_frames": 9,
+        "encoded_bytes": 1323,
+        "retained_states": 10,
+        "threads": 1
+      },
+      "stats": {
+        "min": 9.291805326938629e-06,
+        "max": 1.037493348121643e-05,
+        "mean": 9.741820394992829e-06,
+        "stddev": 4.241989796768702e-07,
+        "rounds": 5,
+        "median": 9.667128324508667e-06,
+        "iqr": 6.14440068602562e-07,
+        "q1": 9.416835382580757e-06,
+        "q3": 1.0031275451183319e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 2,
+        "outliers": "2;0",
+        "ld15iqr": 9.291805326938629e-06,
+        "hd15iqr": 1.037493348121643e-05,
+        "ops": 102650.21930747022,
+        "total": 4.870910197496414e-05,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=10&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-10-cbor]",
+      "name": "test_scoped_awareness_fanout[1-10-cbor] peak memory",
+      "group": null,
+      "parameter_id": "1-10-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 10,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=100&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-json]",
+      "name": "test_scoped_awareness_fanout[1-100-json]",
+      "group": null,
+      "parameter_id": "1-100-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 1,
+        "codec": "json",
+        "delivered_frames": 99,
+        "encoded_bytes": 20097,
+        "retained_states": 100,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.149958163499832e-05,
+        "max": 2.516619861125946e-05,
+        "mean": 2.3207999765872957e-05,
+        "stddev": 1.540905861786321e-06,
+        "rounds": 5,
+        "median": 2.312473952770233e-05,
+        "iqr": 2.6670750230550766e-06,
+        "q1": 2.1843239665031433e-05,
+        "q3": 2.451031468808651e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 2,
+        "outliers": "2;0",
+        "ld15iqr": 2.149958163499832e-05,
+        "hd15iqr": 2.516619861125946e-05,
+        "ops": 43088.59057601708,
+        "total": 0.00011603999882936478,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=100&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-json]",
+      "name": "test_scoped_awareness_fanout[1-100-json] peak memory",
+      "group": null,
+      "parameter_id": "1-100-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=100&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-100-msgpack]",
+      "group": null,
+      "parameter_id": "1-100-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 1,
+        "codec": "msgpack",
+        "delivered_frames": 99,
+        "encoded_bytes": 15741,
+        "retained_states": 100,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.1583400666713715e-05,
+        "max": 2.4874694645404816e-05,
+        "mean": 2.2791698575019838e-05,
+        "stddev": 1.3821278226970588e-06,
+        "rounds": 5,
+        "median": 2.2209249436855316e-05,
+        "iqr": 2.1045561879873276e-06,
+        "q1": 2.1739164367318153e-05,
+        "q3": 2.384372055530548e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 2.1583400666713715e-05,
+        "hd15iqr": 2.4874694645404816e-05,
+        "ops": 43875.624131674864,
+        "total": 0.00011395849287509918,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=100&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-100-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "1-100-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=100&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-cbor]",
+      "name": "test_scoped_awareness_fanout[1-100-cbor]",
+      "group": null,
+      "parameter_id": "1-100-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 1,
+        "codec": "cbor",
+        "delivered_frames": 99,
+        "encoded_bytes": 14553,
+        "retained_states": 100,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.187490463256836e-05,
+        "max": 2.437550574541092e-05,
+        "mean": 2.268347889184952e-05,
+        "stddev": 1.0095011322693727e-06,
+        "rounds": 5,
+        "median": 2.22083181142807e-05,
+        "iqr": 1.1560041457414627e-06,
+        "q1": 2.2062798961997032e-05,
+        "q3": 2.3218803107738495e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 2.187490463256836e-05,
+        "hd15iqr": 2.437550574541092e-05,
+        "ops": 44084.94855519334,
+        "total": 0.00011341739445924759,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=100&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-100-cbor]",
+      "name": "test_scoped_awareness_fanout[1-100-cbor] peak memory",
+      "group": null,
+      "parameter_id": "1-100-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 100,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=1000&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-json]",
+      "name": "test_scoped_awareness_fanout[1-1000-json]",
+      "group": null,
+      "parameter_id": "1-1000-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 1,
+        "codec": "json",
+        "delivered_frames": 999,
+        "encoded_bytes": 202797,
+        "retained_states": 1000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.00014237500727176666,
+        "max": 0.00018141604959964752,
+        "mean": 0.00015741642564535142,
+        "stddev": 1.606983397884505e-05,
+        "rounds": 5,
+        "median": 0.00015962496399879456,
+        "iqr": 2.3322878405451775e-05,
+        "q1": 0.0001426872331649065,
+        "q3": 0.00016601011157035828,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.00014237500727176666,
+        "hd15iqr": 0.00018141604959964752,
+        "ops": 6352.577222487141,
+        "total": 0.000787082128226757,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=1000&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-json]",
+      "name": "test_scoped_awareness_fanout[1-1000-json] peak memory",
+      "group": null,
+      "parameter_id": "1-1000-json",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=1000&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-1000-msgpack]",
+      "group": null,
+      "parameter_id": "1-1000-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 1,
+        "codec": "msgpack",
+        "delivered_frames": 999,
+        "encoded_bytes": 158841,
+        "retained_states": 1000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.00014687515795230865,
+        "max": 0.00015583261847496033,
+        "mean": 0.00014952495694160463,
+        "stddev": 3.664708616733956e-06,
+        "rounds": 5,
+        "median": 0.0001482078805565834,
+        "iqr": 3.895489498972893e-06,
+        "q1": 0.00014715665020048618,
+        "q3": 0.00015105213969945908,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.00014687515795230865,
+        "hd15iqr": 0.00015583261847496033,
+        "ops": 6687.846767884637,
+        "total": 0.0007476247847080231,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=1000&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-msgpack]",
+      "name": "test_scoped_awareness_fanout[1-1000-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "1-1000-msgpack",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=1000&scopes=1",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-cbor]",
+      "name": "test_scoped_awareness_fanout[1-1000-cbor]",
+      "group": null,
+      "parameter_id": "1-1000-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 1,
+        "codec": "cbor",
+        "delivered_frames": 999,
+        "encoded_bytes": 146853,
+        "retained_states": 1000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.00014166627079248428,
+        "max": 0.00017041712999343872,
+        "mean": 0.0001506498083472252,
+        "stddev": 1.2242457674713461e-05,
+        "rounds": 5,
+        "median": 0.00014408305287361145,
+        "iqr": 1.6437144950032234e-05,
+        "q1": 0.00014219782315194607,
+        "q3": 0.0001586349681019783,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.00014166627079248428,
+        "hd15iqr": 0.00017041712999343872,
+        "ops": 6637.910867401505,
+        "total": 0.000753249041736126,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=1000&scopes=1:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[1-1000-cbor]",
+      "name": "test_scoped_awareness_fanout[1-1000-cbor] peak memory",
+      "group": null,
+      "parameter_id": "1-1000-cbor",
+      "parameters": {
+        "scopes": 1,
+        "peers": 1000,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=10&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-json]",
+      "name": "test_scoped_awareness_fanout[3-10-json]",
+      "group": null,
+      "parameter_id": "3-10-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 3,
+        "codec": "json",
+        "delivered_frames": 27,
+        "encoded_bytes": 5481,
+        "retained_states": 30,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.3708678781986237e-05,
+        "max": 2.7542002499103546e-05,
+        "mean": 2.4691782891750334e-05,
+        "stddev": 1.6267268541981803e-06,
+        "rounds": 5,
+        "median": 2.3834407329559326e-05,
+        "iqr": 1.4884863048791885e-06,
+        "q1": 2.3802276700735092e-05,
+        "q3": 2.529076300561428e-05,
+        "iqr_outliers": 1,
+        "stddev_outliers": 1,
+        "outliers": "1;1",
+        "ld15iqr": 2.3708678781986237e-05,
+        "hd15iqr": 2.454034984111786e-05,
+        "ops": 40499.30312379774,
+        "total": 0.00012345891445875168,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=10&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-json]",
+      "name": "test_scoped_awareness_fanout[3-10-json] peak memory",
+      "group": null,
+      "parameter_id": "3-10-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=10&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-10-msgpack]",
+      "group": null,
+      "parameter_id": "3-10-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 3,
+        "codec": "msgpack",
+        "delivered_frames": 27,
+        "encoded_bytes": 4293,
+        "retained_states": 30,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.466607838869095e-05,
+        "max": 2.8665177524089813e-05,
+        "mean": 2.6566348969936372e-05,
+        "stddev": 1.6894148633881093e-06,
+        "rounds": 5,
+        "median": 2.691708505153656e-05,
+        "iqr": 2.875225618481636e-06,
+        "q1": 2.4947570636868477e-05,
+        "q3": 2.7822796255350113e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 2,
+        "outliers": "2;0",
+        "ld15iqr": 2.466607838869095e-05,
+        "hd15iqr": 2.8665177524089813e-05,
+        "ops": 37641.604464792785,
+        "total": 0.00013283174484968185,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=10&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-10-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "3-10-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=10&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-cbor]",
+      "name": "test_scoped_awareness_fanout[3-10-cbor]",
+      "group": null,
+      "parameter_id": "3-10-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 10,
+        "scopes": 3,
+        "codec": "cbor",
+        "delivered_frames": 27,
+        "encoded_bytes": 3969,
+        "retained_states": 30,
+        "threads": 1
+      },
+      "stats": {
+        "min": 2.5958754122257233e-05,
+        "max": 2.800021320581436e-05,
+        "mean": 2.6691891252994538e-05,
+        "stddev": 8.377554319144551e-07,
+        "rounds": 5,
+        "median": 2.629123628139496e-05,
+        "iqr": 1.166248694062233e-06,
+        "q1": 2.6115216314792633e-05,
+        "q3": 2.7281465008854866e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 2.5958754122257233e-05,
+        "hd15iqr": 2.800021320581436e-05,
+        "ops": 37464.56144758236,
+        "total": 0.0001334594562649727,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=10&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-10-cbor]",
+      "name": "test_scoped_awareness_fanout[3-10-cbor] peak memory",
+      "group": null,
+      "parameter_id": "3-10-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 10,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=100&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-json]",
+      "name": "test_scoped_awareness_fanout[3-100-json]",
+      "group": null,
+      "parameter_id": "3-100-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 3,
+        "codec": "json",
+        "delivered_frames": 297,
+        "encoded_bytes": 60291,
+        "retained_states": 300,
+        "threads": 1
+      },
+      "stats": {
+        "min": 6.312504410743713e-05,
+        "max": 6.88750296831131e-05,
+        "mean": 6.51668757200241e-05,
+        "stddev": 2.3072686099073034e-06,
+        "rounds": 5,
+        "median": 6.520841270685196e-05,
+        "iqr": 2.9050279408693314e-06,
+        "q1": 6.32822047919035e-05,
+        "q3": 6.618723273277283e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 6.312504410743713e-05,
+        "hd15iqr": 6.88750296831131e-05,
+        "ops": 15345.219315044218,
+        "total": 0.00032583437860012054,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=100&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-json]",
+      "name": "test_scoped_awareness_fanout[3-100-json] peak memory",
+      "group": null,
+      "parameter_id": "3-100-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=100&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-100-msgpack]",
+      "group": null,
+      "parameter_id": "3-100-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 3,
+        "codec": "msgpack",
+        "delivered_frames": 297,
+        "encoded_bytes": 47223,
+        "retained_states": 300,
+        "threads": 1
+      },
+      "stats": {
+        "min": 6.333272904157639e-05,
+        "max": 6.754137575626373e-05,
+        "mean": 6.442517042160034e-05,
+        "stddev": 1.7693544372947234e-06,
+        "rounds": 5,
+        "median": 6.370898336172104e-05,
+        "iqr": 1.5830155462026596e-06,
+        "q1": 6.339629180729389e-05,
+        "q3": 6.497930735349655e-05,
+        "iqr_outliers": 1,
+        "stddev_outliers": 1,
+        "outliers": "1;1",
+        "ld15iqr": 6.333272904157639e-05,
+        "hd15iqr": 6.412528455257416e-05,
+        "ops": 15521.883659072511,
+        "total": 0.0003221258521080017,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=100&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-100-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "3-100-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=100&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-cbor]",
+      "name": "test_scoped_awareness_fanout[3-100-cbor]",
+      "group": null,
+      "parameter_id": "3-100-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 100,
+        "scopes": 3,
+        "codec": "cbor",
+        "delivered_frames": 297,
+        "encoded_bytes": 43659,
+        "retained_states": 300,
+        "threads": 1
+      },
+      "stats": {
+        "min": 6.279069930315018e-05,
+        "max": 7.083360105752945e-05,
+        "mean": 6.634965538978576e-05,
+        "stddev": 3.4993074507574404e-06,
+        "rounds": 5,
+        "median": 6.695743650197983e-05,
+        "iqr": 6.072456017136574e-06,
+        "q1": 6.285426206886768e-05,
+        "q3": 6.892671808600426e-05,
+        "iqr_outliers": 0,
+        "stddev_outliers": 2,
+        "outliers": "2;0",
+        "ld15iqr": 6.279069930315018e-05,
+        "hd15iqr": 7.083360105752945e-05,
+        "ops": 15071.668332341414,
+        "total": 0.00033174827694892883,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=100&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-100-cbor]",
+      "name": "test_scoped_awareness_fanout[3-100-cbor] peak memory",
+      "group": null,
+      "parameter_id": "3-100-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 100,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=1000&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-json]",
+      "name": "test_scoped_awareness_fanout[3-1000-json]",
+      "group": null,
+      "parameter_id": "3-1000-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "json"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 3,
+        "codec": "json",
+        "delivered_frames": 2997,
+        "encoded_bytes": 608391,
+        "retained_states": 3000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.00046395882964134216,
+        "max": 0.0004805000498890877,
+        "mean": 0.0004693916067481041,
+        "stddev": 6.814358932423212e-06,
+        "rounds": 5,
+        "median": 0.0004665004089474678,
+        "iqr": 8.948612958192825e-06,
+        "q1": 0.0004645825829356909,
+        "q3": 0.0004735311958938837,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.00046395882964134216,
+        "hd15iqr": 0.0004805000498890877,
+        "ops": 2130.4173010844725,
+        "total": 0.0023469580337405205,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22json%22&peers=1000&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-json]",
+      "name": "test_scoped_awareness_fanout[3-1000-json] peak memory",
+      "group": null,
+      "parameter_id": "3-1000-json",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "json"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=1000&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-1000-msgpack]",
+      "group": null,
+      "parameter_id": "3-1000-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "msgpack"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 3,
+        "codec": "msgpack",
+        "delivered_frames": 2997,
+        "encoded_bytes": 476523,
+        "retained_states": 3000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.0004504583775997162,
+        "max": 0.0005082497373223305,
+        "mean": 0.00046902503818273543,
+        "stddev": 2.268414988981809e-05,
+        "rounds": 5,
+        "median": 0.00046191737055778503,
+        "iqr": 2.0509352907538414e-05,
+        "q1": 0.0004562712274491787,
+        "q3": 0.0004767805803567171,
+        "iqr_outliers": 1,
+        "stddev_outliers": 1,
+        "outliers": "1;1",
+        "ld15iqr": 0.0004504583775997162,
+        "hd15iqr": 0.0004662908613681793,
+        "ops": 2132.0823380230568,
+        "total": 0.002345125190913677,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22msgpack%22&peers=1000&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-msgpack]",
+      "name": "test_scoped_awareness_fanout[3-1000-msgpack] peak memory",
+      "group": null,
+      "parameter_id": "3-1000-msgpack",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "msgpack"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=1000&scopes=3",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-cbor]",
+      "name": "test_scoped_awareness_fanout[3-1000-cbor]",
+      "group": null,
+      "parameter_id": "3-1000-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "cbor"
+      },
+      "unit": "seconds",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {
+        "peers": 1000,
+        "scopes": 3,
+        "codec": "cbor",
+        "delivered_frames": 2997,
+        "encoded_bytes": 440559,
+        "retained_states": 3000,
+        "threads": 1
+      },
+      "stats": {
+        "min": 0.000433875247836113,
+        "max": 0.00045512523502111435,
+        "mean": 0.00044085830450057983,
+        "stddev": 8.568649328665352e-06,
+        "rounds": 5,
+        "median": 0.00043687503784894943,
+        "iqr": 1.0063638910651207e-05,
+        "q1": 0.0004354992415755987,
+        "q3": 0.0004455628804862499,
+        "iqr_outliers": 0,
+        "stddev_outliers": 1,
+        "outliers": "1;0",
+        "ld15iqr": 0.000433875247836113,
+        "hd15iqr": 0.00045512523502111435,
+        "ops": 2268.302513055382,
+        "total": 0.002204291522502899,
+        "iterations": 1
+      },
+      "samples": null
+    },
+    {
+      "benchmark_id": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout|codec=%22cbor%22&peers=1000&scopes=3:peak-memory",
+      "nodeid": "benchmarks/test_awareness_fanout.py::test_scoped_awareness_fanout[3-1000-cbor]",
+      "name": "test_scoped_awareness_fanout[3-1000-cbor] peak memory",
+      "group": null,
+      "parameter_id": "3-1000-cbor",
+      "parameters": {
+        "scopes": 3,
+        "peers": 1000,
+        "codec": "cbor"
+      },
+      "unit": "bytes",
+      "options": {
+        "disable_gc": false,
+        "timer": "perf_counter",
+        "min_rounds": 5,
+        "max_time": 1.0,
+        "min_time": 5e-06,
+        "precision": null,
+        "confidence": null,
+        "warmup": false
+      },
+      "extra_info": {},
+      "stats": {
+        "peak_memory": 60522496
+      },
+      "samples": null
+    }
+  ],
+  "provenance": {
+    "source_format": "pytest-benchmark",
+    "source_file": null,
+    "source_checksum": null,
+    "warnings": []
+  }
+}

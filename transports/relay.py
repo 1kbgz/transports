@@ -104,6 +104,8 @@ class RelayBroadcaster:
             async for raw in self.backplane.messages():
                 try:
                     m = json.loads(raw)
+                    if "election" in m and "t" not in m:
+                        continue
                     t = m.get("t", "w")
                     if t == "w":
                         if self._catching_up:
