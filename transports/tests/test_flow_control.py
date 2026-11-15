@@ -672,7 +672,7 @@ def test_wedged_socket_is_cut_by_the_watchdog_and_its_shard_resumes():
 
 
 @pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
-def test_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_updates(codec):
+def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_updates(codec):
     class Source(FakeConn):
         def __init__(self):
             super().__init__()
