@@ -183,6 +183,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#serve-a-hub">Serve a Hub</a>
   </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#add-and-remove-models-after-clients-connect">Add and remove models after clients connect</a>
+  </li>
 </ul>
 </div>
   </div>
@@ -531,6 +534,32 @@ leaves them as observers. Custom manual adapters can pass <code class="docutils 
 <code class="docutils literal notranslate"><span class="pre">Hub.open</span></code>. A closed adapter must call <code class="docutils literal notranslate"><span class="pre">Client.detach</span></code> and the server’s <code class="docutils literal notranslate"><span class="pre">close</span></code> method so ownership
 can transfer; send every message returned by <code class="docutils literal notranslate"><span class="pre">close</span></code> to its destination.</p>
 </section>
+<section id="add-and-remove-models-after-clients-connect">
+<h2>Add and remove models after clients connect<a class="headerlink" href="#add-and-remove-models-after-clients-connect" title="Link to this heading">¶</a></h2>
+<p>Use <code class="docutils literal notranslate"><span class="pre">Session.host()</span></code> while the server is running. The next <code class="docutils literal notranslate"><span class="pre">flush()</span></code>, <code class="docutils literal notranslate"><span class="pre">autosync</span></code>, or <code class="docutils literal notranslate"><span class="pre">sync()</span></code>
+announces the model and sends its snapshot before its first patch.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">model_id</span> <span class="o">=</span> <span class="n">session</span><span class="o">.</span><span class="n">host</span><span class="p">(</span><span class="n">Counter</span><span class="p">(</span><span class="n">tick</span><span class="o">=</span><span class="mi">10</span><span class="p">))</span>
+<span class="c1"># Later, stop serving this model:</span>
+<span class="n">session</span><span class="o">.</span><span class="n">unhost</span><span class="p">(</span><span class="n">model_id</span><span class="p">)</span>
+</pre></div>
+</div>
+<p><code class="docutils literal notranslate"><span class="pre">unhost()</span></code> returns whether it removed a model. It releases replay history, ownership, and pending
+commands, and ignores subsequent changes to the original Python object. A later <code class="docutils literal notranslate"><span class="pre">host()</span></code> allocates
+a new ID. Use the same methods on <code class="docutils literal notranslate"><span class="pre">hub.tenant(key)</span></code> for private models. It does not remove
+models created with <code class="docutils literal notranslate"><span class="pre">Hub.share()</span></code>.</p>
+<p>Handle <code class="docutils literal notranslate"><span class="pre">{&quot;t&quot;:</span> <span class="pre">&quot;remove&quot;,</span> <span class="pre">&quot;id&quot;:</span> <span class="pre">model_id}</span></code> in Python <code class="docutils literal notranslate"><span class="pre">on_change()</span></code> or JavaScript <code class="docutils literal notranslate"><span class="pre">onChange()</span></code> to
+clear application state or detach controls. The transports client removes its mirrored value,
+revision, CRDT outbox, ownership, commands, and awareness. Pending proposals for that model are
+reported through <code class="docutils literal notranslate"><span class="pre">on_abandon()</span></code> / <code class="docutils literal notranslate"><span class="pre">onAbandon()</span></code>.</p>
+<p>When writing a manual reconnect adapter, pass <code class="docutils literal notranslate"><span class="pre">client.revisions()</span></code> as <code class="docutils literal notranslate"><span class="pre">since</span></code> to <code class="docutils literal notranslate"><span class="pre">server.open()</span></code>
+or <code class="docutils literal notranslate"><span class="pre">hub.open()</span></code>. The server then announces any models removed while the client was disconnected.
+The managed WebSocket and anywidget adapters send this resume token. Set <code class="docutils literal notranslate"><span class="pre">inventory=True</span></code> on
+<code class="docutils literal notranslate"><span class="pre">open()</span></code> to request an inventory even without a resume token; managed WebSocket, SSE, and anywidget
+clients request it automatically. This also covers EventSource’s automatic reconnect. A manual
+adapter calling <code class="docutils literal notranslate"><span class="pre">open()</span></code> without either option must initialize a fresh mirror.</p>
+<p>Older clients ignore model inventories. They receive late model snapshots, but need an upgrade to
+clear retired mirrors. The server rejects edits to a retired ID from either client generation.</p>
+</section>
 </section>
 
 
@@ -598,6 +627,9 @@ can transfer; send every message returned by <code class="docutils literal notra
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#serve-a-hub">Serve a Hub</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#add-and-remove-models-after-clients-connect">Add and remove models after clients connect</a>
   </li>
 </ul>
 

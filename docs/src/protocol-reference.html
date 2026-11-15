@@ -190,6 +190,9 @@
     <a href="#protocol-messages">Protocol messages</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
+    <a href="#model-inventory">Model inventory</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
     <a href="#snapshot">Snapshot</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
@@ -519,7 +522,23 @@ an exact permutation and reconciliation exhausts the budget, diff falls back to 
 </section>
 <section id="protocol-messages">
 <h2>Protocol messages<a class="headerlink" href="#protocol-messages" title="Link to this heading">¶</a></h2>
+<section id="model-inventory">
+<h3>Model inventory<a class="headerlink" href="#model-inventory" title="Link to this heading">¶</a></h3>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span><span class="nt">"t"</span><span class="p">:</span><span class="w"> </span><span class="s2">"models"</span><span class="p">,</span><span class="w"> </span><span class="nt">"ids"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="mi">2</span><span class="p">]}</span>
+</pre></div>
+</div>
+<p>An authoritative inventory lists the IDs served to this connection. Clients remove mirrored
+models absent from the list. It does not initialize newly listed IDs; their snapshots follow.
+Session membership changes send an inventory before new model snapshots and patches. A reconnect
+whose <code class="docutils literal notranslate"><span class="pre">since</span></code> token includes removed IDs also receives an inventory. <code class="docutils literal notranslate"><span class="pre">open(inventory=True)</span></code>
+requests one unconditionally; managed adapters negotiate this with <code class="docutils literal notranslate"><span class="pre">inventory=1</span></code>. Inventories are control
+messages and do not coalesce with patches.</p>
+<p>The shared Rust client reducer removes revisions, type names, CRDT membership, and pending
+proposals for retired IDs. Python and JavaScript remove their associated payloads and report one
+<code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;remove&quot;,</span> <span class="pre">id}</span></code> change per retired model. Repeated inventories produce no duplicate removals.
+No retirement history is retained on the server; reconnect detection uses the client’s resume token.</p>
 <p>Connections carry one logical message per frame.</p>
+</section>
 <section id="snapshot">
 <h3>Snapshot<a class="headerlink" href="#snapshot" title="Link to this heading">¶</a></h3>
 <p>A snapshot initializes a client mirror for one model.</p>
@@ -612,7 +631,8 @@ uses the dots in reducer state. A reconnect receives a full CRDT snapshot, reapp
 operations, and resends them. This preserves offline changes without applying an operation twice.</p>
 <p><code class="docutils literal notranslate"><span class="pre">Client.recv()</span></code> (Python and JavaScript alike) returns <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for an accepted
 snapshot, <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;crdt_snapshot&quot;,</span> <span class="pre">id,</span> <span class="pre">rev}</span></code> for a CRDT snapshot, the decoded patch or CRDT operation
-message for an accepted change, and <code class="docutils literal notranslate"><span class="pre">None</span></code>/<code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored revision or an unrecognized
+message for an accepted change, a list of <code class="docutils literal notranslate"><span class="pre">{t:</span> <span class="pre">&quot;remove&quot;,</span> <span class="pre">id}</span></code> changes for a model inventory,
+and <code class="docutils literal notranslate"><span class="pre">None</span></code>/<code class="docutils literal notranslate"><span class="pre">undefined</span></code> for an ignored revision or an unrecognized
 message type. Unknown types are ignored rather than raised, so a newer server can add message types
 without breaking older clients. Reactive adapters can consume the returned change without reading
 and decoding the complete mirror, either from the <code class="docutils literal notranslate"><span class="pre">recv()</span></code> return value or via <code class="docutils literal notranslate"><span class="pre">Client.on_change</span></code> /
@@ -873,6 +893,9 @@ fields. Managed command acknowledgements flush pending status before acknowledgi
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#protocol-messages">Protocol messages</a>
+  </li>
+  <li class="fd-toc-item" data-depth="2">
+    <a href="#model-inventory">Model inventory</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
     <a href="#snapshot">Snapshot</a>

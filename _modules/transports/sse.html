@@ -604,13 +604,13 @@ window.runMermaid = runMermaid;</script>
         <span class="k">await</span> <span class="bp">self</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">data</span><span class="o">.</span><span class="n">decode</span><span class="p">())</span>
 
 
-<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">_SSEConn</span><span class="p">):</span>
+<span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">:</span> <span class="n">Broadcaster</span><span class="p">,</span> <span class="n">conn</span><span class="p">:</span> <span class="n">_SSEConn</span><span class="p">,</span> <span class="o">*</span><span class="p">,</span> <span class="n">inventory</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">"""Async generator of wire messages for one SSE connection: the opening snapshots, then patches.</span>
 
 <span class="sd">    Patches arrive on the connection's queue via `autosync` (which calls `send_text`). Closes the</span>
 <span class="sd">    connection when the consumer stops iterating.</span>
 <span class="sd">    """</span>
-    <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">,</span> <span class="n">ownership</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>  <span class="c1"># snapshots first</span>
+    <span class="k">for</span> <span class="n">wire</span> <span class="ow">in</span> <span class="n">server</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">protocol</span><span class="o">.</span><span class="n">JSON</span><span class="p">,</span> <span class="n">ownership</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">inventory</span><span class="o">=</span><span class="n">inventory</span><span class="p">):</span>  <span class="c1"># snapshots first</span>
         <span class="k">await</span> <span class="n">conn</span><span class="o">.</span><span class="n">queue</span><span class="o">.</span><span class="n">put</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
     <span class="k">try</span><span class="p">:</span>
         <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
@@ -630,7 +630,7 @@ window.runMermaid = runMermaid;</script>
     <span class="kn">from</span><span class="w"> </span><span class="nn">sse_starlette</span><span class="w"> </span><span class="kn">import</span> <span class="n">EventSourceResponse</span>
 
     <span class="k">async</span> <span class="k">def</span><span class="w"> </span><span class="nf">endpoint</span><span class="p">(</span><span class="n">request</span><span class="p">:</span> <span class="n">Any</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">EventSourceResponse</span><span class="p">(</span><span class="n">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">_SSEConn</span><span class="p">()))</span>
+        <span class="k">return</span> <span class="n">EventSourceResponse</span><span class="p">(</span><span class="n">sse_stream</span><span class="p">(</span><span class="n">server</span><span class="p">,</span> <span class="n">_SSEConn</span><span class="p">(),</span> <span class="n">inventory</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">query_params</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">"inventory"</span><span class="p">)</span> <span class="o">==</span> <span class="s2">"1"</span><span class="p">))</span>
 
     <span class="k">return</span> <span class="n">endpoint</span></div>
 

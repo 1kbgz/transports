@@ -162,6 +162,9 @@
     <a href="#transports.Session.host">Session.host()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.unhost">Session.unhost()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Session.ids">Session.ids()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
@@ -304,6 +307,9 @@
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.ids">Client.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.revisions">Client.revisions()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.pending_proposals">Client.pending_proposals()</a>
@@ -596,6 +602,9 @@
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Store.snapshot">Store.snapshot()</a>
   </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.unhost">Store.unhost()</a>
+  </li>
   <li class="fd-toc-item" data-depth="2">
     <a href="#client-model-metadata">Client model metadata</a>
   </li>
@@ -626,6 +635,14 @@ message where available, so callers can put it on the wire (the <cite>reject</ci
 <dt class="sig sig-object py" id="transports.Session.host">
 <span class="sig-name descname"><span class="pre">host</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">list_keys</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">owner</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">'server'</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">int</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.host"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.host" title="Link to this definition">¶</a></dt>
 <dd><p>Host and watch a model. Optional list_keys records define exact list and item-key paths.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Session.unhost">
+<span class="sig-name descname"><span class="pre">unhost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../../_modules/transports/session.html#Session.unhost"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Session.unhost" title="Link to this definition">¶</a></dt>
+<dd><p>Retire a hosted model; connected mirrors remove it on the next server flush.</p>
+<p>Releases state, replay history, ownership and queued commands. Further mutations of the
+original object are ignored. Returns False for an unknown or already retired id.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -784,11 +801,13 @@ the messages to send; an adapter such as <cite>ws_endpoint</cite> performs the I
 <p>Each connection has its own negotiated codec, so outbound messages are encoded per connection.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Server.open">
-<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">since</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">ownership</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.open" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">since</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">ownership</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inventory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/server.html#Server.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Server.open" title="Link to this definition">¶</a></dt>
 <dd><p>Register a connection; return the messages that bring it up to date.</p>
 <p>Fresh connect (<code class="docutils literal notranslate"><span class="pre">since=None</span></code>) → a snapshot per model. Resume (<code class="docutils literal notranslate"><span class="pre">since={mid:</span> <span class="pre">last_rev}</span></code>) → only
 the patches each model emitted after <code class="docutils literal notranslate"><span class="pre">last_rev</span></code>, falling back to a snapshot for any model whose
-replay log can’t bridge the gap. So a reconnecting client replays the delta, not the whole model.</p>
+replay log can’t bridge the gap. So a reconnecting client replays the delta, not the whole model.
+<code class="docutils literal notranslate"><span class="pre">inventory=True</span></code> also sends the current model IDs, allowing a retained mirror to remove
+unavailable models even without a resume token. Stale IDs in <code class="docutils literal notranslate"><span class="pre">since</span></code> imply this inventory.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -874,7 +893,7 @@ None withdraws only the selected scope. Awareness requires a shared Hub model.</
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_change">
 <span class="sig-name descname"><span class="pre">on_change</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_change"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_change" title="Link to this definition">¶</a></dt>
-<dd><p>Register a callback fired after each accepted snapshot or patch — the same change dict
+<dd><p>Register a callback fired after each accepted snapshot, patch, or model removal — the same change dict
 <cite>recv</cite> returns — so <cite>connect</cite>/<cite>run</cite>/<cite>connect_sse</cite> consumers get path-level changes without
 managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
 type). Returns an unsubscribe function.</p>
@@ -918,7 +937,7 @@ Returns an unsubscribe function.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.on_abandon">
 <span class="sig-name descname"><span class="pre">on_abandon</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">callback</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">None</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.on_abandon"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.on_abandon" title="Link to this definition">¶</a></dt>
-<dd><p>Register a callback fired with unsettled proposal identifiers on disconnect.</p>
+<dd><p>Register a callback fired with proposal identifiers abandoned on disconnect or model removal.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -946,7 +965,7 @@ existing channel is disconnected before its replacement is attached.</p>
 to <cite>on_reject</cite>), and an unrecognized message type, which is ignored so a newer server can add
 message types without breaking older clients. A connection that negotiated <code class="docutils literal notranslate"><span class="pre">?batch=1</span></code>
 may receive batch frames, which apply in order and return the accepted changes as a
-<code class="docutils literal notranslate"><span class="pre">list</span></code>. Invalid frames raise without changing the mirror or its accepted revision.</p>
+<code class="docutils literal notranslate"><span class="pre">list</span></code>. A model inventory returns a list of <code class="docutils literal notranslate"><span class="pre">{&quot;t&quot;:</span> <span class="pre">&quot;remove&quot;,</span> <span class="pre">&quot;id&quot;}</span></code> changes, or None. Invalid frames raise without changing the mirror or its accepted revision.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -983,6 +1002,12 @@ may receive batch frames, which apply in order and return the accepted changes a
 <dt class="sig sig-object py" id="transports.Client.ids">
 <span class="sig-name descname"><span class="pre">ids</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.ids"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.ids" title="Link to this definition">¶</a></dt>
 <dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Client.revisions">
+<span class="sig-name descname"><span class="pre">revisions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/client.html#Client.revisions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Client.revisions" title="Link to this definition">¶</a></dt>
+<dd><p>Resume token for a manual adapter: pass as Server.open(since=…) on reconnect.</p>
+</dd></dl>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Client.pending_proposals">
@@ -1278,7 +1303,7 @@ it cannot be combined with <code class="docutils literal notranslate"><span clas
 
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Hub.open">
-<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">since</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">ownership</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.open" title="Link to this definition">¶</a></dt>
+<span class="sig-name descname"><span class="pre">open</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">conn</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">codec</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">since</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">None</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">batch</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="keyword-only-separator o"><abbr title="Keyword-only parameters separator (PEP 3102)"><span class="pre">*</span></abbr></span></em>, <em class="sig-param"><span class="n"><span class="pre">ownership</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">inventory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="w"> </span><span class="p"><span class="pre">|</span></span><span class="w"> </span><span class="pre">bytes</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../../_modules/transports/hub.html#Hub.open"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transports.Hub.open" title="Link to this definition">¶</a></dt>
 <dd><p>Register a connection; return the messages to bring it up to date — its tenant’s private models
 and its subscribed shared models. With <code class="docutils literal notranslate"><span class="pre">since={mid:</span> <span class="pre">last_rev}</span></code> a reconnecting client resumes its
 <strong>private</strong> models from the delta until the first tenant retirement; afterwards private
@@ -1726,6 +1751,11 @@ has its own <code class="docutils literal notranslate"><span class="pre">registe
 <dl class="py method">
 <dt class="sig sig-object py" id="transports.Store.snapshot">
 <span class="sig-name descname"><span class="pre">snapshot</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.Store.snapshot" title="Link to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="transports.Store.unhost">
+<span class="sig-name descname"><span class="pre">unhost</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">id</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#transports.Store.unhost" title="Link to this definition">¶</a></dt>
 <dd><p><cite>{“type_name”:..,”rev”:..,”value”:..}</cite> for a hosted model, or <cite>None</cite>.</p>
 </dd></dl>
 
@@ -1779,6 +1809,9 @@ The accepted-change notification shape is unchanged.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Session.host">Session.host()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Session.unhost">Session.unhost()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Session.ids">Session.ids()</a>
@@ -1923,6 +1956,9 @@ The accepted-change notification shape is unchanged.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.ids">Client.ids()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Client.revisions">Client.revisions()</a>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Client.pending_proposals">Client.pending_proposals()</a>
@@ -2214,6 +2250,9 @@ The accepted-change notification shape is unchanged.</p>
   </li>
   <li class="fd-toc-item" data-depth="3">
     <a href="#transports.Store.snapshot">Store.snapshot()</a>
+  </li>
+  <li class="fd-toc-item" data-depth="3">
+    <a href="#transports.Store.unhost">Store.unhost()</a>
   </li>
   <li class="fd-toc-item" data-depth="2">
     <a href="#client-model-metadata">Client model metadata</a>

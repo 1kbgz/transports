@@ -238,6 +238,24 @@ an exact permutation and reconciliation exhausts the budget, diff falls back to 
 
 ## Protocol messages
 
+### Model inventory
+
+```json
+{"t": "models", "ids": [1, 2]}
+```
+
+An authoritative inventory lists the IDs served to this connection. Clients remove mirrored
+models absent from the list. It does not initialize newly listed IDs; their snapshots follow.
+Session membership changes send an inventory before new model snapshots and patches. A reconnect
+whose `since` token includes removed IDs also receives an inventory. `open(inventory=True)`
+requests one unconditionally; managed adapters negotiate this with `inventory=1`. Inventories are control
+messages and do not coalesce with patches.
+
+The shared Rust client reducer removes revisions, type names, CRDT membership, and pending
+proposals for retired IDs. Python and JavaScript remove their associated payloads and report one
+`{t: "remove", id}` change per retired model. Repeated inventories produce no duplicate removals.
+No retirement history is retained on the server; reconnect detection uses the client's resume token.
+
 Connections carry one logical message per frame.
 
 ### Snapshot
@@ -346,7 +364,8 @@ operations, and resends them. This preserves offline changes without applying an
 
 `Client.recv()` (Python and JavaScript alike) returns `{t: "snapshot", id, rev}` for an accepted
 snapshot, `{t: "crdt_snapshot", id, rev}` for a CRDT snapshot, the decoded patch or CRDT operation
-message for an accepted change, and `None`/`undefined` for an ignored revision or an unrecognized
+message for an accepted change, a list of `{t: "remove", id}` changes for a model inventory,
+and `None`/`undefined` for an ignored revision or an unrecognized
 message type. Unknown types are ignored rather than raised, so a newer server can add message types
 without breaking older clients. Reactive adapters can consume the returned change without reading
 and decoding the complete mirror, either from the `recv()` return value or via `Client.on_change` /
