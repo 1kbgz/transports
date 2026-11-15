@@ -11,6 +11,9 @@ use crate::{Patch, Value};
 /// One live protocol message.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Message {
+    Models {
+        ids: Vec<u64>,
+    },
     Ownership(crate::OwnershipMessage),
     Snapshot {
         id: u64,
@@ -66,6 +69,8 @@ pub enum Message {
 #[derive(Serialize, Deserialize)]
 #[serde(tag = "t")]
 enum KnownMessage {
+    #[serde(rename = "models")]
+    Models { ids: Vec<u64> },
     #[serde(rename = "snapshot")]
     Snapshot {
         id: u64,
@@ -137,6 +142,7 @@ enum KnownMessage {
 impl From<KnownMessage> for Message {
     fn from(message: KnownMessage) -> Self {
         match message {
+            KnownMessage::Models { ids } => Message::Models { ids },
             KnownMessage::Snapshot {
                 id,
                 model_type,
@@ -222,6 +228,7 @@ impl From<KnownMessage> for Message {
 impl From<&Message> for KnownMessage {
     fn from(message: &Message) -> Self {
         match message {
+            Message::Models { ids } => KnownMessage::Models { ids: ids.clone() },
             Message::Snapshot {
                 id,
                 model_type,
@@ -337,7 +344,7 @@ impl<'de> Deserialize<'de> for Message {
                 .map_err(serde::de::Error::custom),
             Some(
                 "snapshot" | "crdt_snapshot" | "patch" | "crdt" | "ack" | "reject" | "awareness"
-                | "scoped_awareness" | "batch",
+                | "scoped_awareness" | "batch" | "models",
             ) => value
                 .deserialized::<KnownMessage>()
                 .map(Message::from)

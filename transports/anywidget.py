@@ -120,7 +120,15 @@ def serve_anywidget(server: Broadcaster, widget: Any, codec: str = "json", *, vi
         target_conn = connections.get(view)
         if content.get("ready") and target_conn is None:
             target_conn = conn if view is None else _WidgetConn(widget, codec, view)
-            opening = server.open(target_conn, codec, ownership=bool(content.get("ownership")))
+            since = content.get("since")
+            if since is not None:
+                if not isinstance(since, dict):
+                    return
+                try:
+                    since = {int(mid): int(rev) for mid, rev in since.items()}
+                except (ValueError, TypeError):
+                    return
+            opening = server.open(target_conn, codec, since=since, ownership=bool(content.get("ownership")), inventory=bool(content.get("inventory")))
             connections[view] = target_conn
             if view is not None and content.get("heartbeat"):
                 renew(view)

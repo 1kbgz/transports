@@ -333,6 +333,11 @@ impl OwnedFields {
         })
     }
 
+    pub fn remove(&mut self, id: u64) {
+        self.grants.remove(&id);
+        self.pending.remove(&id);
+    }
+
     pub fn disconnect(&mut self) {
         self.pending.clear();
         for grant in self.grants.values_mut() {

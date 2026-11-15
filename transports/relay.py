@@ -199,11 +199,18 @@ class RelayBroadcaster:
 
     # --- broadcaster contract: delegate to the hub; recv also publishes shared writes to the cluster ---
     def open(
-        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+        self,
+        conn: Any,
+        codec: str | None = None,
+        since: dict[int, int] | None = None,
+        batch: bool = False,
+        *,
+        ownership: bool = True,
+        inventory: bool = False,
     ) -> list[Wire]:
         if any(session._authorities for session in self.hub._tenants.values()):
             raise ValueError("client-owned fields require a single Server or Hub; clustered ownership is not supported")
-        return self.hub.open(conn, codec, since, batch=batch)
+        return self.hub.open(conn, codec, since, batch=batch, ownership=ownership, inventory=inventory)
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]:
         codec = self.hub._codecs.get(conn)

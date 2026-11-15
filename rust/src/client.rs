@@ -14,6 +14,10 @@ use crate::{Message, Op, Patch};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "effect", rename_all = "snake_case")]
 pub enum ClientEffect {
+    Removed {
+        ids: Vec<u64>,
+        proposals: Vec<String>,
+    },
     Snapshot {
         id: u64,
         rev: u64,
@@ -83,13 +87,15 @@ pub struct ClientState {
     revisions: BTreeMap<u64, u64>,
     types: BTreeMap<u64, String>,
     crdt_ids: BTreeSet<u64>,
-    pending: BTreeSet<String>,
+    pending: BTreeMap<String, u64>,
     next_proposal: u64,
 }
 
 #[derive(Deserialize)]
 #[serde(tag = "t")]
 enum ClientMessage {
+    #[serde(rename = "models")]
+    Models { ids: Vec<u64> },
     #[serde(rename = "snapshot")]
     Snapshot {
         id: u64,
@@ -155,7 +161,7 @@ impl ClientState {
             revisions: BTreeMap::new(),
             types: BTreeMap::new(),
             crdt_ids: BTreeSet::new(),
-            pending: BTreeSet::new(),
+            pending: BTreeMap::new(),
             next_proposal: 1,
         }
     }
@@ -163,6 +169,7 @@ impl ClientState {
     /// Classify one non-batch message without changing state.
     pub fn prepare(&self, message: &Message) -> Result<ClientEffect, String> {
         match message {
+            Message::Models { ids } => Ok(self.models(ids)),
             Message::Snapshot {
                 id,
                 rev,
@@ -257,6 +264,7 @@ impl ClientState {
         let message: ClientMessage =
             serde_json::from_str(message_json).map_err(|error| error.to_string())?;
         let effect = match message {
+            ClientMessage::Models { ids } => self.models(&ids),
             ClientMessage::Snapshot { id, rev, type_name } => {
                 ClientEffect::Snapshot { id, rev, type_name }
             }
@@ -321,8 +329,38 @@ impl ClientState {
         effect.to_json()
     }
 
+    fn models(&self, ids: &[u64]) -> ClientEffect {
+        let current: BTreeSet<u64> = ids.iter().copied().collect();
+        let removed: BTreeSet<u64> = self
+            .revisions
+            .keys()
+            .copied()
+            .filter(|id| !current.contains(id))
+            .collect();
+        let proposals = self
+            .pending
+            .iter()
+            .filter(|(_, id)| removed.contains(id))
+            .map(|(proposal, _)| proposal.clone())
+            .collect();
+        ClientEffect::Removed {
+            ids: removed.into_iter().collect(),
+            proposals,
+        }
+    }
+
     /// Commit an effect after the binding has applied its local value change successfully.
     pub fn commit(&mut self, effect: &ClientEffect) {
+        if let ClientEffect::Removed { ids, proposals } = effect {
+            for id in ids {
+                self.revisions.remove(id);
+                self.types.remove(id);
+                self.crdt_ids.remove(id);
+            }
+            for proposal in proposals {
+                self.pending.remove(proposal);
+            }
+        }
         if let ClientEffect::Snapshot { id, type_name, .. }
         | ClientEffect::CrdtSnapshot { id, type_name, .. } = effect
         {
@@ -384,7 +422,7 @@ impl ClientState {
         proposal: Option<&str>,
     ) -> Result<String, String> {
         let ops: Vec<Op> = serde_json::from_str(ops_json).map_err(|error| error.to_string())?;
-        let proposal = self.proposal_id(proposal)?;
+        let proposal = self.proposal_id(id, proposal)?;
         Message::Patch {
             id,
             patch: Patch { rev: 0, ops },
@@ -393,7 +431,7 @@ impl ClientState {
         .to_json()
     }
 
-    fn proposal_id(&mut self, proposal: Option<&str>) -> Result<String, String> {
+    fn proposal_id(&mut self, id: u64, proposal: Option<&str>) -> Result<String, String> {
         let proposal = match proposal {
             Some(proposal) if reserved_proposal(proposal) => {
                 return Err("proposal identifiers matching 'auto-N' are reserved".into());
@@ -405,14 +443,14 @@ impl ClientState {
                 proposal
             }
         };
-        self.pending.insert(proposal.clone());
+        self.pending.insert(proposal.clone(), id);
         Ok(proposal)
     }
 
     /// Abandon every unsettled proposal while retaining revisions for reconnect resume.
     pub fn disconnect(&mut self) -> ClientEffect {
         ClientEffect::Disconnect {
-            proposals: std::mem::take(&mut self.pending).into_iter().collect(),
+            proposals: std::mem::take(&mut self.pending).into_keys().collect(),
         }
     }
 
@@ -430,7 +468,7 @@ impl ClientState {
     }
 
     pub fn pending(&self) -> Vec<String> {
-        self.pending.iter().cloned().collect()
+        self.pending.keys().cloned().collect()
     }
 
     pub fn pending_json(&self) -> Result<String, String> {
@@ -438,7 +476,7 @@ impl ClientState {
     }
 
     pub fn abandon(&mut self, proposal: &str) -> bool {
-        self.pending.remove(proposal)
+        self.pending.remove(proposal).is_some()
     }
 }
 

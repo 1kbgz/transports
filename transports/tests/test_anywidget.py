@@ -88,3 +88,23 @@ def test_widget_factory_builds_a_served_anywidget():
     w._msg_callbacks(w, {"ready": True}, None)  # what the frontend sends once a view listens
     assert json.loads(sends[0]["wire"])["t"] == "snapshot"
     assert json.loads(sends[0]["wire"])["id"] == mid
+
+
+def test_ready_inventory_clears_models_retired_while_view_disconnected():
+    session = transports.Session()
+    mid = session.host(Model())
+    server = transports.Server(session)
+    widget = FakeWidget()
+    transports.serve_anywidget(server, widget)
+    client = transports.Client()
+    widget.fire({"ready": True, "view": "editor", "inventory": True})
+    for item in widget.sent:
+        client.recv(item["wire"])
+    assert client.ids() == [mid]
+    widget.fire({"closed": True, "view": "editor"})
+    session.unhost(mid)
+    widget.sent.clear()
+    widget.fire({"ready": True, "view": "editor", "inventory": True, "since": client.revisions()})
+    for item in widget.sent:
+        client.recv(item["wire"])
+    assert client.ids() == []

@@ -19,6 +19,7 @@ from collections.abc import Callable
 from typing import Any, Protocol
 
 from . import protocol
+from ._models import ModelAnnouncements
 from ._ownership import OwnershipServer
 from .session import Session
 
@@ -45,7 +46,9 @@ class Broadcaster(Protocol):
     @property
     def _codecs(self) -> dict[Any, str]: ...
 
-    def open(self, conn: Any, codec: str = ..., since: dict[int, int] | None = ..., batch: bool = ..., *, ownership: bool = ...) -> list[Wire]: ...
+    def open(
+        self, conn: Any, codec: str = ..., since: dict[int, int] | None = ..., batch: bool = ..., *, ownership: bool = ..., inventory: bool = ...
+    ) -> list[Wire]: ...
 
     def recv(self, conn: Any, data: Wire) -> dict[Any, list[Wire]]: ...
 
@@ -66,6 +69,7 @@ class Server:
     def __init__(self, session: Session, *, default_codec: str = protocol.JSON) -> None:
         self._session = session
         self._ownership = OwnershipServer(session)
+        self._models = ModelAnnouncements()
         self._codecs: dict[Any, str] = {}
         self._batched: set[Any] = set()
         self.default_codec = protocol.normalize_codec(default_codec)
@@ -92,19 +96,31 @@ class Server:
         return out
 
     def open(
-        self, conn: Any, codec: str | None = None, since: dict[int, int] | None = None, batch: bool = False, *, ownership: bool = True
+        self,
+        conn: Any,
+        codec: str | None = None,
+        since: dict[int, int] | None = None,
+        batch: bool = False,
+        *,
+        ownership: bool = True,
+        inventory: bool = False,
     ) -> list[Wire]:
         """Register a connection; return the messages that bring it up to date.
 
         Fresh connect (``since=None``) → a snapshot per model. Resume (``since={mid: last_rev}``) → only
         the patches each model emitted after ``last_rev``, falling back to a snapshot for any model whose
         replay log can't bridge the gap. So a reconnecting client replays the delta, not the whole model.
+        ``inventory=True`` also sends the current model IDs, allowing a retained mirror to remove
+        unavailable models even without a resume token. Stale IDs in ``since`` imply this inventory.
         """
         self._codecs[conn] = protocol.normalize_codec(codec or self.default_codec)
         if batch:
             self._batched.add(conn)
         try:
+            models = self._models.open(conn, self._session)
             out: list[Wire] = []
+            if inventory or since is not None and set(since) - set(self._session.ids()):
+                out.append(self._encode_for(conn, models))
             for mid in self._session.ids():
                 client_rev = since.get(mid) if since else None
                 delta = self._session.since(mid, client_rev) if client_rev is not None and mid not in self._session._authorities else None
@@ -181,10 +197,22 @@ class Server:
         return {conn: stripped.setdefault(id(tagged), [wire for _, wire in tagged]) for conn, tagged in self._flush_tagged().items()}
 
     def _flush_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
-        out = self._flush_patches_tagged()
+        out: dict[Any, list[tuple[int | None, Wire]]] = {}
+        for conn in list(self._codecs):
+            messages = self._models.flush(conn, self._session)
+            if messages:
+                try:
+                    out[conn] = [(None, self._encode_for(conn, message)) for message in messages]
+                except Exception:  # noqa: BLE001
+                    self.close(conn)
+        for conn, tagged in self._flush_patches_tagged().items():
+            if conn in out:
+                out[conn].extend(tagged)
+            else:
+                out[conn] = tagged
         for conn, messages in self._ownership.flush().items():
             out[conn] = [*out.get(conn, []), *((None, self._encode_for(conn, message)) for message in messages)]
-        return out
+        return {conn: messages for conn, messages in out.items() if messages}
 
     def _flush_patches_tagged(self) -> dict[Any, list[tuple[int | None, Wire]]]:
         """`flush`, with each message tagged by its model id (``None`` for a batch envelope) so
@@ -215,6 +243,7 @@ class Server:
         return out
 
     def close(self, conn: Any) -> dict[Any, list[Wire]]:
+        self._models.close(conn)
         self._codecs.pop(conn, None)
         self._batched.discard(conn)
         return {target: [self._encode_for(target, message) for message in messages] for target, messages in self._ownership.close(conn).items()}
@@ -268,7 +297,14 @@ def ws_endpoint(server: Broadcaster):
         batch = websocket.query_params.get("batch") in ("1", "true")
         await websocket.accept()
         try:
-            for msg in server.open(websocket, codec, since, batch=batch, ownership=websocket.query_params.get("ownership") == "1"):
+            for msg in server.open(
+                websocket,
+                codec,
+                since,
+                batch=batch,
+                ownership=websocket.query_params.get("ownership") == "1",
+                inventory=websocket.query_params.get("inventory") == "1",
+            ):
                 await _send(websocket, msg)
             while True:
                 frame = await websocket.receive()

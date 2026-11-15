@@ -248,6 +248,10 @@ impl JsonStore {
             })
     }
 
+    pub fn unhost(&mut self, id: u64) -> bool {
+        self.inner.unhost(ModelId(id))
+    }
+
     /// Read a revision without serializing the model's payload.
     pub fn revision(&self, id: u64) -> Option<u64> {
         self.inner.snapshot(ModelId(id)).map(|(_, _, rev)| rev)

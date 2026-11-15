@@ -39,13 +39,13 @@ class _SSEConn:
         await self.queue.put(data.decode())
 
 
-async def sse_stream(server: Broadcaster, conn: _SSEConn):
+async def sse_stream(server: Broadcaster, conn: _SSEConn, *, inventory: bool = False):
     """Async generator of wire messages for one SSE connection: the opening snapshots, then patches.
 
     Patches arrive on the connection's queue via `autosync` (which calls `send_text`). Closes the
     connection when the consumer stops iterating.
     """
-    for wire in server.open(conn, protocol.JSON, ownership=False):  # snapshots first
+    for wire in server.open(conn, protocol.JSON, ownership=False, inventory=inventory):  # snapshots first
         await conn.queue.put(wire)
     try:
         while True:
@@ -63,6 +63,6 @@ def sse_endpoint(server: Broadcaster):
     from sse_starlette import EventSourceResponse
 
     async def endpoint(request: Any):
-        return EventSourceResponse(sse_stream(server, _SSEConn()))
+        return EventSourceResponse(sse_stream(server, _SSEConn(), inventory=request.query_params.get("inventory") == "1"))
 
     return endpoint

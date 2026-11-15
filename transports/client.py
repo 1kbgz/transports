@@ -68,7 +68,7 @@ class Client:
     @property
     def _rev(self) -> dict[int, int]:
         """Compatibility view of revisions now owned by the shared core."""
-        return {int(mid): rev for mid, rev in json.loads(self._state.revisions()).items()}
+        return self.revisions()
 
     async def send(self, frame: str | bytes) -> bool:
         """Send a frame over the active managed duplex connection.
@@ -138,7 +138,7 @@ class Client:
         return sent
 
     def on_change(self, callback: Callable[[dict], None]) -> Callable[[], None]:
-        """Register a callback fired after each accepted snapshot or patch — the same change dict
+        """Register a callback fired after each accepted snapshot, patch, or model removal — the same change dict
         `recv` returns — so `connect`/`run`/`connect_sse` consumers get path-level changes without
         managing the socket themselves. Not fired for ignored frames (stale revision, unknown message
         type). Returns an unsubscribe function."""
@@ -188,7 +188,7 @@ class Client:
         return lambda: self._connect_cbs.remove(callback)
 
     def on_abandon(self, callback: Callable[[list[str]], None]) -> Callable[[], None]:
-        """Register a callback fired with unsettled proposal identifiers on disconnect."""
+        """Register a callback fired with proposal identifiers abandoned on disconnect or model removal."""
         self._abandon_cbs.append(callback)
         return lambda: self._abandon_cbs.remove(callback)
 
@@ -286,17 +286,17 @@ class Client:
         to `on_reject`), and an unrecognized message type, which is ignored so a newer server can add
         message types without breaking older clients. A connection that negotiated ``?batch=1``
         may receive batch frames, which apply in order and return the accepted changes as a
-        ``list``. Invalid frames raise without changing the mirror or its accepted revision."""
+        ``list``. A model inventory returns a list of ``{"t": "remove", "id"}`` changes, or None. Invalid frames raise without changing the mirror or its accepted revision."""
         msg = protocol.decode(data, self._codec)
         t = msg.get("t")
         if t == "batch":
             # a negotiated batch frame: apply each message in order; the accepted changes come
             # back as a list (only connections that requested ?batch=1 ever receive these)
             accepted = [self._recv_msg(m) for m in msg["msgs"]]
-            return [a for a in accepted if a is not None] or None
+            return [change for item in accepted if item is not None for change in (item if isinstance(item, list) else [item])] or None
         return self._recv_msg(msg)
 
-    def _recv_msg(self, msg: dict) -> dict | None:
+    def _recv_msg(self, msg: dict) -> dict | list[dict] | None:
         if msg.get("t") in ("ownership", "command", "owned_ack"):
             if not self._owned.receive(json.dumps(msg)):
                 return None
@@ -326,7 +326,29 @@ class Client:
         effect_json = self._state.prepare(json.dumps(metadata))
         effect = json.loads(effect_json)
         kind = effect["effect"]
-        if kind == "snapshot":
+        if kind == "removed":
+            self._state.commit(effect_json)
+            for mid in effect["ids"]:
+                self._values.pop(mid, None)
+                self._crdt.pop(mid, None)
+                self._crdt_outbox = [item for item in self._crdt_outbox if item["id"] != mid]
+                self._owned.remove(mid)
+                self._commands = {key: command for key, command in self._commands.items() if key[0] != mid}
+                for key in [key for key in self._local_awareness if key[0] == mid]:
+                    del self._local_awareness[key]
+                for key in [key for key in self._awareness if key[0] == mid]:
+                    peers = self._awareness.pop(key)
+                    for peer in peers:
+                        update = {"t": "scoped_awareness" if key[1] is not None else "awareness", "id": mid, "peer": peer, "state": None}
+                        if key[1] is not None:
+                            update["scope"] = key[1]
+                        for callback in list(self._awareness_cbs):
+                            callback(update)
+            if effect["proposals"]:
+                for callback in list(self._abandon_cbs):
+                    callback(effect["proposals"])
+            return [self._accepted({"t": "remove", "id": mid}) for mid in effect["ids"]] or None
+        elif kind == "snapshot":
             mid: int = msg["id"]
             self._crdt.pop(mid, None)
             self._crdt_outbox = [pending for pending in self._crdt_outbox if pending["id"] != mid]
@@ -428,6 +450,10 @@ class Client:
 
     def ids(self) -> list[int]:
         return list(self._values)
+
+    def revisions(self) -> dict[int, int]:
+        """Resume token for a manual adapter: pass as Server.open(since=...) on reconnect."""
+        return {int(mid): rev for mid, rev in json.loads(self._state.revisions()).items()}
 
     def pending_proposals(self) -> list[str]:
         """Identifiers for proposals that have not settled or been abandoned."""
@@ -555,7 +581,7 @@ class Client:
         """``url`` + ``?codec=``, plus ``?since=`` (last-seen rev per model) when this client already
         mirrors models, so a reconnect resumes from the delta instead of re-sending each whole model."""
         sep = "&" if "?" in url else "?"
-        params = f"codec={self._codec}&ownership={int(self._ownership)}"
+        params = f"codec={self._codec}&ownership={int(self._ownership)}&inventory=1"
         revisions = self._state.revisions()
         if revisions != "{}":
             params += "&since=" + urllib.parse.quote(revisions)
@@ -764,6 +790,7 @@ class Client:
         `connect()` (WebSocket) when the client also needs to send edits. Under Pyodide this rides
         the browser's native ``EventSource`` (no raw sockets for `httpx`).
         """
+        url += ("&" if "?" in url else "?") + "inventory=1"
         if sys.platform == "emscripten":  # pragma: no cover - exercised by the in-Pyodide suite
             await self._connect_sse_browser(url)
             return
