@@ -671,7 +671,8 @@ def test_wedged_socket_is_cut_by_the_watchdog_and_its_shard_resumes():
 
 
 @pytest.mark.parametrize("codec", ["json", "msgpack", "cbor"])
-def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_updates(codec):
+@pytest.mark.parametrize("clock_resolution", [None, 1 / 64], ids=["default-clock", "coarse-clock"])
+def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_healthy_updates(codec, clock_resolution, monkeypatch):
     class Source(FakeConn):
         def __init__(self):
             super().__init__()
@@ -691,7 +692,14 @@ def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_heal
         async def send_bytes(self, msg):
             await asyncio.Event().wait()
 
+    async def wait_until(predicate):
+        while not predicate():
+            await asyncio.sleep(0.01)
+
     async def run():
+        if clock_resolution is not None:
+            # Exercise early timer wakeups on platforms with coarse monotonic clocks.
+            monkeypatch.setattr(asyncio.get_running_loop(), "_clock_resolution", clock_resolution)
         hub = transports.Hub(key=lambda connection: connection)
         sid = hub.share(Counter())
         source, healthy, stalled = Source(), FakeConn(), Stalled()
@@ -703,19 +711,11 @@ def test_starlette_scoped_awareness_slow_consumer_is_dropped_without_losing_heal
         sync = asyncio.create_task(transports.autosync(hub, interval=0.001, max_queue=4, stall_timeout=0.05, shards=3))
         endpoint = asyncio.create_task(transports.ws_endpoint(hub)(source))
         try:
-            for _ in range(100):
-                if source.sent:
-                    break
-                await asyncio.sleep(0.01)
-            assert source.sent
+            await asyncio.wait_for(wait_until(lambda: bool(source.sent)), timeout=5)
             for value in range(20):
                 frame = transports.protocol.encode(transports.protocol.awareness_msg(sid, {"row": value}, scope="table"), codec)
                 await source.incoming.put({"text" if isinstance(frame, str) else "bytes": frame})
-            for _ in range(100):
-                if stalled not in hub._codecs and len(healthy.sent) >= 20:
-                    break
-                await asyncio.sleep(0.01)
-            assert stalled not in hub._codecs
+            await asyncio.wait_for(wait_until(lambda: stalled not in hub._codecs and len(healthy.sent) >= 21), timeout=5)
             assert healthy in hub._codecs
             messages = [transports.protocol.decode(frame, codec) for frame in healthy.sent]
             assert [message["state"]["row"] for message in messages if message.get("state") is not None] == list(range(20))
