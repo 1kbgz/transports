@@ -4,6 +4,16 @@ This reference lists the Python surface exposed by `transports`.
 
 ## Session
 
+`Session.submit()` and `Session.apply_patch()` refresh Python fields in model declaration order.
+For models serialized as field maps, fields matching the validated incoming model before refresh
+are left untouched. Root models and other serialization layouts retain a full field refresh.
+`apply_patch()` replaces pending local edits with authoritative state; validation coercion alone
+does not emit a patch. Synchronous observer writes that differ from the validated incoming model
+are emitted at the next flush as a later revision. If a proposal changes several fields, a later
+field assignment can replace a value written by an earlier observer.
+`Server.recv()` and `Hub.recv()` send pending host patches, the proposal reply, and observer patches
+in that order.
+
 ```{eval-rst}
 .. autoclass:: transports.Session
    :members:

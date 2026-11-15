@@ -779,6 +779,7 @@ window.runMermaid = runMermaid;</script>
 
 <span class="sd">        Also refreshes the hosted Python object so the caller's own reference stays in sync — the</span>
 <span class="sd">        update is made under observation suppression so it doesn't echo back as a new patch.</span>
+<span class="sd">        Additional writes by Python observers are emitted on the next flush.</span>
 <span class="sd">        """</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_apply_authoritative</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">patch</span><span class="p">)</span></div>
 
@@ -988,22 +989,41 @@ window.runMermaid = runMermaid;</script>
         <span class="k">if</span> <span class="n">snapshot</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="kc">False</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="n">value</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)[</span><span class="s2">"value"</span><span class="p">]),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)))</span>
+            <span class="n">previous</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">snapshot</span><span class="p">)[</span><span class="s2">"value"</span><span class="p">]</span>
+            <span class="n">value</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">_apply</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">previous</span><span class="p">),</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)))</span>
             <span class="n">fresh</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_validated_model</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
+            <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span>
+            <span class="n">before</span> <span class="o">=</span> <span class="n">to_value</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span>
+            <span class="n">expected</span> <span class="o">=</span> <span class="n">to_value</span><span class="p">(</span><span class="n">fresh</span><span class="p">)</span>
+            <span class="n">changed</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">_annotations</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)))</span>
+            <span class="k">if</span> <span class="p">(</span>
+                <span class="nb">isinstance</span><span class="p">(</span><span class="n">before</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="s2">"Map"</span> <span class="ow">in</span> <span class="n">before</span>
+                <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">expected</span><span class="p">,</span> <span class="nb">dict</span><span class="p">)</span>
+                <span class="ow">and</span> <span class="s2">"Map"</span> <span class="ow">in</span> <span class="n">expected</span>
+                <span class="ow">and</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">BaseModel</span><span class="p">)</span> <span class="ow">and</span> <span class="n">obj</span><span class="o">.</span><span class="n">__pydantic_root_model__</span><span class="p">)</span>
+            <span class="p">):</span>
+                <span class="n">changed</span> <span class="o">=</span> <span class="p">[</span>
+                    <span class="n">name</span>
+                    <span class="k">for</span> <span class="n">wire</span><span class="p">,</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_field_names</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">))</span><span class="o">.</span><span class="n">items</span><span class="p">()</span>
+                    <span class="k">if</span> <span class="n">wire</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">before</span><span class="p">[</span><span class="s2">"Map"</span><span class="p">]</span> <span class="ow">or</span> <span class="n">wire</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">expected</span><span class="p">[</span><span class="s2">"Map"</span><span class="p">]</span> <span class="ow">or</span> <span class="n">before</span><span class="p">[</span><span class="s2">"Map"</span><span class="p">][</span><span class="n">wire</span><span class="p">]</span> <span class="o">!=</span> <span class="n">expected</span><span class="p">[</span><span class="s2">"Map"</span><span class="p">][</span><span class="n">wire</span><span class="p">]</span>
+                <span class="p">]</span>
         <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>  <span class="c1"># noqa: BLE001</span>
             <span class="k">return</span> <span class="kc">False</span>
         <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">_store</span><span class="o">.</span><span class="n">apply</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">patch</span><span class="p">)):</span>
             <span class="k">return</span> <span class="kc">False</span>
-        <span class="n">obj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_models</span><span class="p">[</span><span class="n">mid</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">try</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">_annotations</span><span class="p">(</span><span class="nb">type</span><span class="p">(</span><span class="n">obj</span><span class="p">)):</span>
+            <span class="c1"># Choose fields before setters run; unchanged fields must not overwrite observer writes.</span>
+            <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">changed</span><span class="p">:</span>
                 <span class="k">if</span> <span class="n">name</span> <span class="ow">not</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_owned_names</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">values</span><span class="p">():</span>
                     <span class="nb">setattr</span><span class="p">(</span><span class="n">obj</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">fresh</span><span class="p">,</span> <span class="n">name</span><span class="p">))</span>
             <span class="k">if</span> <span class="n">mid</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_owned_fields</span><span class="p">:</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">_refresh_owned</span><span class="p">(</span><span class="n">mid</span><span class="p">,</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">value</span><span class="p">[</span><span class="s2">"Map"</span><span class="p">][</span><span class="n">name</span><span class="p">]</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">_owned_fields</span><span class="p">[</span><span class="n">mid</span><span class="p">]})</span>
         <span class="k">finally</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">_suppress</span><span class="o">.</span><span class="n">discard</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">to_value</span><span class="p">(</span><span class="n">obj</span><span class="p">)</span> <span class="o">!=</span> <span class="n">expected</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_dirty</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">mid</span><span class="p">)</span>
         <span class="k">return</span> <span class="kc">True</span>
 
 <div class="viewcode-block" id="Session.schema">
