@@ -177,6 +177,9 @@
   <li class="fd-toc-item" data-depth="1">
     <a href="#interactive-results">Interactive results</a>
   </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#scoped-awareness">Scoped awareness</a>
+  </li>
 </ul>
 </div>
   </div>
@@ -499,6 +502,18 @@ benchmark parameters, timing distributions, and machine metadata.</p>
 <benched-report src="../../_static/benched/reports/results-1086f7a9c6d9.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>The <a class="reference external" href="https://1kbgz.github.io/transports/benchmarks/">full interactive report</a> includes all committed
 timing runs and filters.</p>
 </section>
+<section id="scoped-awareness">
+<h2>Scoped awareness<a class="headerlink" href="#scoped-awareness" title="Link to this heading">¶</a></h2>
+<p><code class="docutils literal notranslate"><span class="pre">test_scoped_awareness_fanout</span></code> measures one participant updating one or three scopes with
+10, 100, or 1,000 connected peers, over JSON, MessagePack, and CBOR. Payloads contain a record ID,
+field, and normalized pointer coordinates. Repeated updates retain one state per peer/scope;
+closing the peers removes those states. The benchmark checks recipient counts and thread stability.</p>
+<benched-report src="../../_static/benched/reports/results-0fe363b7e15b.json" view="trend" metric="median" x-axis="time" data-theme="inherit"></benched-report><p>The measurement includes Hub reduction, encoding, and construction of the recipient map. It excludes
+WebSocket delivery, browser rendering, slow-consumer queues, and relay presence, which is not supported.
+<code class="docutils literal notranslate"><span class="pre">extra_info</span></code> records encoded bytes, delivered frames, and retained state counts. These checks bound
+retention for the fixed fixture; they do not impose a server-wide scope or payload limit. Calibrate
+latency limits on a stable runner before treating local timings as a release budget.</p>
+</section>
 </section>
 
 
@@ -560,6 +575,9 @@ timing runs and filters.</p>
   </li>
   <li class="fd-toc-item" data-depth="1">
     <a href="#interactive-results">Interactive results</a>
+  </li>
+  <li class="fd-toc-item" data-depth="1">
+    <a href="#scoped-awareness">Scoped awareness</a>
   </li>
 </ul>
 
