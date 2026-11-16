@@ -357,7 +357,7 @@ checksum = "8c447be3a2abfa84b2d91680c56600bd6b2873866de27b36ec911be705e291da"
 
 [[package]]
 name = "transports"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "base64",
  "ciborium",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "transports_js"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "transports",
  "wasm-bindgen",
@@ -377,7 +377,7 @@ dependencies = [
 
 [[package]]
 name = "transports_py"
-version = "0.12.3"
+version = "0.12.4"
 dependencies = [
  "pyo3",
  "transports",
