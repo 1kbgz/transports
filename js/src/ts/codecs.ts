@@ -25,7 +25,7 @@ const registry = new Map<
   { encode: CodecEncode; decode: CodecDecode }
 >();
 
-/** Register a custom codec under `contentType`. The built-in json/msgpack codecs cannot be overridden. */
+/** Register a custom codec under `contentType`. The built-in JSON, MessagePack, and CBOR codecs cannot be overridden. */
 export function registerCodec(
   contentType: string,
   encode: CodecEncode,

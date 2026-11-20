@@ -58,10 +58,10 @@ def register_codec(content_type: str, encode: Callable[[Any], str | bytes], deco
     """Register a custom wire codec under ``content_type``.
 
     ``encode`` turns a JSON-able object (a protocol message or a model ``Value``) into wire bytes (or
-    a str); ``decode`` is its inverse. Once registered, ``content_type`` works anywhere a codec name
-    is accepted — ``Client(codec=content_type)``, a ``?codec=`` query param, or ``encode_as`` /
+    a str); ``decode`` is its inverse. Once registered, use ``content_type`` with WebSocket
+    connections (``Client(codec=content_type)`` or a ``?codec=`` query param), ``encode_as``, or
     ``decode_as``. Register a matching implementation in every binding that needs it (the JS binding
-    has its own ``registerCodec``). The built-in ``json`` / ``msgpack`` codecs cannot be overridden.
+    has its own ``registerCodec``). The built-in ``json``, ``msgpack``, and ``cbor`` codecs cannot be overridden.
     """
     if content_type in _BUILTIN:
         raise ValueError(f"cannot override built-in codec: {content_type}")
