@@ -47,7 +47,8 @@ A model is defined once as a [pydantic](https://docs.pydantic.dev) model, stdlib
 [msgspec](https://jcristharif.com/msgspec/) struct. A Python process hosts it and mutates it
 normally, and transports sends only the patch needed to update a remote mirror. The same Rust core
 drives Python (PyO3) and JavaScript (wasm), so both sides share the same `Value` type, diff, patch
-application, and codecs.
+application, and codecs. Models and patches can be encoded as JSON, MessagePack, CBOR, or a
+user-registered [custom codec](docs/src/codecs.md#register-a-custom-python-codec).
 
 ```python
 import transports
@@ -86,7 +87,7 @@ server/client protocol.
 
 [Model bridges](docs/src/bridges.md) covers pydantic, dataclasses, msgspec, schemas, and plain
 JavaScript objects. [Connections](docs/src/connections.md) covers WebSocket, SSE, Jupyter comm, and
-anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, and custom codecs.
+anywidget adapters. [Codecs](docs/src/codecs.md) covers JSON, MessagePack, CBOR, and custom codecs.
 [Multi-tenancy and sharing](docs/src/multitenancy.md) covers tenant isolation, shared models, and
 merge strategies. [Pyodide](docs/src/pyodide.md) covers building and loading transports in a browser.
 

@@ -625,10 +625,10 @@ window.runMermaid = runMermaid;</script>
 <span class="w">    </span><span class="sd">"""Register a custom wire codec under ``content_type``.</span>
 
 <span class="sd">    ``encode`` turns a JSON-able object (a protocol message or a model ``Value``) into wire bytes (or</span>
-<span class="sd">    a str); ``decode`` is its inverse. Once registered, ``content_type`` works anywhere a codec name</span>
-<span class="sd">    is accepted — ``Client(codec=content_type)``, a ``?codec=`` query param, or ``encode_as`` /</span>
+<span class="sd">    a str); ``decode`` is its inverse. Once registered, use ``content_type`` with WebSocket</span>
+<span class="sd">    connections (``Client(codec=content_type)`` or a ``?codec=`` query param), ``encode_as``, or</span>
 <span class="sd">    ``decode_as``. Register a matching implementation in every binding that needs it (the JS binding</span>
-<span class="sd">    has its own ``registerCodec``). The built-in ``json`` / ``msgpack`` codecs cannot be overridden.</span>
+<span class="sd">    has its own ``registerCodec``). The built-in ``json``, ``msgpack``, and ``cbor`` codecs cannot be overridden.</span>
 <span class="sd">    """</span>
     <span class="k">if</span> <span class="n">content_type</span> <span class="ow">in</span> <span class="n">_BUILTIN</span><span class="p">:</span>
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">"cannot override built-in codec: </span><span class="si">{</span><span class="n">content_type</span><span class="si">}</span><span class="s2">"</span><span class="p">)</span>

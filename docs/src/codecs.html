@@ -177,8 +177,9 @@
       <div class="fd-prose">
   <section class="tex2jax_ignore mathjax_ignore" id="how-to-use-codecs">
 <h1>How to use codecs<a class="headerlink" href="#how-to-use-codecs" title="Link to this heading">¶</a></h1>
-<p>This guide shows you how to encode values and protocol messages as JSON, MessagePack, or a registered
-custom format.</p>
+<p>This guide shows you how to encode values and protocol messages as JSON, MessagePack, CBOR, or a
+registered custom format. Codecs select the wire encoding independently of the
+<a class="reference internal" href="bridges.html"><span class="std std-doc">model type</span></a>.</p>
 <section id="encode-a-model-value">
 <h2>Encode a model value<a class="headerlink" href="#encode-a-model-value" title="Link to this heading">¶</a></h2>
 <p><code class="docutils literal notranslate"><span class="pre">encode_as</span></code> and <code class="docutils literal notranslate"><span class="pre">decode_as</span></code> operate on a JSON string containing a core <code class="docutils literal notranslate"><span class="pre">Value</span></code>.</p>
@@ -198,28 +199,39 @@ custom format.</p>
 </pre></div>
 </div>
 <p><code class="docutils literal notranslate"><span class="pre">transports.encode(value_json)</span></code> and <code class="docutils literal notranslate"><span class="pre">transports.decode(bytes)</span></code> are JSON-codec shortcuts for model
-values.</p>
+values. Use <code class="docutils literal notranslate"><span class="pre">application/cbor</span></code> for CBOR:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">blob</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">encode_as</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s2">"application/cbor"</span><span class="p">)</span>
+<span class="n">restored</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">transports</span><span class="o">.</span><span class="n">decode_as</span><span class="p">(</span><span class="n">blob</span><span class="p">,</span> <span class="s2">"application/cbor"</span><span class="p">))</span>
+<span class="k">assert</span> <span class="n">restored</span> <span class="o">==</span> <span class="n">value</span>
+</pre></div>
+</div>
 </section>
 <section id="select-a-connection-codec">
 <h2>Select a connection codec<a class="headerlink" href="#select-a-connection-codec" title="Link to this heading">¶</a></h2>
-<p>Use JSON when you want readable text frames. Use MessagePack when you want compact binary frames.</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"msgpack"</span><span class="p">)</span>
+<p>Use JSON when you want readable text frames. Use MessagePack or CBOR for binary frames.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"cbor"</span><span class="p">)</span>
 <span class="k">await</span> <span class="n">client</span><span class="o">.</span><span class="n">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">)</span>
 </pre></div>
 </div>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"msgpack"</span><span class="p">);</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"cbor"</span><span class="p">);</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">ws</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="nx">client</span><span class="p">.</span><span class="nx">connect</span><span class="p">(</span><span class="s2">"ws://127.0.0.1:8000/ws"</span><span class="p">);</span>
 </pre></div>
 </div>
-<p>The server stores the codec per connection. JSON and MessagePack clients can connect to the same
-server, send edits, and receive frames encoded for their own connection.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">codec=&quot;json&quot;</span></code> or <code class="docutils literal notranslate"><span class="pre">codec=&quot;msgpack&quot;</span></code> in Python, or <code class="docutils literal notranslate"><span class="pre">new</span> <span class="pre">Client(&quot;json&quot;)</span></code> or <code class="docutils literal notranslate"><span class="pre">new</span> <span class="pre">Client(&quot;msgpack&quot;)</span></code>
+in JavaScript, to select the other built-in formats. The server stores the codec per connection.
+JSON, MessagePack, and CBOR clients can connect to the same WebSocket server, send edits, and receive
+frames encoded for their own connection. See the <a class="reference internal" href="protocol-reference.html#built-in-codecs"><span class="std std-ref">protocol reference</span></a>
+for other connection adapters’ codec restrictions.</p>
 </section>
 <section id="convert-whole-protocol-messages">
 <h2>Convert whole protocol messages<a class="headerlink" href="#convert-whole-protocol-messages" title="Link to this heading">¶</a></h2>
-<p>Use <code class="docutils literal notranslate"><span class="pre">json_to_msgpack</span></code> and <code class="docutils literal notranslate"><span class="pre">msgpack_to_json</span></code> for whole snapshot or patch messages.</p>
+<p>Use <code class="docutils literal notranslate"><span class="pre">json_to_msgpack</span></code> and <code class="docutils literal notranslate"><span class="pre">msgpack_to_json</span></code>, or <code class="docutils literal notranslate"><span class="pre">json_to_cbor</span></code> and <code class="docutils literal notranslate"><span class="pre">cbor_to_json</span></code>, for snapshot or patch messages.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">msg</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">protocol</span><span class="o">.</span><span class="n">snapshot_msg</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">"Device"</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">value</span><span class="p">)</span>
 <span class="n">wire</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">json_to_msgpack</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
 <span class="n">round_trip</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">msgpack_to_json</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
+
+<span class="n">wire</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">json_to_cbor</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+<span class="n">round_trip</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">cbor_to_json</span><span class="p">(</span><span class="n">wire</span><span class="p">)</span>
 </pre></div>
 </div>
 </section>
@@ -240,17 +252,18 @@ JSON-able object.</p>
 <span class="n">transports</span><span class="o">.</span><span class="n">register_codec</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">,</span> <span class="n">encode_zlib</span><span class="p">,</span> <span class="n">decode_zlib</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Once registered, the content type works wherever a codec name is accepted:</p>
+<p>Use the registered content type with a WebSocket client or <code class="docutils literal notranslate"><span class="pre">encode_as</span></code> / <code class="docutils literal notranslate"><span class="pre">decode_as</span></code>:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">client</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">Client</span><span class="p">(</span><span class="n">codec</span><span class="o">=</span><span class="s2">"application/x-json-zlib"</span><span class="p">)</span>
 <span class="n">blob</span> <span class="o">=</span> <span class="n">transports</span><span class="o">.</span><span class="n">encode_as</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">value</span><span class="p">),</span> <span class="s2">"application/x-json-zlib"</span><span class="p">)</span>
 </pre></div>
 </div>
-<p>Register the same content type on every process that needs to read or write it. Built-in JSON and
-MessagePack names cannot be overridden.</p>
+<p>Register matching encoder and decoder implementations under the same content type in each Python
+or JavaScript process that uses it. Registration is local to that process. Built-in JSON,
+MessagePack, and CBOR names cannot be overridden.</p>
 </section>
 <section id="register-a-custom-javascript-codec">
 <h2>Register a custom JavaScript codec<a class="headerlink" href="#register-a-custom-javascript-codec" title="Link to this heading">¶</a></h2>
-<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">registerCodec</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"1kbgz/transports"</span><span class="p">;</span>
+<div class="highlight-ts notranslate"><div class="highlight"><pre><span></span><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">Client</span><span class="p">,</span><span class="w"> </span><span class="nx">registerCodec</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">"@1kbgz/transports"</span><span class="p">;</span>
 
 <span class="nx">registerCodec</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">,</span><span class="w"> </span><span class="nx">encodeZlib</span><span class="p">,</span><span class="w"> </span><span class="nx">decodeZlib</span><span class="p">);</span>
 <span class="kd">const</span><span class="w"> </span><span class="nx">client</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="ow">new</span><span class="w"> </span><span class="nx">Client</span><span class="p">(</span><span class="s2">"application/x-json-zlib"</span><span class="p">);</span>

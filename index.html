@@ -191,7 +191,8 @@
 <a class="reference external" href="https://jcristharif.com/msgspec/">msgspec</a> struct. A Python process hosts it and mutates it
 normally, and transports sends only the patch needed to update a remote mirror. The same Rust core
 drives Python (PyO3) and JavaScript (wasm), so both sides share the same <code class="docutils literal notranslate"><span class="pre">Value</span></code> type, diff, patch
-application, and codecs.</p>
+application, and codecs. Models and patches can be encoded as JSON, MessagePack, CBOR, or a
+user-registered <a class="reference internal" href="docs/src/codecs.html#register-a-custom-python-codec"><span class="std std-ref">custom codec</span></a>.</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">transports</span>
 <span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
 
@@ -228,7 +229,7 @@ server/client protocol.</p>
 <h2>How-to guides<a class="headerlink" href="#how-to-guides" title="Link to this heading">¶</a></h2>
 <p><a class="reference internal" href="docs/src/bridges.html"><span class="std std-doc">Model bridges</span></a> covers pydantic, dataclasses, msgspec, schemas, and plain
 JavaScript objects. <a class="reference internal" href="docs/src/connections.html"><span class="std std-doc">Connections</span></a> covers WebSocket, SSE, Jupyter comm, and
-anywidget adapters. <a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> covers JSON, MessagePack, and custom codecs.
+anywidget adapters. <a class="reference internal" href="docs/src/codecs.html"><span class="std std-doc">Codecs</span></a> covers JSON, MessagePack, CBOR, and custom codecs.
 <a class="reference internal" href="docs/src/multitenancy.html"><span class="std std-doc">Multi-tenancy and sharing</span></a> covers tenant isolation, shared models, and
 merge strategies. <a class="reference internal" href="docs/src/pyodide.html"><span class="std std-doc">Pyodide</span></a> covers building and loading transports in a browser.</p>
 </section>
