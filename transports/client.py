@@ -16,7 +16,8 @@ import sys
 import urllib.parse
 import uuid
 from collections.abc import Callable
-from typing import Any
+from importlib import import_module
+from typing import Any, cast
 
 from . import protocol
 from ._bridge import M, _value_of, from_value
@@ -649,7 +650,7 @@ class Client:
 
         from pyodide.ffi import create_proxy  # ty: ignore[import-not-found]
 
-        from js import WebSocket  # ty: ignore[import-not-found]  # browser global via the Pyodide FFI
+        WebSocket = cast(Any, import_module("js")).WebSocket  # browser global via the Pyodide FFI
 
         ws = WebSocket.new(self._connect_url(url))
         ws.binaryType = "arraybuffer"
@@ -807,7 +808,7 @@ class Client:
 
         from pyodide.ffi import create_proxy  # ty: ignore[import-not-found]
 
-        from js import EventSource  # ty: ignore[import-not-found]  # browser global via the Pyodide FFI
+        EventSource = cast(Any, import_module("js")).EventSource  # browser global via the Pyodide FFI
 
         source = EventSource.new(url)
         closed: asyncio.Future = asyncio.get_running_loop().create_future()
